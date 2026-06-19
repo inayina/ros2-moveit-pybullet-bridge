@@ -1,0 +1,22 @@
+dist_monitor:
+  ros__parameters:
+    window_duration_sec: 5.0
+    update_frequency_hz: 10.0
+    kl_threshold_mean: 0.15
+    mmd_threshold: 0.05
+    mmd_permutation_count: 100
+    mmd_gamma: 1.0
+    use_kl: true
+    use_mmd: true
+    min_samples: 50
+
+thresholds:
+  kl_threshold_mean: 0.15
+  mmd_threshold: 0.05
+  mmd_p_value_alpha: 0.05
+
+calibration:
+  baseline_kl_p99: null
+  baseline_mmd_p99: null
+  calibration_date: null
+  calibration_scenario: "SC-01"

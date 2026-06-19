@@ -1,0 +1,6 @@
+string parameter_name
+float64 delta_percent
+float64 duration_sec
+---
+bool success
+string message

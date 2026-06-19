@@ -1,0 +1,7 @@
+std_msgs/Header header
+string experiment_id
+string scenario_id
+int32 random_seed
+float64 randomization_strength
+string operator_note
+string git_commit_hash

@@ -1,0 +1,7 @@
+string experiment_id
+string format
+string output_path
+---
+bool success
+string file_path
+string message

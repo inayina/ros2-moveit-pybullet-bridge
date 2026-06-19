@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<robot name="planar_2dof_arm">
+  <group name="manipulator">
+    <chain base_link="base_link" tip_link="tool0"/>
+  </group>
+  <group_state name="home" group="manipulator">
+    <joint name="joint1" value="0.0"/>
+    <joint name="joint2" value="0.0"/>
+  </group_state>
+  <disable_collisions link1="base_link" link2="link1" reason="Adjacent"/>
+  <disable_collisions link1="link1" link2="link2" reason="Adjacent"/>
+</robot>

@@ -1,0 +1,16 @@
+std_msgs/Header header
+int32 random_seed
+float64 randomization_strength
+
+float64 joint_damping_min
+float64 joint_damping_max
+float64 joint_friction_min
+float64 joint_friction_max
+float64 motor_strength_min
+float64 motor_strength_max
+float64 position_noise_std
+float64 velocity_noise_std
+float64 time_delay_min_ms
+float64 time_delay_max_ms
+float64 payload_mass_min
+float64 payload_mass_max

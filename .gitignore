@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# ROS 2
+install/
+log/
+*.bag
+*.db3
+
+# Frontend
+hoc_console/frontend/node_modules/
+hoc_console/frontend/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store

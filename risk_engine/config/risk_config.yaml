@@ -1,0 +1,15 @@
+risk_engine:
+  ros__parameters:
+    weights:
+      distribution_shift: 0.35
+      tracking_error: 0.25
+      dynamics_anomaly: 0.20
+      comm_health: 0.10
+      planning_failure: 0.10
+    level_thresholds: [0.25, 0.50, 0.75]
+    tracking_rmse_threshold: 0.05
+    torque_saturation_ratio: 0.9
+    comm_latency_threshold_ms: 100.0
+    planning_failure_rate_threshold: 0.1
+    alert_cooldown_sec: 2.0
+    auto_e_stop_on_r3: true

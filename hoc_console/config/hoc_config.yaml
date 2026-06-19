@@ -1,0 +1,7 @@
+hoc_server:
+  ros__parameters:
+    websocket_port: 8765
+    http_port: 8080
+    push_frequency_hz: 5.0
+    rosbag_output_dir: "~/ros2_ws/bags"
+    enable_cors: true

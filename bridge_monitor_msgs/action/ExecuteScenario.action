@@ -1,0 +1,15 @@
+string scenario_id
+int32 random_seed
+float64 randomization_strength
+bool record_bag
+---
+bool success
+string experiment_id
+DistributionMetrics final_metrics
+RiskStatus final_risk
+string message
+---
+float64 progress
+string current_phase
+RiskStatus current_risk
+DistributionMetrics current_metrics

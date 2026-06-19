@@ -1,0 +1,17 @@
+pybullet_bridge:
+  ros__parameters:
+    urdf_path: ""
+    sim_mode: "DIRECT"
+    physics_frequency: 240.0
+    publish_frequency: 100.0
+    enable_dual_source: false
+    random_seed: 42
+    randomization_strength: 0.5
+    watchdog_timeout_ms: 5000
+    joint_damping_range: [0.0, 0.5]
+    joint_friction_range: [0.0, 0.3]
+    motor_strength_range: [0.85, 1.15]
+    position_noise_std: 0.01
+    velocity_noise_std: 0.05
+    time_delay_range_ms: [10.0, 50.0]
+    payload_mass_range: [0.0, 0.5]
