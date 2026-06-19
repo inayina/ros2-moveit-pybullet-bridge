@@ -1,5 +1,5 @@
-import { DownloadOutlined, ExperimentOutlined, PlayCircleOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import { Button, InputNumber, Select, Slider, Space, message } from 'antd';
+import { DownloadOutlined, ExperimentOutlined, PauseCircleOutlined, PlayCircleOutlined, UploadOutlined, VerticalAlignBottomOutlined, VideoCameraOutlined } from '@ant-design/icons';
+import { Button, InputNumber, Progress, Select, Slider, Space, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 
@@ -16,6 +16,7 @@ interface ExperimentControlProps {
     success: boolean;
     message?: string;
     file_path?: string;
+    bag_path?: string;
   }>;
   dashboardRef: React.RefObject<HTMLDivElement>;
 }
@@ -42,6 +43,7 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
   const [loading, setLoading] = useState<string | null>(null);
   const recording = useDashboardStore((s) => s.recording);
   const bagPath = useDashboardStore((s) => s.bagPath);
+  const experiment = useDashboardStore((s) => s.experiment);
   const setRecording = useDashboardStore((s) => s.setRecording);
 
   const run = async (action: string, params: Record<string, unknown> = {}) => {
@@ -59,6 +61,18 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
   return (
     <div className="panel panel--wide experiment-control">
       <h3>实验控制</h3>
+      <div className={`experiment-progress-slot ${experiment ? '' : 'experiment-progress-slot--empty'}`}>
+        {experiment && (
+          <>
+            <Space wrap style={{ marginBottom: 8 }}>
+              <Tag color="blue">{experiment.scenario_id}</Tag>
+              <span>{experiment.current_phase}</span>
+              <span>{Math.round(experiment.progress * 100)}%</span>
+            </Space>
+            <Progress percent={Math.round(experiment.progress * 100)} size="small" showInfo={false} />
+          </>
+        )}
+      </div>
       <Space wrap size="middle" align="center">
         <span>场景</span>
         <Select
@@ -96,6 +110,13 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
           开始实验
         </Button>
         <Button
+          icon={<PauseCircleOutlined />}
+          loading={loading === 'pause'}
+          onClick={() => run('pause')}
+        >
+          暂停仿真
+        </Button>
+        <Button
           icon={<VideoCameraOutlined />}
           type={recording ? 'primary' : 'default'}
           danger={recording}
@@ -106,7 +127,9 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
               if (res.success) setRecording(false, bagPath);
             } else {
               const res = await run('start_recording');
-              if (res.success) setRecording(true);
+              if (res.success) {
+                setRecording(true, String(res.bag_path ?? ''));
+              }
             }
           }}
         >
@@ -124,6 +147,20 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
           }
         >
           注入偏移
+        </Button>
+        <Button
+          icon={<VerticalAlignBottomOutlined />}
+          loading={loading === 'start_pick'}
+          onClick={() => run('start_pick')}
+        >
+          Pick
+        </Button>
+        <Button
+          icon={<UploadOutlined />}
+          loading={loading === 'start_place'}
+          onClick={() => run('start_place')}
+        >
+          Place
         </Button>
         <Button
           icon={<DownloadOutlined />}

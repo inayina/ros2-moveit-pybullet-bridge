@@ -16,3 +16,7 @@ pybullet_bridge:
     motor_strength_range: [0.85, 1.15]
     time_delay_range_ms: [0.0, 50.0]
     payload_mass_range: [0.0, 0.5]
+    enable_camera: true
+    camera_fps: 12.0
+    camera_width: 640
+    camera_height: 480

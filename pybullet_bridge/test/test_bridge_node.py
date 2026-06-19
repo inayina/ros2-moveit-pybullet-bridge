@@ -9,6 +9,7 @@ import time
 import pytest
 import rclpy
 from bridge_monitor_msgs.msg import SimRealError
+from bridge_monitor_msgs.msg import RiskStatus
 from builtin_interfaces.msg import Duration
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
@@ -162,3 +163,49 @@ def test_dual_source_publishes_divergent_states_and_error(dual_bridge_stack):
         for s, r in zip(observer.sim_states[-1].position, observer.real_states[-1].position)
     )
     assert max_q_gap > 0.0 or max(abs(e) for e in observer.errors[-1].q_error) > 0.0
+
+
+class _RiskPublisher(Node):
+    def __init__(self) -> None:
+        super().__init__('test_risk_publisher')
+        self.pub = self.create_publisher(RiskStatus, '/risk/status', 10)
+
+    def publish_e_stop(self, active: bool) -> None:
+        deadline = time.time() + 2.0
+        while time.time() < deadline and self.pub.get_subscription_count() == 0:
+            time.sleep(0.05)
+        msg = RiskStatus()
+        msg.e_stop_active = active
+        msg.level = 3 if active else 0
+        self.pub.publish(msg)
+
+
+def test_bridge_honors_risk_e_stop(bridge_stack):
+    bridge, _publisher, observer, _executor, _thread = bridge_stack
+    risk_pub = _RiskPublisher()
+    risk_executor = SingleThreadedExecutor()
+    risk_executor.add_node(risk_pub)
+    risk_thread = threading.Thread(target=risk_executor.spin, daemon=True)
+    risk_thread.start()
+
+    try:
+        risk_pub.publish_e_stop(True)
+        deadline = time.time() + 3.0
+        while time.time() < deadline and not bridge._e_stop:  # noqa: SLF001
+            time.sleep(0.05)
+        assert bridge._e_stop is True  # noqa: SLF001
+
+        deadline = time.time() + 3.0
+        while time.time() < deadline and not any(s.data == 'E_STOP' for s in observer.system_states):
+            time.sleep(0.05)
+        assert any(s.data == 'E_STOP' for s in observer.system_states)
+
+        risk_pub.publish_e_stop(False)
+        deadline = time.time() + 3.0
+        while time.time() < deadline and bridge._e_stop:  # noqa: SLF001
+            time.sleep(0.05)
+        assert bridge._e_stop is False  # noqa: SLF001
+    finally:
+        risk_executor.shutdown()
+        risk_thread.join(timeout=2.0)
+        risk_pub.destroy_node()

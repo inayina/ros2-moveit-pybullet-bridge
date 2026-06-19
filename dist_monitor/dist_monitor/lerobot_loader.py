@@ -8,6 +8,8 @@ from pathlib import Path
 
 import numpy as np
 
+from dist_monitor.joint_names import normalize_joint_names
+
 
 @dataclass
 class LeRobotTrajectory:
@@ -99,6 +101,15 @@ def _infer_state_keys(features: dict) -> tuple[str | None, str | None]:
     return position_key, velocity_key
 
 
+def _joint_names_from_features(features: dict, position_key: str | None, dim: int) -> list[str]:
+    if position_key and position_key in features:
+        feat = features[position_key]
+        raw_names = feat.get('names')
+        if raw_names:
+            return normalize_joint_names([str(name) for name in raw_names])
+    return normalize_joint_names([f'joint_{index}' for index in range(dim)])
+
+
 def load_lerobot_dataset(
     dataset_path: str | Path,
     episode_indices: list[int] | None = None,
@@ -123,7 +134,9 @@ def load_lerobot_dataset(
         if position_key and position_key in features:
             shape = features[position_key].get('shape', [])
             if shape:
-                joint_names = [f'joint_{i + 1}' for i in range(int(shape[0]))]
+                joint_names = _joint_names_from_features(
+                    features, position_key, int(shape[0]),
+                )
 
     parquet_files = _discover_parquet_files(root)
     if not parquet_files:
@@ -214,7 +227,9 @@ def load_lerobot_dataset(
     velocities = np.vstack(velocities_list)
 
     if not joint_names:
-        joint_names = [f'joint_{i + 1}' for i in range(positions.shape[1])]
+        joint_names = normalize_joint_names(
+            [f'joint_{index}' for index in range(positions.shape[1])],
+        )
 
     return LeRobotTrajectory(
         timestamps=timestamps,

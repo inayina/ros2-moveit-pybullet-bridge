@@ -3,6 +3,15 @@ export interface RosTimestamp {
   nanosec: number;
 }
 
+export interface ExperimentProgressPayload {
+  experiment_id: string;
+  scenario_id: string;
+  progress: number;
+  current_phase: string;
+  current_risk?: RiskStatusPayload;
+  current_metrics?: DistributionMetricsPayload;
+}
+
 export interface RiskAttribution {
   dimension: string;
   raw_score: number;
@@ -26,12 +35,26 @@ export interface DistributionMetricsPayload {
   joint_names: string[];
   kl_divergence_per_joint: number[];
   kl_divergence_mean: number;
+  wasserstein_per_joint: number[];
+  wasserstein_mean: number;
+  w1_threshold: number;
+  shift_detected_w1: boolean;
   mmd_statistic: number;
   mmd_p_value: number;
   mmd_threshold: number;
   window_duration_sec: number;
   sample_count_sim: number;
   sample_count_real: number;
+  sim_position_min_per_joint: number[];
+  sim_position_q1_per_joint: number[];
+  sim_position_median_per_joint: number[];
+  sim_position_q3_per_joint: number[];
+  sim_position_max_per_joint: number[];
+  real_position_min_per_joint: number[];
+  real_position_q1_per_joint: number[];
+  real_position_median_per_joint: number[];
+  real_position_q3_per_joint: number[];
+  real_position_max_per_joint: number[];
   shift_detected: boolean;
   detection_method: string;
 }
@@ -68,6 +91,7 @@ export interface AlertEvent {
 export interface MetricsHistoryPoint {
   t: number;
   kl_mean: number;
+  w1_mean: number;
   mmd_stat: number;
 }
 

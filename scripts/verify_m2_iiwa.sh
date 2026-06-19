@@ -5,19 +5,12 @@ set -eo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-export PATH="/usr/bin:/bin:/opt/ros/jazzy/bin:${PATH}"
-unset CONDA_PREFIX CONDA_DEFAULT_ENV VIRTUAL_ENV
-export ROS_LOG_DIR="${ROOT}/.ros_log"
-mkdir -p "${ROS_LOG_DIR}"
-
-# shellcheck source=/dev/null
-source "$ROOT/setup.sh"
+# shellcheck source=verify_env.sh
+source "${ROOT}/scripts/verify_env.sh"
+verify_env_init "${ROOT}"
 
 echo "==> 1/4 前置检查"
-if ! ros2 pkg prefix moveit_config &>/dev/null; then
-  echo "[FAIL] moveit_config 未找到，请先 colcon build moveit_config"
-  exit 1
-fi
+verify_env_require_pkg moveit_config
 
 echo "==> 2/4 关节一致性"
 python3 scripts/check_iiwa_joint_consistency.py

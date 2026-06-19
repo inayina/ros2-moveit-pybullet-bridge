@@ -10,6 +10,7 @@ import rclpy
 from bridge_monitor_msgs.msg import DistributionMetrics, RiskStatus
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import JointState
 
 from risk_engine.risk_node import RiskEngineNode
@@ -21,7 +22,7 @@ class _MonitorFeed(Node):
         self.metrics_pub = self.create_publisher(
             DistributionMetrics, '/monitor/distribution_metrics', 10)
         self.error_pub = self.create_publisher(
-            JointState, '/monitor/tracking_error', 10)
+            JointState, '/monitor/tracking_error', qos_profile_sensor_data)
 
     def publish_shifted_metrics(self) -> None:
         metrics = DistributionMetrics()

@@ -47,7 +47,7 @@ def render_html_report(
     table {{ border-collapse: collapse; width: 100%; margin: 12px 0; }}
     th, td {{ border: 1px solid #434343; padding: 8px; text-align: left; }}
     th {{ background: #1f1f1f; }}
-    .metric-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
+    .metric-grid {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }}
     .metric-card {{ background: #1f1f1f; padding: 16px; border-radius: 8px; }}
     .metric-value {{ font-size: 24px; font-weight: bold; color: #95de64; }}
   </style>
@@ -70,6 +70,7 @@ def render_html_report(
     <div class="metric-card"><div>Max Risk</div><div class="metric-value">R{summary.get('max_risk_level', 0)}</div></div>
     <div class="metric-card"><div>Max Score</div><div class="metric-value">{summary.get('max_composite_score', 0):.3f}</div></div>
     <div class="metric-card"><div>Mean KL</div><div class="metric-value">{summary.get('mean_kl', 0):.4f}</div></div>
+    <div class="metric-card"><div>Mean W1</div><div class="metric-value">{summary.get('mean_w1', 0):.4f}</div></div>
     <div class="metric-card"><div>Mean MMD</div><div class="metric-value">{summary.get('mean_mmd', 0):.4f}</div></div>
   </div>
   <p>Shift detected: {summary.get('shift_detected_count', 0)} / ratio {summary.get('shift_detected_ratio', 0):.2%}</p>
@@ -85,8 +86,8 @@ def render_html_report(
 
   <h2>Metrics Timeline (last 50)</h2>
   <table>
-    <tr><th>t (s)</th><th>KL mean</th><th>MMD</th><th>Shift</th></tr>
-    {_table_rows(metrics_timeline, ['t', 'kl_mean', 'mmd_stat', 'shift_detected'])}
+    <tr><th>t (s)</th><th>KL mean</th><th>W1 mean</th><th>MMD</th><th>Shift</th></tr>
+    {_table_rows(metrics_timeline, ['t', 'kl_mean', 'w1_mean', 'mmd_stat', 'shift_detected'])}
   </table>
 
   <h2>Latest Snapshot</h2>

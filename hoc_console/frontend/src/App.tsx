@@ -1,10 +1,11 @@
-import { ConfigProvider, Layout, Space, Button, theme } from 'antd';
+import { ConfigProvider, Layout, Space, Button, theme, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, useRef } from 'react';
 import { AlertTimeline } from './components/AlertTimeline';
 import { DistributionPanel } from './components/DistributionPanel';
 import { EStopButton } from './components/EStopButton';
 import { ExperimentControl } from './components/ExperimentControl';
+import { RobotCameraPanel } from './components/RobotCameraPanel';
 import { R3Modal } from './components/R3Modal';
 import { RiskBanner } from './components/RiskBanner';
 import { RiskRadar } from './components/RiskRadar';
@@ -21,6 +22,23 @@ function App() {
   const { sendCommand } = useWebSocket();
   const risk = useDashboardStore((s) => s.risk);
   const level = risk?.level ?? 0;
+
+  const handleResume = async () => {
+    if (level >= 3) {
+      message.warning('请先确认 R3 告警后再恢复');
+      return;
+    }
+    const res = await sendCommand('resume');
+    if (res.success) {
+      message.success(res.message ?? '系统已恢复');
+    } else {
+      message.error(res.message ?? '恢复失败');
+    }
+  };
+
+  useEffect(() => {
+    document.documentElement.dataset.riskLevel = String(level);
+  }, [level]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -42,20 +60,26 @@ function App() {
         token: { colorPrimary: '#1677ff', borderRadius: 8 },
       }}
     >
-      <Layout className={`app-shell app-shell--r${level}`}>
+      <Layout className="app-shell">
         <div ref={dashboardRef} className="dashboard-root">
           <RiskBanner />
           <Content className="dashboard-content">
             <Space className="toolbar" wrap>
               <EStopButton onEStop={() => sendCommand('e_stop')} />
-              <Button onClick={() => sendCommand('resume')}>恢复</Button>
+              <Button onClick={() => sendCommand('pause')}>暂停</Button>
+              <Button onClick={handleResume}>恢复</Button>
             </Space>
-            <div className="dashboard-grid dashboard-grid--3">
-              <RiskRadar />
-              <DistributionPanel />
-              <TrackingChart />
+            <div className="dashboard-grid dashboard-grid--main">
+              <RobotCameraPanel />
+              <div className="dashboard-stack">
+                <div className="dashboard-grid dashboard-grid--3">
+                  <RiskRadar />
+                  <DistributionPanel />
+                  <TrackingChart />
+                </div>
+                <TrendChart />
+              </div>
             </div>
-            <TrendChart />
             <ExperimentControl sendCommand={sendCommand} dashboardRef={dashboardRef} />
             <AlertTimeline />
           </Content>

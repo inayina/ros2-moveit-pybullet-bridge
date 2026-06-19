@@ -1,5 +1,5 @@
 import ReactECharts from 'echarts-for-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { DIMENSION_LABELS } from '../types/messages';
 
@@ -11,7 +11,7 @@ const AXES = [
   'planning_failure',
 ];
 
-export function RiskRadar() {
+export const RiskRadar = memo(function RiskRadar() {
   const risk = useDashboardStore((s) => s.risk);
   const riskHistory = useDashboardStore((s) => s.riskHistory);
 
@@ -28,50 +28,60 @@ export function RiskRadar() {
     return { current: scores, previous: prevScores };
   }, [risk, riskHistory]);
 
-  const option = {
-    backgroundColor: 'transparent',
-    tooltip: {},
-    legend: {
-      data: ['当前', '30s前'],
-      textStyle: { color: '#aaa' },
-      bottom: 0,
-    },
-    radar: {
-      indicator: AXES.map((dim) => ({
-        name: DIMENSION_LABELS[dim] ?? dim,
-        max: 1,
-      })),
-      splitArea: { areaStyle: { color: ['#1f1f1f', '#141414'] } },
-      axisName: { color: '#ccc' },
-    },
-    series: [
-      {
-        type: 'radar',
-        data: [
-          {
-            value: current,
-            name: '当前',
-            areaStyle: { color: 'rgba(105, 177, 255, 0.35)' },
-            lineStyle: { color: '#69b1ff' },
-          },
-          {
-            value: previous,
-            name: '30s前',
-            lineStyle: { type: 'dashed', color: '#8c8c8c' },
-            areaStyle: { opacity: 0 },
-          },
-        ],
+  const option = useMemo(
+    () => ({
+      backgroundColor: 'transparent',
+      animation: false,
+      tooltip: {},
+      legend: {
+        data: ['当前', '30s前'],
+        textStyle: { color: '#aaa' },
+        bottom: 0,
       },
-    ],
-  };
+      radar: {
+        indicator: AXES.map((dim) => ({
+          name: DIMENSION_LABELS[dim] ?? dim,
+          max: 1,
+        })),
+        splitArea: { areaStyle: { color: ['#1f1f1f', '#141414'] } },
+        axisName: { color: '#ccc' },
+      },
+      series: [
+        {
+          type: 'radar',
+          data: [
+            {
+              value: current,
+              name: '当前',
+              areaStyle: { color: 'rgba(105, 177, 255, 0.35)' },
+              lineStyle: { color: '#69b1ff' },
+            },
+            {
+              value: previous,
+              name: '30s前',
+              lineStyle: { type: 'dashed', color: '#8c8c8c' },
+              areaStyle: { opacity: 0 },
+            },
+          ],
+        },
+      ],
+    }),
+    [current, previous],
+  );
 
   return (
-    <div className="panel">
+    <div className="panel panel--chart">
       <h3>五维风险雷达</h3>
-      <ReactECharts option={option} style={{ height: 280 }} notMerge lazyUpdate />
+      <ReactECharts
+        option={option}
+        style={{ height: 280, width: '100%' }}
+        opts={{ renderer: 'canvas' }}
+        notMerge
+        lazyUpdate
+      />
       <p className="panel-caption">
         主因: {risk?.primary_driver ?? '—'} · {risk?.recommendation ?? '系统运行正常'}
       </p>
     </div>
   );
-}
+});

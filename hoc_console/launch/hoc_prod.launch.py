@@ -31,5 +31,5 @@ def generate_launch_description():
     return LaunchDescription([
         build_frontend,
         hoc_server,
-        LogInfo(msg='HOC production UI: http://localhost:8080 (WebSocket ws://localhost:8765)'),
+        LogInfo(msg='HOC production UI: http://<host>:8080 — WebSocket ws://<host>:8080/hoc-ws'),
     ])

@@ -13,3 +13,5 @@ risk_engine:
     planning_failure_rate_threshold: 0.1
     alert_cooldown_sec: 2.0
     auto_e_stop_on_r3: true
+    cancel_move_group_on_e_stop: true
+    move_group_action: /move_action

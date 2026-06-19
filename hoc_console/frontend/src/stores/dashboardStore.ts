@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   AlertEvent,
   DistributionMetricsPayload,
+  ExperimentProgressPayload,
   MetricsHistoryPoint,
   RiskHistoryPoint,
   RiskStatusPayload,
@@ -25,6 +26,8 @@ interface DashboardState {
   bagPath: string;
   r3ModalDismissed: boolean;
   sessionStart: number;
+  experiment: ExperimentProgressPayload | null;
+  cameraFrame: string | null;
   setConnected: (connected: boolean) => void;
   ingestRisk: (payload: RiskStatusPayload) => void;
   ingestMetrics: (payload: DistributionMetricsPayload) => void;
@@ -33,6 +36,8 @@ interface DashboardState {
   setRecording: (recording: boolean, bagPath?: string) => void;
   dismissR3Modal: () => void;
   resetR3Modal: () => void;
+  ingestExperimentProgress: (payload: ExperimentProgressPayload) => void;
+  setCameraFrame: (dataUrl: string | null) => void;
 }
 
 function computeTrend(history: RiskHistoryPoint[]): TrendDirection {
@@ -61,6 +66,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   bagPath: '',
   r3ModalDismissed: false,
   sessionStart: Date.now(),
+  experiment: null,
+  cameraFrame: null,
 
   setConnected: (connected) => set({ connected }),
 
@@ -86,6 +93,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     const point: MetricsHistoryPoint = {
       t,
       kl_mean: payload.kl_divergence_mean,
+      w1_mean: payload.wasserstein_mean,
       mmd_stat: payload.mmd_statistic,
     };
     const metricsHistory = [...get().metricsHistory, point].filter(
@@ -114,4 +122,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   dismissR3Modal: () => set({ r3ModalDismissed: true }),
 
   resetR3Modal: () => set({ r3ModalDismissed: false }),
+
+  ingestExperimentProgress: (payload) =>
+    set({ experiment: payload, lastMessageAt: Date.now() }),
+
+  setCameraFrame: (cameraFrame) => set({ cameraFrame }),
 }));

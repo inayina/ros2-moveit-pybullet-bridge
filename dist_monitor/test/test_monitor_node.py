@@ -107,6 +107,9 @@ def test_monitor_node_publishes_metrics(monitor_node):
     assert latest.joint_names == ['joint1', 'joint2']
     assert latest.sample_count_sim >= 10
     assert latest.sample_count_real >= 10
+    assert len(latest.sim_position_median_per_joint) == 2
+    assert len(latest.real_position_median_per_joint) == 2
+    assert latest.sim_position_max_per_joint[0] >= latest.sim_position_min_per_joint[0]
 
 
 def test_monitor_node_detects_shift(monitor_node):

@@ -15,5 +15,5 @@ profiles:
     role: "Portfolio / episode-data-lab / M4 calibration"
     dof: 7
     urdf: kuka_iiwa/model.urdf
-    episode_data_lab_export: >-
-      /home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export
+    # LeRobot export path: EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
+    # or set LEROBOT_EXPORT (see pybullet_bridge.integration_paths)

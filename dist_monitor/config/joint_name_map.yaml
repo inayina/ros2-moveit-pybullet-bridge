@@ -1,0 +1,28 @@
+# Canonical iiwa7 joint names (bridge URDF / MoveIt).
+# dist_monitor/joint_names.py applies legacy aliases at load time.
+#
+# Legacy LeRobot export aliases (episode-data-lab v0):
+#   joint_0 .. joint_6  ->  lbr_iiwa_joint_1 .. lbr_iiwa_joint_7
+#   joint_1 .. joint_7  ->  lbr_iiwa_joint_1 .. lbr_iiwa_joint_7  (loader fallback)
+
+canonical_iiwa_arm:
+  - lbr_iiwa_joint_1
+  - lbr_iiwa_joint_2
+  - lbr_iiwa_joint_3
+  - lbr_iiwa_joint_4
+  - lbr_iiwa_joint_5
+  - lbr_iiwa_joint_6
+  - lbr_iiwa_joint_7
+
+canonical_gripper:
+  - left_finger_joint
+  - right_finger_joint
+
+legacy_zero_indexed:
+  joint_0: lbr_iiwa_joint_1
+  joint_1: lbr_iiwa_joint_2
+  joint_2: lbr_iiwa_joint_3
+  joint_3: lbr_iiwa_joint_4
+  joint_4: lbr_iiwa_joint_5
+  joint_5: lbr_iiwa_joint_6
+  joint_6: lbr_iiwa_joint_7

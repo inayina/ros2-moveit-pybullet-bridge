@@ -14,6 +14,8 @@ from std_srvs.srv import Trigger
 from bridge_monitor_msgs.msg import DistributionMetrics
 
 from dist_monitor.lerobot_loader import LeRobotTrajectory, load_lerobot_dataset
+from dist_monitor.boxplot_stats import boxplot_per_joint
+from dist_monitor.joint_names import normalize_joint_names, reorder_joint_vector
 from dist_monitor.metrics_core import MetricsConfig, compute_distribution_metrics
 from dist_monitor.sliding_window import SlidingWindow
 from dist_monitor.time_aligner import TimeAligner
@@ -23,10 +25,20 @@ def _stamp_to_sec(msg) -> float:
     return float(msg.sec) + float(msg.nanosec) * 1e-9
 
 
-def _extract_full_state(msg: JointState) -> np.ndarray:
+def _extract_full_state(msg: JointState, joint_names: list[str] | None = None) -> np.ndarray:
     pos = np.asarray(msg.position, dtype=float)
+    if msg.name and joint_names:
+        pos = np.asarray(
+            reorder_joint_vector(list(msg.name), pos.tolist(), joint_names),
+            dtype=float,
+        )
     if msg.velocity:
         vel = np.asarray(msg.velocity, dtype=float)
+        if msg.name and joint_names:
+            vel = np.asarray(
+                reorder_joint_vector(list(msg.name), vel.tolist(), joint_names),
+                dtype=float,
+            )
     else:
         vel = np.zeros_like(pos)
     n = min(len(pos), len(vel))
@@ -42,12 +54,14 @@ class DistMonitorNode(Node):
         self.declare_parameter('window_duration_sec', 5.0)
         self.declare_parameter('update_frequency_hz', 10.0)
         self.declare_parameter('kl_threshold_mean', 0.15)
+        self.declare_parameter('w1_threshold_mean', 0.08)
         self.declare_parameter('mmd_threshold', 0.05)
         self.declare_parameter('mmd_p_value_alpha', 0.05)
         self.declare_parameter('mmd_permutation_count', 50)
         self.declare_parameter('mmd_max_samples', 100)
         self.declare_parameter('mmd_gamma', 0.0)
         self.declare_parameter('use_kl', True)
+        self.declare_parameter('use_w1', True)
         self.declare_parameter('use_mmd', True)
         self.declare_parameter('min_samples', 50)
         self.declare_parameter('align_tolerance_sec', 0.02)
@@ -105,15 +119,16 @@ class DistMonitorNode(Node):
             self._lerobot_origin = time.monotonic()
             self._joint_names = list(self._lerobot_traj.joint_names)
             self.get_logger().info(
-                f'Loaded LeRobot Real trajectory: {len(self._lerobot_traj.timestamps)} samples')
+                f'Loaded LeRobot Real trajectory: {len(self._lerobot_traj.timestamps)} samples, '
+                f'joints={self._joint_names}')
         except Exception as exc:
             self.get_logger().error(f'Failed to load LeRobot dataset: {exc}')
 
     def _on_sim(self, msg: JointState) -> None:
         if msg.name:
-            self._joint_names = list(msg.name)
+            self._joint_names = normalize_joint_names(list(msg.name))
         t = _stamp_to_sec(msg.header.stamp)
-        self._sim_window.push(t, _extract_full_state(msg))
+        self._sim_window.push(t, _extract_full_state(msg, self._joint_names or None))
 
         if self.get_parameter('real_source').value == 'lerobot' and self._lerobot_traj is not None:
             rel_t = t - (self._lerobot_origin or t)
@@ -125,17 +140,23 @@ class DistMonitorNode(Node):
 
     def _on_real(self, msg: JointState) -> None:
         t = _stamp_to_sec(msg.header.stamp)
-        self._real_window.push(t, _extract_full_state(msg))
+        if msg.name and self._joint_names:
+            self._joint_names = normalize_joint_names(list(msg.name))
+        self._real_window.push(
+            t, _extract_full_state(msg, self._joint_names or None),
+        )
 
     def _metrics_config(self) -> MetricsConfig:
         return MetricsConfig(
             kl_threshold_mean=self.get_parameter('kl_threshold_mean').value,
+            w1_threshold_mean=self.get_parameter('w1_threshold_mean').value,
             mmd_threshold=self.get_parameter('mmd_threshold').value,
             mmd_p_value_alpha=self.get_parameter('mmd_p_value_alpha').value,
             mmd_permutation_count=self.get_parameter('mmd_permutation_count').value,
             mmd_max_samples=self.get_parameter('mmd_max_samples').value,
             mmd_gamma=self.get_parameter('mmd_gamma').value,
             use_kl=self.get_parameter('use_kl').value,
+            use_w1=self.get_parameter('use_w1').value,
             use_mmd=self.get_parameter('use_mmd').value,
             min_samples=self.get_parameter('min_samples').value,
             align_tolerance_sec=self.get_parameter('align_tolerance_sec').value,
@@ -164,8 +185,10 @@ class DistMonitorNode(Node):
         metrics.sample_count_sim = self._sim_window.count()
         metrics.sample_count_real = self._real_window.count()
         metrics.mmd_threshold = self.get_parameter('mmd_threshold').value
+        metrics.w1_threshold = self.get_parameter('w1_threshold_mean').value
         metrics.detection_method = 'none'
         metrics.shift_detected = False
+        metrics.shift_detected_w1 = False
 
         min_samples = self.get_parameter('min_samples').value
         aligned_sim, aligned_real = self._aligner.align_windows(self._sim_window, self._real_window)
@@ -175,9 +198,26 @@ class DistMonitorNode(Node):
             return
 
         n_dof = aligned_sim.shape[1] // 2
-        errors = aligned_sim[:, :n_dof] - aligned_real[:, :n_dof]
+        sim_pos = aligned_sim[:, :n_dof]
+        real_pos = aligned_real[:, :n_dof]
+        errors = sim_pos - real_pos
         now_sec = _stamp_to_sec(metrics.header.stamp)
         self._maybe_collect_baseline(errors, now_sec)
+
+        (
+            metrics.sim_position_min_per_joint,
+            metrics.sim_position_q1_per_joint,
+            metrics.sim_position_median_per_joint,
+            metrics.sim_position_q3_per_joint,
+            metrics.sim_position_max_per_joint,
+        ) = boxplot_per_joint(sim_pos)
+        (
+            metrics.real_position_min_per_joint,
+            metrics.real_position_q1_per_joint,
+            metrics.real_position_median_per_joint,
+            metrics.real_position_q3_per_joint,
+            metrics.real_position_max_per_joint,
+        ) = boxplot_per_joint(real_pos)
 
         baseline = self._baseline_errors if self._baseline_ready else None
         result = compute_distribution_metrics(
@@ -191,9 +231,12 @@ class DistMonitorNode(Node):
 
         metrics.kl_divergence_per_joint = result.kl_per_joint
         metrics.kl_divergence_mean = result.kl_mean
+        metrics.wasserstein_per_joint = result.w1_per_joint
+        metrics.wasserstein_mean = result.w1_mean
         metrics.mmd_statistic = result.mmd_statistic
         metrics.mmd_p_value = result.mmd_p_value
         metrics.shift_detected = result.shift_detected if self._baseline_ready else False
+        metrics.shift_detected_w1 = result.shift_detected_w1 if self._baseline_ready else False
         metrics.detection_method = result.detection_method if self._baseline_ready else 'none'
 
         self._metrics_pub.publish(metrics)

@@ -1,0 +1,15 @@
+# Goal
+geometry_msgs/PoseStamped grasp_pose
+string end_effector_link          # default: tool0 / lbr_iiwa_link_7
+string planning_group             # default: manipulator
+float64 pre_grasp_offset_m        # retreat along approach axis before grasp
+float64 grasp_timeout_sec
+---
+# Result
+bool success
+string message
+trajectory_msgs/JointTrajectory executed_trajectory
+---
+# Feedback
+string phase                      # approach | grasp | lift
+float64 progress

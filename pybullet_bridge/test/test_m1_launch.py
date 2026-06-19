@@ -65,8 +65,8 @@ class TestM1Launch(unittest.TestCase):
             rclpy.shutdown()
 
     def test_joint_states_and_motion(self) -> None:
-        # joint_sweep_demo publishes after ~4s (1s timer + 3s delay)
-        time.sleep(12.0)
+        # joint_sweep_demo: 1s launch delay + 2s publish_delay + 4s trajectory
+        time.sleep(10.0)
 
         self.assertGreaterEqual(
             len(self.collector.samples), 2,

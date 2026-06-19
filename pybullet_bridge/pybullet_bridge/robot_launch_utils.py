@@ -7,8 +7,6 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
-from pybullet_bridge.robot_profiles import DEFAULT_CI_PROFILE, DEFAULT_PORTFOLIO_PROFILE
-
 
 def declare_robot_launch_arg(*, default_profile: str) -> DeclareLaunchArgument:
     return DeclareLaunchArgument(

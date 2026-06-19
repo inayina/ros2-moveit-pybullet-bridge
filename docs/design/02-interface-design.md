@@ -35,6 +35,12 @@ string[] joint_names
 float64[] kl_divergence_per_joint
 float64 kl_divergence_mean
 
+# Wasserstein-1（平移型分布偏移）
+float64[] wasserstein_per_joint
+float64 wasserstein_mean
+float64 w1_threshold
+bool shift_detected_w1
+
 # 多维 MMD
 float64 mmd_statistic
 float64 mmd_p_value
@@ -47,7 +53,7 @@ uint32 sample_count_real
 
 # 综合判定
 bool shift_detected
-string detection_method    # "kl" | "mmd" | "both"
+string detection_method    # "none" | "kl" | "w1" | "mmd" | "kl+w1" | ...
 ```
 
 #### `RiskAttribution.msg`
@@ -301,6 +307,20 @@ DistributionMetrics current_metrics
 |-----------|--------|--------|
 | `/hoc/execute_scenario` | `hoc_server` | HOC 前端 / CLI |
 
+### 5.3 自定义 Action：`Pick` / `Place`
+
+高层抓取/放置行为，由 `manipulation_actions` 组合 MoveIt2 `/move_action`（或 bridge 关节回退）。
+
+| Action 名 | 类型 | 提供者 | 客户端 |
+|-----------|------|--------|--------|
+| `/manipulation/pick` | `bridge_monitor_msgs/Pick` | `manipulation_actions` | HOC / CLI / Demo |
+| `/manipulation/place` | `bridge_monitor_msgs/Place` | `manipulation_actions` | HOC / CLI / Demo |
+
+**Pick 阶段**：`approach` → `grasp` → `lift`  
+**Place 阶段**：`approach` → `release` → `retreat`
+
+验收：`./scripts/verify_pick.sh`
+
 ---
 
 ## 6. 参数（ROS 2 Parameters）
@@ -337,10 +357,12 @@ dist_monitor:
     update_frequency_hz: 10.0
     joint_names: []                  # 空则自动从 joint_states 推断
     kl_threshold_mean: 0.15
+    w1_threshold_mean: 0.08
     mmd_threshold: 0.05
     mmd_permutation_count: 100
     mmd_gamma: 1.0                   # RBF 核带宽
     use_kl: true
+    use_w1: true
     use_mmd: true
     min_samples: 50
 ```
@@ -363,6 +385,8 @@ risk_engine:
     planning_failure_rate_threshold: 0.1
     alert_cooldown_sec: 2.0
     auto_e_stop_on_r3: true
+    cancel_move_group_on_e_stop: true
+    move_group_action: /move_action
 ```
 
 ### 6.4 `hoc_server`

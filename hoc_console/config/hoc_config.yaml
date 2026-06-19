@@ -7,3 +7,4 @@ hoc_server:
     report_output_dir: "~/ros2_ws/reports"
     serve_frontend: true
     frontend_dist_dir: ""
+    camera_http_port: 8766

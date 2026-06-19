@@ -30,6 +30,8 @@ def main() -> None:
             'shift_detected_ratio': 0.125,
             'mean_kl': 0.18,
             'max_kl': 0.91,
+            'mean_w1': 0.07,
+            'max_w1': 0.12,
             'mean_mmd': 0.04,
             'max_mmd': 0.08,
         },
@@ -39,9 +41,9 @@ def main() -> None:
             {'t': 58.4, 'level': 2, 'score': 0.58},
         ],
         metrics_timeline=[
-            {'t': 10.0, 'kl_mean': 0.08, 'mmd_stat': 0.02, 'shift_detected': False},
-            {'t': 45.0, 'kl_mean': 0.21, 'mmd_stat': 0.05, 'shift_detected': True},
-            {'t': 90.0, 'kl_mean': 0.35, 'mmd_stat': 0.07, 'shift_detected': True},
+            {'t': 10.0, 'kl_mean': 0.08, 'w1_mean': 0.04, 'mmd_stat': 0.02, 'shift_detected': False},
+            {'t': 45.0, 'kl_mean': 0.21, 'w1_mean': 0.09, 'mmd_stat': 0.05, 'shift_detected': True},
+            {'t': 90.0, 'kl_mean': 0.35, 'w1_mean': 0.11, 'mmd_stat': 0.07, 'shift_detected': True},
         ],
         alerts=[
             {
@@ -72,6 +74,7 @@ def main() -> None:
         latest_metrics={
             'joint_names': [f'iiwa_joint_{i}' for i in range(1, 8)],
             'kl_divergence_mean': 0.21,
+            'wasserstein_mean': 0.09,
             'mmd_statistic': 0.05,
             'shift_detected': True,
         },

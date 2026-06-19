@@ -6,11 +6,12 @@ import os
 import tempfile
 import time
 
+import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time as BuiltinTime
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import CompressedImage, JointState
 from std_msgs.msg import String
 from std_srvs.srv import SetBool, Trigger
 from trajectory_msgs.msg import JointTrajectory
@@ -18,6 +19,7 @@ from trajectory_msgs.msg import JointTrajectory
 from bridge_monitor_msgs.msg import (
     DomainRandomizationConfig,
     ExperimentMetadata,
+    RiskStatus,
     SimRealError,
 )
 from bridge_monitor_msgs.srv import InjectShift, SetRandomization
@@ -54,6 +56,10 @@ class PyBulletBridgeNode(Node):
         self.declare_parameter('motor_strength_range', [0.85, 1.15])
         self.declare_parameter('time_delay_range_ms', [0.0, 50.0])
         self.declare_parameter('payload_mass_range', [0.0, 0.5])
+        self.declare_parameter('enable_camera', True)
+        self.declare_parameter('camera_fps', 12.0)
+        self.declare_parameter('camera_width', 640)
+        self.declare_parameter('camera_height', 480)
 
         reliable_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
@@ -79,8 +85,18 @@ class PyBulletBridgeNode(Node):
         self._metadata_pub = self.create_publisher(
             ExperimentMetadata, '/bridge/experiment_metadata', reliable_qos)
 
+        self._enable_camera = self.get_parameter('enable_camera').value
+        self._camera_pub = None
+        if self._enable_camera:
+            self._camera_pub = self.create_publisher(
+                CompressedImage,
+                '/bridge/camera/image_compressed',
+                qos_profile_sensor_data,
+            )
+
         self.create_subscription(
             JointTrajectory, '/bridge/command', self._on_command, 10)
+        self.create_subscription(RiskStatus, '/risk/status', self._on_risk_status, 10)
 
         self.create_service(SetRandomization, '/bridge/set_randomization',
                             self._handle_set_randomization)
@@ -144,6 +160,14 @@ class PyBulletBridgeNode(Node):
         self._physics_timer = self.create_timer(1.0 / physics_hz, self._on_physics_step)
         self._publish_timer = self.create_timer(1.0 / pub_hz, self._on_publish)
         self._meta_timer = self.create_timer(1.0, self._publish_metadata)
+        if self._enable_camera and self._camera_pub is not None:
+            cam_hz = float(self.get_parameter('camera_fps').value)
+            self._camera_width = int(self.get_parameter('camera_width').value)
+            self._camera_height = int(self.get_parameter('camera_height').value)
+            self._camera_timer = self.create_timer(1.0 / cam_hz, self._on_camera_publish)
+            self._camera_warned = False
+        else:
+            self._camera_timer = None
 
         self._latest_sim_snapshot = self._sim.read_state() if self._pybullet_ok else None
         self._latest_real_snapshot = None
@@ -207,6 +231,15 @@ class PyBulletBridgeNode(Node):
             f'Trajectory received: joints={list(msg.joint_names)}, '
             f'points={len(msg.points)}')
 
+    def _on_risk_status(self, msg: RiskStatus) -> None:
+        if msg.e_stop_active and not self._e_stop:
+            self._e_stop = True
+            self._trajectory.clear()
+            self.get_logger().warn('E-stop active from /risk/status — physics halted')
+        elif not msg.e_stop_active and self._e_stop and not self._paused:
+            self._e_stop = False
+            self.get_logger().info('E-stop cleared from /risk/status — physics resumed')
+
     def _sim_time_sec(self) -> float:
         return time.monotonic() - self._sim_start_mono
 
@@ -250,6 +283,26 @@ class PyBulletBridgeNode(Node):
             )
         except Exception as exc:
             self.get_logger().error(f'physics step failed: {exc}')
+
+    def _on_camera_publish(self) -> None:
+        if not self._pybullet_ok or self._camera_pub is None:
+            return
+        jpeg = self._sim.capture_camera_jpeg(
+            width=self._camera_width,
+            height=self._camera_height,
+        )
+        if jpeg is None:
+            if not self._camera_warned:
+                self.get_logger().warn(
+                    'Camera capture disabled — install Pillow: '
+                    'python3 -m pip install pillow')
+                self._camera_warned = True
+            return
+        msg = CompressedImage()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.format = 'jpeg'
+        msg.data = jpeg
+        self._camera_pub.publish(msg)
 
     def _on_publish(self) -> None:
         stamp = self.get_clock().now().to_msg()
@@ -384,11 +437,19 @@ class PyBulletBridgeNode(Node):
         ])
 
         if self._real is not None:
+            damping_base = self.get_parameter('joint_damping_base').value
+            friction_base = self.get_parameter('joint_friction_base').value
+            damping_frac = self._perturb_fraction(
+                damping_base, cfg.joint_damping_min, cfg.joint_damping_max)
+            friction_frac = self._perturb_fraction(
+                friction_base, cfg.joint_friction_min, cfg.joint_friction_max)
             dr_cfg = DomainRandomizerConfig(
                 random_seed=cfg.random_seed,
                 randomization_strength=cfg.randomization_strength,
-                joint_damping_base=self.get_parameter('joint_damping_base').value,
-                joint_friction_base=self.get_parameter('joint_friction_base').value,
+                joint_damping_base=damping_base,
+                joint_friction_base=friction_base,
+                damping_perturb_fraction=damping_frac,
+                friction_perturb_fraction=friction_frac,
                 motor_strength_range=(cfg.motor_strength_min, cfg.motor_strength_max),
                 payload_mass_range=(cfg.payload_mass_min, cfg.payload_mass_max),
                 time_delay_range_ms=(cfg.time_delay_min_ms, cfg.time_delay_max_ms),
@@ -399,6 +460,15 @@ class PyBulletBridgeNode(Node):
         response.success = True
         response.message = 'Domain randomization updated and episode resampled.'
         return response
+
+    @staticmethod
+    def _perturb_fraction(base: float, min_val: float, max_val: float) -> float:
+        if base <= 0.0:
+            return 0.0
+        lo = min(min_val, max_val)
+        hi = max(min_val, max_val)
+        span = max(abs(lo - base), abs(hi - base))
+        return float(np.clip(span / base, 0.0, 1.0))
 
     def _handle_inject_shift(self, request, response):
         if self._real is None:

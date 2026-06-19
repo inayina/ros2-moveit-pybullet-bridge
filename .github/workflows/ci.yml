@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    container:
+      image: ros:jazzy-ros-base
+    env:
+      ROS_DISTRO: jazzy
+      ROS2_WS_ROOT: /ws
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            python3-pip \
+            python3-pytest \
+            ros-jazzy-robot-state-publisher \
+            ros-jazzy-launch-testing \
+            ros-jazzy-launch-testing-ros \
+            ros-jazzy-launch-testing-ament-cmake
+          rm -rf /var/lib/apt/lists/*
+
+      - name: Install Python dependencies
+        shell: bash
+        run: |
+          pip3 install --break-system-packages --no-cache-dir -r /github/workspace/requirements.txt
+
+      - name: Build workspace
+        shell: bash
+        run: |
+          mkdir -p /ws/src
+          ln -sfn /github/workspace /ws/src/ros2-moveit-pybullet-bridge
+          cd /ws
+          . /opt/ros/jazzy/setup.sh
+          colcon build \
+            --packages-select bridge_monitor_msgs pybullet_bridge dist_monitor risk_engine hoc_console manipulation_actions moveit_config \
+            --symlink-install
+
+      - name: Run tests
+        shell: bash
+        run: |
+          cd /github/workspace
+          ./scripts/run_tests.sh
+
+      - name: Generate milestone assets (smoke)
+        shell: bash
+        run: |
+          cd /github/workspace
+          python3 scripts/generate_milestone_assets.py
+          test -f docs/assets/m1-joint-sweep.gif
+          test -f docs/assets/m3-dual-source.gif
+          test -f docs/assets/m4-monitor-metrics.png

@@ -139,6 +139,22 @@ def generate_launch_description():
             parameters=move_group_params,
         ),
         TimerAction(
+            period=4.0,
+            actions=[
+                Node(
+                    package='manipulation_actions',
+                    executable='manipulation_node',
+                    name='manipulation_actions',
+                    output='screen',
+                    parameters=[{
+                        'use_moveit': True,
+                        'joint_names': iiwa_joints,
+                        'home_positions': iiwa_home,
+                    }],
+                ),
+            ],
+        ),
+        TimerAction(
             period=3.0,
             actions=[
                 Node(

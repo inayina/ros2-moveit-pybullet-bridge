@@ -5,24 +5,14 @@ set -eo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-echo "==> 1/5 加载环境"
-# shellcheck source=/dev/null
-source "$ROOT/setup.sh"
+# shellcheck source=verify_env.sh
+source "${ROOT}/scripts/verify_env.sh"
+verify_env_init "${ROOT}"
+
+echo "==> 1/5 环境就绪（ROS Jazzy + system Python 3.12）"
 
 echo "==> 2/5 前置检查"
-if ! ros2 pkg prefix pybullet_bridge &>/dev/null; then
-  echo "[FAIL] pybullet_bridge 未找到。请先编译："
-  echo "  cd ~/ros2_ws"
-  echo "  export PATH=\"/usr/bin:/bin:/opt/ros/jazzy/bin:\$PATH\" && unset CONDA_PREFIX"
-  echo "  colcon build --packages-select bridge_monitor_msgs pybullet_bridge --symlink-install"
-  echo "  source install/setup.bash"
-  exit 1
-fi
-
-if ! python3 -c "import pybullet" 2>/dev/null; then
-  echo "[FAIL] pybullet 未安装。请执行: pip install -r requirements.txt"
-  exit 1
-fi
+verify_env_require_pkg pybullet_bridge
 
 echo "==> 3/5 清理残留 ROS 节点"
 pkill -f "ros2 launch pybullet_bridge" 2>/dev/null || true
@@ -66,12 +56,11 @@ while time.time() < deadline and len(node.samples) < 10:
     rclpy.spin_once(node, timeout_sec=0.2)
 
 if len(node.samples) < 2:
-    print('[FAIL] 未收到 /bridge/sim/joint_states，请确认 bridge 已启动且 source setup.sh')
+    print('[FAIL] 未收到 /bridge/sim/joint_states，请确认 bridge 已启动且 colcon build 完成')
     rclpy.shutdown()
     sys.exit(1)
 
 names = node.samples[-1][0]
-max_abs = max(abs(v) for _, pos in node.samples for v in pos)
 peak = max(max(abs(v) for v in pos) for _, pos in node.samples)
 first = node.samples[0][1]
 last = node.samples[-1][1]

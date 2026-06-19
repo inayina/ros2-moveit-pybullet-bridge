@@ -147,24 +147,34 @@ def generate_m3_gif() -> None:
 def generate_m4_png() -> None:
     joints = [f'iiwa_joint_{i}' for i in range(1, 8)]
     kl = np.array([0.08, 0.12, 0.21, 0.15, 0.09, 0.11, 0.10])
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.2))
-    fig.suptitle('M4: Distribution Monitor Metrics', fontweight='bold')
+    w1 = np.array([0.04, 0.06, 0.09, 0.07, 0.05, 0.06, 0.05])
+    fig, axes = plt.subplots(1, 3, figsize=(11, 3.2))
+    fig.suptitle('M4: Distribution Monitor Metrics (KL / W1 / MMD)', fontweight='bold')
 
     axes[0].bar(joints, kl, color='#9b59b6')
     axes[0].axhline(0.15, color='#e74c3c', ls='--', label='KL threshold')
     axes[0].set_title('KL divergence per joint')
     axes[0].set_ylabel('KL(P||Q)')
-    axes[0].legend()
+    axes[0].legend(fontsize=8)
     axes[0].grid(True, axis='y', alpha=0.3)
+    plt.setp(axes[0].get_xticklabels(), rotation=30, ha='right')
+
+    axes[1].bar(joints, w1, color='#8e44ad')
+    axes[1].axhline(0.08, color='#e74c3c', ls='--', label='W1 threshold')
+    axes[1].set_title('Wasserstein-1 per joint')
+    axes[1].set_ylabel('W1')
+    axes[1].legend(fontsize=8)
+    axes[1].grid(True, axis='y', alpha=0.3)
+    plt.setp(axes[1].get_xticklabels(), rotation=30, ha='right')
 
     labels = ['MMD stat', 'p-value', 'mean KL']
     values = [0.062, 0.018, kl.mean()]
     colors = ['#2980b9', '#27ae60', '#8e44ad']
-    axes[1].bar(labels, values, color=colors)
-    axes[1].set_title('Shift detection summary')
-    axes[1].set_ylim(0, 0.15)
-    axes[1].grid(True, axis='y', alpha=0.3)
-    axes[1].text(1, 0.018, 'shift detected', ha='center', va='bottom', color='#c0392b')
+    axes[2].bar(labels, values, color=colors)
+    axes[2].set_title('Shift detection summary')
+    axes[2].set_ylim(0, 0.15)
+    axes[2].grid(True, axis='y', alpha=0.3)
+    axes[2].text(1, 0.018, 'shift detected', ha='center', va='bottom', color='#c0392b', fontsize=8)
 
     fig.tight_layout()
     out = ASSETS / 'm4-monitor-metrics.png'

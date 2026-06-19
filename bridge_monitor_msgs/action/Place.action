@@ -1,0 +1,12 @@
+# Goal
+geometry_msgs/PoseStamped place_pose
+string planning_group             # default: manipulator
+float64 retreat_offset_m
+---
+# Result
+bool success
+string message
+---
+# Feedback
+string phase                      # approach | release | retreat
+float64 progress

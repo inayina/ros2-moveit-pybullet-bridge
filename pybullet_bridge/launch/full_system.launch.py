@@ -12,7 +12,7 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-from robot_launch_utils import declare_robot_launch_arg
+from pybullet_bridge.robot_launch_utils import declare_robot_launch_arg
 
 
 def _launch_setup(context, *args, **kwargs):

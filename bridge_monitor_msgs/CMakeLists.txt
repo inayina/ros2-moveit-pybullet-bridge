@@ -9,6 +9,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(builtin_interfaces REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 
 # Force Python 3.12 install path to match ROS Jazzy rclpy (avoid conda 3.13 mismatch)
 set(PYTHON_INSTALL_DIR "lib/python3.12/site-packages" CACHE STRING "" FORCE)
@@ -31,13 +33,15 @@ set(srv_files
 
 set(action_files
   "action/ExecuteScenario.action"
+  "action/Pick.action"
+  "action/Place.action"
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   ${msg_files}
   ${srv_files}
   ${action_files}
-  DEPENDENCIES std_msgs builtin_interfaces
+  DEPENDENCIES std_msgs builtin_interfaces geometry_msgs trajectory_msgs
 )
 
 ament_export_dependencies(rosidl_default_runtime)

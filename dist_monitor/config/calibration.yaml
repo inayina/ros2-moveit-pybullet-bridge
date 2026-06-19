@@ -1,11 +1,11 @@
-# Reference calibration metadata (not loaded by monitor_node launch).
 thresholds:
-  kl_threshold_mean: 0.15
-  mmd_threshold: 0.05
+  kl_threshold_mean: 0.1
+  w1_threshold_mean: 0.05
+  mmd_threshold: 0.03
   mmd_p_value_alpha: 0.05
-
 calibration:
-  baseline_kl_p99: null
-  baseline_mmd_p99: null
-  calibration_date: null
-  calibration_scenario: "SC-01"
+  baseline_kl_p99: 0.0
+  baseline_w1_p99: 0.0
+  baseline_mmd_p99: 0.0
+  calibration_date: '2026-06-19'
+  calibration_scenario: synthetic_inject_shift_proxy

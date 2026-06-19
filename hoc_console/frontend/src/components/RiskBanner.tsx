@@ -1,7 +1,8 @@
 import { ArrowDownOutlined, ArrowUpOutlined, MinusOutlined } from '@ant-design/icons';
 import { Badge, Space, Typography } from 'antd';
-import { useEffect, useState } from 'react';
+import { memo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { SessionClock } from './SessionClock';
 import { DIMENSION_LABELS, RISK_BG, RISK_COLORS } from '../types/messages';
 
 const { Text, Title } = Typography;
@@ -15,23 +16,11 @@ const DRIVER_LABELS: Record<string, string> = {
   ...DIMENSION_LABELS,
 };
 
-export function RiskBanner() {
+export const RiskBanner = memo(function RiskBanner() {
   const risk = useDashboardStore((s) => s.risk);
   const trend = useDashboardStore((s) => s.trend);
   const connected = useDashboardStore((s) => s.connected);
   const sessionStart = useDashboardStore((s) => s.sessionStart);
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    const id = window.setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  const sec = Math.floor((Date.now() - sessionStart) / 1000);
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = sec % 60;
-  const elapsed = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 
   const level = risk?.level ?? 0;
   const blink = level >= 2;
@@ -45,6 +34,7 @@ export function RiskBanner() {
       style={{
         borderColor: RISK_COLORS[level] ?? RISK_COLORS[0],
         background: RISK_BG[level] ?? RISK_BG[0],
+        ['--risk-accent' as string]: RISK_COLORS[level] ?? RISK_COLORS[0],
       }}
     >
       <Space size="large" wrap>
@@ -65,8 +55,8 @@ export function RiskBanner() {
         <Text type="secondary">
           主因: {DRIVER_LABELS[risk?.primary_driver ?? ''] ?? risk?.primary_driver ?? '—'}
         </Text>
-        <Text type="secondary">⏱ {elapsed}</Text>
+        <SessionClock sessionStart={sessionStart} />
       </Space>
     </div>
   );
-}
+});

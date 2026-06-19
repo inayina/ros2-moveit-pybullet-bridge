@@ -1,19 +1,47 @@
 # ROS2 + MoveIt2 + PyBullet Sim2Real Bridge
 
+[![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
+
 虚实映射与分布监控系统 — ROS 2 Jazzy 工作区。
 
 ## 包结构
 
 | 包 | 说明 |
 |----|------|
-| `bridge_monitor_msgs` | 自定义消息/服务/Action |
+| `bridge_monitor_msgs` | 自定义消息/服务/Action（含 Pick/Place） |
 | `pybullet_bridge` | PyBullet 双源仿真桥接 |
-| `dist_monitor` | KL/MMD 分布偏移监控 |
-| `risk_engine` | 多维风险态势聚合 |
+| `dist_monitor` | KL / W1 / MMD 分布偏移监控 |
+| `risk_engine` | 多维风险态势聚合（R3 取消 MoveIt） |
+| `manipulation_actions` | Pick/Place 高层 Action Server |
 | `hoc_console` | 人机运维控制台后端 |
 | `moveit_config` | MoveIt2 配置（2-DOF 占位 + KUKA iiwa7 作品集） |
 
 设计文档见 [`docs/design/`](docs/design/README.md)。
+
+## 与 episode-data-lab 联动
+
+跨仓库路径通过环境变量解析（见 `pybullet_bridge/integration_paths.py`）：
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
+```
+
+未设置时按顺序尝试：`/data/episode-data-lab`（Docker 挂载）、`~/robot-sim-lab/robot-arm-episode-data-lab`、与 bridge 同级的 `robot-arm-episode-data-lab`。
+
+完整联调步骤、Docker 与 **`./scripts/run_integration_demo.sh`** 见 **[docs/INTEGRATION.md](docs/INTEGRATION.md)**。
+
+episode-data-lab 侧简要说明：[integration_with_bridge.md](https://github.com/inayina/robot-arm-episode-data-lab/blob/main/docs/reference/integration_with_bridge.md)
+
+## Docker（可选）
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+docker compose run --rm verify          # 冒烟：offline_compare + portfolio_demo
+docker compose run --rm portfolio-demo  # 交互式 iiwa7 演示（headless）
+```
+
+详见 [`docker/README.md`](docker/README.md)。
 
 ## 快速开始
 
@@ -27,7 +55,7 @@ pip install -r requirements.txt
 # 3. 编译（conda 用户请先执行下一行，确保消息包绑定 Python 3.12）
 # export PATH="/usr/bin:/bin:/opt/ros/jazzy/bin:$PATH" && unset CONDA_PREFIX
 cd ~/ros2_ws
-colcon build --packages-select bridge_monitor_msgs pybullet_bridge dist_monitor risk_engine hoc_console moveit_config --symlink-install
+colcon build --packages-select bridge_monitor_msgs pybullet_bridge dist_monitor risk_engine hoc_console manipulation_actions moveit_config --symlink-install
 source install/setup.bash
 
 # 4. 启动完整系统（默认 KUKA iiwa7 作品集主线）
@@ -77,8 +105,8 @@ python3 scripts/generate_sample_report.py
 | **M1** | ✅ | PyBullet 单实例 + 关节轨迹控制 + `/joint_states` 反馈 |
 | **M2** | ✅ | MoveIt2 规划闭环 — iiwa7 作品集主线 + UR5 教程可选 |
 | **M3** | ✅ | 双源域随机化 |
-| **M4** | ✅ | 分布监控标定（KL/MMD） |
-| **M5** | ✅ | HOC 前端 + 实验报告 |
+| **M4** | ✅ | 分布监控标定（KL / W1 / MMD） |
+| **M5** | ✅ | HOC 前端 + 实验报告 + Pick/Place Action |
 
 ## 机器人平台（方案 C）
 
@@ -92,12 +120,16 @@ python3 scripts/generate_sample_report.py
 ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
 
 # 与 episode-data-lab LeRobot 离线对比
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 ros2 run dist_monitor offline_compare \
-  --real-dataset ~/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export \
-  --sim-dataset ~/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export
+  --real-dataset "$LEROBOT_EXPORT" \
+  --sim-dataset "$LEROBOT_EXPORT"
 
 ./scripts/verify_portfolio.sh
+./scripts/verify_pick.sh
 python3 scripts/check_iiwa_joint_consistency.py
+python3 scripts/calibrate_monitor_thresholds.py --write   # 可选：重标定监控阈值
 ```
 
 详设：[`docs/design/06-robot-platform-selection.md`](docs/design/06-robot-platform-selection.md)
@@ -199,7 +231,7 @@ ros2 launch moveit_config m2_demo.launch.py sim_mode:=DIRECT ur_type:=ur5
 
 > 配图为 iiwa 7 关节合成指标（`generate_milestone_assets.py`）；在线数据请从 `/monitor/distribution_metrics` 导出替换。
 
-- KL 散度 + MMD 置换检验检测 Sim/Real 偏移
+- KL / W1 / MMD 置换检验检测 Sim/Real 偏移
 - 发布 `/monitor/distribution_metrics` 与 `/monitor/tracking_error`
 - 节点测试：`dist_monitor/test/test_monitor_node.py`
 

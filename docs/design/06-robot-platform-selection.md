@@ -3,8 +3,11 @@
 **文档版本**：v0.1  
 **依赖**：[01 · 系统架构与需求](./01-system-architecture-and-requirements.md)、[03 · 分布监控算法详设](./03-distribution-monitoring-algorithm.md)  
 **关联仓库**：
-- `ros2-moveit-pybullet-bridge`（本仓库）
-- `robot-arm-episode-data-lab`（`/home/ina/robot-sim-lab/robot-arm-episode-data-lab`）
+- `ros2-moveit-pybullet-bridge`（`~/ros2_ws/src/ros2-moveit-pybullet-bridge`）
+- `robot-arm-episode-data-lab`（`~/robot-sim-lab/robot-arm-episode-data-lab`）
+
+**双仓库通盘设计**（联动时优先阅读）：[08 · 双仓库通盘集成设计](./08-dual-repo-portfolio-integration-spec.md)  
+**单仓库 bridge Spec**：[07 · 作品集系统 Spec 补充](./07-portfolio-system-spec-supplement.md)
 
 ---
 

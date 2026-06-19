@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import type {
   AlertEvent,
   DistributionMetricsPayload,
+  ExperimentProgressPayload,
   RiskStatusPayload,
   TrackingErrorPayload,
   WsFrame,
 } from '../types/messages';
 import { useDashboardStore } from '../stores/dashboardStore';
-
-const WS_URL = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8765';
+import { resolveWsUrl } from '../utils/wsUrl';
 const SUBSCRIBE_TOPICS = [
   '/monitor/distribution_metrics',
   '/risk/status',
@@ -47,6 +47,16 @@ function isMetricsPayload(payload: unknown): payload is DistributionMetricsPaylo
   );
 }
 
+function isExperimentProgress(payload: unknown): payload is ExperimentProgressPayload {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'experiment_id' in payload &&
+    'scenario_id' in payload &&
+    'progress' in payload
+  );
+}
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -59,6 +69,8 @@ export function useWebSocket() {
   const ingestTracking = useDashboardStore((s) => s.ingestTracking);
   const ingestAlert = useDashboardStore((s) => s.ingestAlert);
   const setRecording = useDashboardStore((s) => s.setRecording);
+  const ingestExperimentProgress = useDashboardStore((s) => s.ingestExperimentProgress);
+  const setCameraFrame = useDashboardStore((s) => s.setCameraFrame);
 
   const handleFrame = useCallback(
     (frame: WsFrame) => {
@@ -99,14 +111,36 @@ export function useWebSocket() {
         ingestAlert(frame.payload);
       } else if (frame.type === 'recording_status' && 'recording' in frame) {
         setRecording(Boolean(frame.recording), String(frame.bag_path ?? ''));
+      } else if (frame.type === 'experiment_progress' && 'payload' in frame) {
+        const payload = frame.payload;
+        if (isExperimentProgress(payload)) {
+          ingestExperimentProgress(payload);
+          if (payload.current_metrics) {
+            ingestMetrics(payload.current_metrics);
+          }
+          if (payload.current_risk) {
+            ingestRisk(payload.current_risk);
+          }
+        }
+      } else if (frame.type === 'camera_frame' && 'payload' in frame) {
+        const payload = frame.payload;
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          'image_b64' in payload &&
+          typeof payload.image_b64 === 'string'
+        ) {
+          setCameraFrame(`data:image/jpeg;base64,${payload.image_b64}`);
+        }
       }
     },
-    [ingestAlert, ingestMetrics, ingestRisk, ingestTracking, setRecording],
+    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setRecording],
   );
 
   const connect = useCallback(() => {
     if (!mountedRef.current) return;
-    const ws = new WebSocket(WS_URL);
+    const wsUrl = resolveWsUrl();
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {

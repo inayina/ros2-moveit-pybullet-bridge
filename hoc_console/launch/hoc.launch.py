@@ -39,5 +39,5 @@ def generate_launch_description():
     return LaunchDescription([
         hoc_server,
         vite,
-        LogInfo(msg='HOC console: open http://localhost:5173 (WebSocket ws://localhost:8765)'),
+        LogInfo(msg='HOC console: open http://<host>:5173 — WebSocket via /hoc-ws (needs hoc_server on :8765)'),
     ])

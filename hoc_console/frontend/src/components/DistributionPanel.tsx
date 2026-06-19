@@ -3,29 +3,59 @@ import ReactECharts from 'echarts-for-react';
 import { useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 
+function buildBoxplotSeries(
+  joints: string[],
+  mins: number[],
+  q1s: number[],
+  medians: number[],
+  q3s: number[],
+  maxs: number[],
+): number[][] {
+  const count = Math.min(joints.length, mins.length, q1s.length, medians.length, q3s.length, maxs.length);
+  const data: number[][] = [];
+  for (let i = 0; i < count; i += 1) {
+    data.push([i, mins[i], q1s[i], medians[i], q3s[i], maxs[i]]);
+  }
+  return data;
+}
+
 export function DistributionPanel() {
   const metrics = useDashboardStore((s) => s.metrics);
 
   const boxplotOption = useMemo(() => {
     const joints = metrics?.joint_names ?? [];
-    const klValues = metrics?.kl_divergence_per_joint ?? [];
     const simCount = metrics?.sample_count_sim ?? 0;
     const realCount = metrics?.sample_count_real ?? 0;
+    const hasWindowBoxplot =
+      (metrics?.sim_position_median_per_joint?.length ?? 0) > 0 &&
+      (metrics?.real_position_median_per_joint?.length ?? 0) > 0;
 
-    const simData = klValues.map((kl, i) => {
-      const spread = kl * 0.3 + 0.01;
-      return [i, Math.max(kl - spread, 0), kl, kl + spread * 0.5, kl + spread];
-    });
-    const realData = klValues.map((kl, i) => {
-      const shift = metrics?.shift_detected ? kl * 0.15 : kl * 0.05;
-      return [i, Math.max(kl - shift, 0), kl + shift * 0.5, kl + shift, kl + shift * 1.2];
-    });
+    const simData = hasWindowBoxplot
+      ? buildBoxplotSeries(
+          joints,
+          metrics?.sim_position_min_per_joint ?? [],
+          metrics?.sim_position_q1_per_joint ?? [],
+          metrics?.sim_position_median_per_joint ?? [],
+          metrics?.sim_position_q3_per_joint ?? [],
+          metrics?.sim_position_max_per_joint ?? [],
+        )
+      : [];
+    const realData = hasWindowBoxplot
+      ? buildBoxplotSeries(
+          joints,
+          metrics?.real_position_min_per_joint ?? [],
+          metrics?.real_position_q1_per_joint ?? [],
+          metrics?.real_position_median_per_joint ?? [],
+          metrics?.real_position_q3_per_joint ?? [],
+          metrics?.real_position_max_per_joint ?? [],
+        )
+      : [];
 
     return {
       backgroundColor: 'transparent',
       tooltip: { trigger: 'item' },
       legend: {
-        data: ['Sim 误差', 'Real 误差'],
+        data: ['Sim 位置', 'Real 位置'],
         textStyle: { color: '#aaa' },
         top: 0,
       },
@@ -33,30 +63,32 @@ export function DistributionPanel() {
       xAxis: {
         type: 'category',
         data: joints.length ? joints : ['J1', 'J2', 'J3'],
-        axisLabel: { color: '#aaa' },
+        axisLabel: { color: '#aaa', fontSize: 10, rotate: joints.length > 5 ? 30 : 0 },
       },
       yAxis: {
         type: 'value',
-        name: '误差 (KL proxy)',
+        name: hasWindowBoxplot ? '关节位置 (rad)' : '等待窗口样本…',
         axisLabel: { color: '#aaa' },
         splitLine: { lineStyle: { color: '#303030' } },
       },
       series: [
         {
-          name: 'Sim 误差',
+          name: 'Sim 位置',
           type: 'boxplot',
-          data: simData.length ? simData : [[0, 0.01, 0.02, 0.03, 0.04]],
+          data: simData.length ? simData : [],
           itemStyle: { color: '#69b1ff', borderColor: '#69b1ff' },
         },
         {
-          name: 'Real 误差',
+          name: 'Real 位置',
           type: 'boxplot',
-          data: realData.length ? realData : [[0, 0.02, 0.04, 0.05, 0.06]],
+          data: realData.length ? realData : [],
           itemStyle: { color: '#95de64', borderColor: '#95de64' },
         },
       ],
       title: {
-        subtext: `Sim n=${simCount} · Real n=${realCount} · 窗口 ${metrics?.window_duration_sec?.toFixed(1) ?? '—'}s`,
+        subtext: hasWindowBoxplot
+          ? `窗口分布 · Sim n=${simCount} · Real n=${realCount} · ${metrics?.window_duration_sec?.toFixed(1) ?? '—'}s`
+          : `样本不足 · Sim n=${simCount} · Real n=${realCount}`,
         subtextStyle: { color: '#888' },
         left: 'center',
       },
@@ -66,19 +98,30 @@ export function DistributionPanel() {
   const barOption = useMemo(() => {
     const joints = metrics?.joint_names ?? ['J1', 'J2', 'J3'];
     const kl = metrics?.kl_divergence_per_joint ?? joints.map(() => 0);
+    const w1 = metrics?.wasserstein_per_joint ?? joints.map(() => 0);
     return {
       backgroundColor: 'transparent',
-      grid: { left: 40, right: 10, top: 10, bottom: 30 },
+      tooltip: { trigger: 'axis' },
+      legend: {
+        data: ['KL', 'W1'],
+        textStyle: { color: '#aaa' },
+        top: 0,
+      },
+      grid: { left: 40, right: 10, top: 28, bottom: 30 },
       xAxis: { type: 'category', data: joints, axisLabel: { color: '#aaa', fontSize: 10 } },
       yAxis: { type: 'value', axisLabel: { color: '#aaa', fontSize: 10 }, splitLine: { show: false } },
       series: [
         {
+          name: 'KL',
           type: 'bar',
           data: kl,
-          itemStyle: {
-            color: (params: { dataIndex: number }) =>
-              kl[params.dataIndex] > (metrics?.kl_divergence_mean ?? 0) ? '#fa8c16' : '#69b1ff',
-          },
+          itemStyle: { color: '#69b1ff' },
+        },
+        {
+          name: 'W1',
+          type: 'bar',
+          data: w1,
+          itemStyle: { color: '#b37feb' },
         },
       ],
     };
@@ -98,6 +141,7 @@ export function DistributionPanel() {
       <ReactECharts option={barOption} style={{ height: 100 }} notMerge lazyUpdate />
       <Space size="large" wrap>
         <Statistic title="KL mean" value={metrics?.kl_divergence_mean ?? 0} precision={4} />
+        <Statistic title="W1 mean" value={metrics?.wasserstein_mean ?? 0} precision={4} />
         <Statistic title="MMD" value={metrics?.mmd_statistic ?? 0} precision={4} />
         <Statistic title="p-value" value={metrics?.mmd_p_value ?? 0} precision={4} />
         <Badge

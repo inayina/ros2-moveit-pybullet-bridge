@@ -21,8 +21,10 @@ def test_metrics_identical_near_zero():
     result = compute_distribution_metrics(sim_ts, sim, real_ts, real, cfg=cfg)
     assert result.sample_count >= 50
     assert result.kl_mean < 0.05
+    assert result.w1_mean < 0.05
     assert result.mmd_statistic < 0.05
     assert result.shift_detected is False
+    assert result.shift_detected_w1 is False
 
 
 def test_metrics_shift_detected_with_offset():
@@ -40,4 +42,5 @@ def test_metrics_shift_detected_with_offset():
         cfg=cfg,
     )
     assert result.kl_mean > 0.0
+    assert result.w1_mean > 0.5
     assert result.mmd_statistic > 0.0

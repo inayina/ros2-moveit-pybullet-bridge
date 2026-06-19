@@ -12,24 +12,24 @@ echo "Workspace: $WS"
 source "$WS/install/setup.bash"
 
 echo
-echo "[1/5] 启动完整 ROS 系统 (后台)..."
+echo "[1/6] 启动完整 ROS 系统 (后台)..."
 ros2 launch pybullet_bridge full_system.launch.py &
 FULL_PID=$!
 sleep 8
 
 echo
-echo "[2/5] 启动 HOC 控制台 (后台)..."
+echo "[2/6] 启动 HOC 控制台 (后台)..."
 ros2 launch hoc_console hoc.launch.py &
 HOC_PID=$!
 sleep 6
 
 echo
-echo "[3/5] 等待监控话题..."
+echo "[3/6] 等待监控话题..."
 timeout 30 bash -c 'until ros2 topic echo /monitor/distribution_metrics --once >/dev/null 2>&1; do sleep 1; done'
 echo "  /monitor/distribution_metrics OK"
 
 echo
-echo "[4/5] 演示动作序列..."
+echo "[4/6] 演示动作序列..."
 echo "  → 设置随机化强度 50%"
 ros2 service call /bridge/set_randomization bridge_monitor_msgs/srv/SetRandomization \
   "{config: {random_seed: 42, randomization_strength: 0.5, joint_damping_min: 0.5, joint_damping_max: 2.0, joint_friction_min: 0.0, joint_friction_max: 0.2, motor_strength_min: 0.8, motor_strength_max: 1.2, position_noise_std: 0.01, velocity_noise_std: 0.05, time_delay_min_ms: 0.0, time_delay_max_ms: 50.0, payload_mass_min: 0.0, payload_mass_max: 5.0}}" \
@@ -48,15 +48,25 @@ ros2 action send_goal /hoc/execute_scenario bridge_monitor_msgs/action/ExecuteSc
   --feedback >/dev/null 2>&1 || true
 
 echo
-echo "[5/5] 打开浏览器控制台"
+echo "[5/6] 可选 Pick 演示 (portfolio_demo 含 manipulation_actions)"
+if ros2 action list 2>/dev/null | grep -q '/manipulation/pick'; then
+  echo "  → 发送 Pick goal"
+  ros2 run manipulation_actions pick_place_demo --ros-args -p mode:=pick >/dev/null 2>&1 || true
+else
+  echo "  [SKIP] /manipulation/pick 未启动 (需 portfolio_demo 或 m2_iiwa_demo)"
+fi
+
+echo
+echo "[6/6] 打开浏览器控制台"
 echo "  URL: http://localhost:5173"
 echo "  WebSocket: ws://localhost:8765"
 echo
 echo "演示要点 (约 3 分钟):"
 echo "  1. 顶部 RiskBanner 显示 R0→R2 变化与趋势箭头"
 echo "  2. 雷达图 D1(分布偏移) 升高，分布对比面板检出 shift"
-echo "  3. KL/MMD 时序曲线实时更新"
-echo "  4. 点击「导出报告」生成 HTML (~/ros2_ws/reports/)"
+echo "  3. KL / W1 / MMD 时序曲线实时更新"
+echo "  4. 实验控制面板可触发 Pick / Place (需 manipulation 节点)"
+echo "  5. 点击「导出报告」生成 HTML (含 W1 汇总, ~/ros2_ws/reports/)"
 echo
 echo "按 Ctrl+C 停止所有进程"
 

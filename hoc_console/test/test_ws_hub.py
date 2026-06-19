@@ -49,3 +49,17 @@ def test_send_to_single_client():
     ws = _FakeWebSocket()
     asyncio.run(hub.send_to(ws, {'type': 'pong'}))
     assert json.loads(ws.sent[0])['type'] == 'pong'
+
+
+def test_camera_frame_reaches_all_subscribers():
+    hub = WsHub()
+    ws = _FakeWebSocket()
+    hub.register(ws)
+    hub.subscribe(ws, [TOPIC_METRICS])
+
+    asyncio.run(hub.broadcast('camera_frame', {'image_b64': 'abc123'}))
+
+    assert len(ws.sent) == 1
+    frame = json.loads(ws.sent[0])
+    assert frame['type'] == 'camera_frame'
+    assert frame['payload']['image_b64'] == 'abc123'

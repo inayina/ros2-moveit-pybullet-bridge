@@ -5,13 +5,13 @@ from __future__ import annotations
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, TimerAction
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, OpaqueFunction, TimerAction
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-from robot_launch_utils import declare_robot_launch_arg
+from pybullet_bridge.robot_launch_utils import declare_robot_launch_arg
 
 
 def _launch_setup(context, *args, **kwargs):
@@ -58,15 +58,15 @@ def _launch_setup(context, *args, **kwargs):
         TimerAction(
             period=1.0,
             actions=[
-                Node(
-                    package='pybullet_bridge',
-                    executable='joint_sweep_demo',
-                    name='joint_sweep_demo',
+                ExecuteProcess(
+                    cmd=[
+                        'python3', '-m', 'pybullet_bridge.joint_sweep_demo',
+                        '--ros-args',
+                        '-p', 'joint_names:=[joint1,joint2]',
+                        '-p', 'publish_delay_sec:=2.0',
+                        '-p', 'amplitude:=0.8',
+                    ],
                     output='screen',
-                    parameters=[{
-                        'joint_names': ['joint1', 'joint2'],
-                        'publish_delay_sec': 3.0,
-                    }],
                 ),
             ],
         ),

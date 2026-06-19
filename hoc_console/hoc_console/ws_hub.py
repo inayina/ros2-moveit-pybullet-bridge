@@ -19,6 +19,15 @@ TOPIC_TYPE_MAP = {
 
 TYPE_TOPIC_MAP = {v: k for k, v in TOPIC_TYPE_MAP.items()}
 
+# UI events — delivered to every connected client (not ROS topic subscriptions).
+EVENT_TYPES = frozenset({
+    'camera_frame',
+    'experiment_progress',
+    'recording_status',
+    'alert_event',
+    'system_state',
+})
+
 
 class WsHub:
     """Manage WebSocket clients and broadcast JSON frames."""
@@ -46,6 +55,9 @@ class WsHub:
     async def broadcast(self, message_type: str, payload: dict[str, Any]) -> None:
         if not self._clients:
             return
+        if message_type in EVENT_TYPES:
+            await self._broadcast_event(message_type, payload)
+            return
         topic = TYPE_TOPIC_MAP.get(message_type, message_type)
         await self._send_to_subscribers(message_type, topic, payload)
 
@@ -55,8 +67,26 @@ class WsHub:
         message_type = TOPIC_TYPE_MAP.get(topic, 'data')
         await self._send_to_subscribers(message_type, topic, payload)
 
+    async def _broadcast_event(self, message_type: str, payload: dict[str, Any]) -> None:
+        if message_type == 'recording_status':
+            frame = {'type': message_type, **payload}
+        else:
+            frame = {'type': message_type, 'payload': payload}
+        text = json.dumps(frame)
+        dead: list = []
+        for ws in self._clients:
+            try:
+                await self.send_raw(ws, text)
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.unregister(ws)
+
     async def send_to(self, websocket, frame: dict[str, Any]) -> None:
         await websocket.send(json.dumps(frame))
+
+    async def send_raw(self, websocket, text: str) -> None:
+        await websocket.send(text)
 
     async def _send_to_subscribers(
         self,
@@ -76,7 +106,7 @@ class WsHub:
             if topic not in topics and message_type not in topics:
                 continue
             try:
-                await ws.send(data_frame)
+                await self.send_raw(ws, data_frame)
             except Exception:
                 dead.append(ws)
         for ws in dead:

@@ -1,34 +1,74 @@
-# HOC Frontend
+# HOC WebSocket troubleshooting
 
-React 18 + TypeScript + Vite dashboard for Sim2Real monitoring.
+## 正确启动顺序
 
-## Setup
+WebSocket 由 **`hoc_server`** 提供，不会随 `portfolio_demo` 自动启动。
 
 ```bash
-cd hoc_console/frontend
-npm install
-npm run dev
+# 终端 1：仿真 + 监控
+ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
+
+# 终端 2：HOC（同时起 hoc_server + Vite 前端）
+ros2 launch hoc_console hoc.launch.py
 ```
 
-Open http://localhost:5173 — WebSocket connects to `ws://localhost:8765`.
+浏览器打开 **http://\<机器 IP\>:5173**（不要只开前端、不启 hoc_server）。
 
-## Stack
+## 连接方式
 
-- React 18 + TypeScript + Vite
-- Ant Design 5 (dark theme)
-- ECharts 5 (radar, boxplot, line)
-- Zustand (real-time state)
-- html2canvas (report screenshots)
+| 模式 | 页面地址 | WebSocket |
+|------|----------|-----------|
+| 开发 `hoc.launch.py` | `:5173` | 经 Vite 代理 `ws://<host>:5173/hoc-ws` → 后端 `:8765` |
+| 生产 `hoc_prod.launch.py` | `:8080` | 同端口 `ws://<host>:8080/hoc-ws` |
+| 仅后端 | — | `ws://<host>:8765` |
 
-## Panels
+前端已改为使用 **页面 hostname**，不再硬编码 `localhost`（远程/SSH 浏览器时 `localhost` 会连到本机而非 ROS 机器）。
 
-| Panel | Description |
-|-------|-------------|
-| RiskBanner | R0–R3 level, trend arrow, primary driver |
-| RiskRadar | Five-dimensional risk radar |
-| DistributionPanel | Sim/Real error boxplot per joint |
-| TrendChart | KL/MMD 60s rolling trend |
-| ExperimentControl | Scenario run, record, export HTML report |
-| R3Modal | Full-screen alert for R3 with acknowledge flow |
+## 常见原因
 
-See [04-hoc-console-design.md](../../docs/design/04-hoc-console-design.md).
+1. **未启动 hoc_server** — 页面显示「WS 断开」，8765 无监听  
+   ```bash
+   ss -tlnp | grep 8765
+   ```
+
+2. **缺少 Python 依赖** — 日志出现 `websockets not installed`  
+   ```bash
+   python3 -m pip install websockets aiohttp --break-system-packages
+   ```
+
+3. **8765 端口被占用** — 重复启动了 hoc_server  
+   ```bash
+   pkill -f hoc_server
+   ros2 launch hoc_console hoc.launch.py
+   ```
+
+4. **只转发 5173 未转发 8765** — 开发模式已用 Vite `/hoc-ws` 代理，一般只需开放 **5173**；若直连 8765 需同时转发该端口。
+
+5. **只开了 `npm run dev` 没开 hoc_server** — 代理目标 8765 不存在，WS 一直重连。
+
+## 自检
+
+```bash
+# 1. 启动 hoc_server
+ros2 run hoc_console hoc_server --ros-args -p serve_frontend:=false
+
+# 2. 另开终端测试握手
+python3 - <<'PY'
+import asyncio, websockets
+async def t():
+    async with websockets.connect('ws://127.0.0.1:8765') as ws:
+        print(await ws.recv())
+asyncio.run(t())
+PY
+# 期望: {"type": "connected", ...}
+```
+
+或使用仓库脚本：`./scripts/verify_hoc.sh`
+
+## 自定义地址
+
+前端构建时可设置：
+
+```bash
+VITE_WS_URL=ws://192.168.1.10:8765 npm run build
+```

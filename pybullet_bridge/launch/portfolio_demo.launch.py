@@ -11,15 +11,14 @@ from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
-from robot_launch_utils import declare_robot_launch_arg
+from pybullet_bridge.integration_paths import default_lerobot_export_path
+from pybullet_bridge.robot_launch_utils import declare_robot_launch_arg
 
-DEFAULT_LEROBOT_DATASET = (
-    '/home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export'
-)
+DEFAULT_LEROBOT_DATASET = default_lerobot_export_path()
 
 
 def _launch_setup(context, *args, **kwargs):
-    from pybullet_bridge.robot_profiles import resolve_profile_config
+    from pybullet_bridge.robot_profiles import IIWA_HOME, IIWA_JOINTS, resolve_profile_config
 
     sim_mode = LaunchConfiguration('sim_mode').perform(context)
     real_source = LaunchConfiguration('real_source').perform(context)
@@ -39,6 +38,9 @@ def _launch_setup(context, *args, **kwargs):
         'real_source': real_source,
         'lerobot_dataset_path': lerobot_path,
     }
+
+    iiwa_home = list(IIWA_HOME)
+    iiwa_joints = list(IIWA_JOINTS)
 
     nodes = [
         Node(
@@ -83,6 +85,22 @@ def _launch_setup(context, *args, **kwargs):
             name='risk_engine',
             output='screen',
             parameters=[os.path.join(risk_pkg, 'config', 'risk_config.yaml')],
+        ),
+        TimerAction(
+            period=3.0,
+            actions=[
+                Node(
+                    package='manipulation_actions',
+                    executable='manipulation_node',
+                    name='manipulation_actions',
+                    output='screen',
+                    parameters=[{
+                        'use_moveit': False,
+                        'joint_names': iiwa_joints,
+                        'home_positions': iiwa_home,
+                    }],
+                ),
+            ],
         ),
         TimerAction(
             period=2.0,

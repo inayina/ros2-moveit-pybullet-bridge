@@ -7,6 +7,7 @@ import json
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import JointState
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -15,6 +16,7 @@ from bridge_monitor_msgs.msg import DistributionMetrics, RiskAttribution, RiskSt
 from bridge_monitor_msgs.srv import AcknowledgeRisk
 
 from risk_engine.aggregator import RiskAggregator, RiskWeights
+from risk_engine.move_group_cancel import MoveGroupCancelClient
 
 
 class RiskEngineNode(Node):
@@ -31,6 +33,8 @@ class RiskEngineNode(Node):
         self.declare_parameter('level_thresholds', [0.25, 0.50, 0.75])
         self.declare_parameter('tracking_rmse_threshold', 0.05)
         self.declare_parameter('auto_e_stop_on_r3', True)
+        self.declare_parameter('move_group_action', '/move_action')
+        self.declare_parameter('cancel_move_group_on_e_stop', True)
 
         weights = RiskWeights(
             distribution_shift=self.get_parameter('weights.distribution_shift').value,
@@ -47,11 +51,15 @@ class RiskEngineNode(Node):
         self._e_stop_active = False
         self._acknowledged = True
         self._prev_level = 0
+        self._move_cancel = MoveGroupCancelClient(
+            self,
+            action_name=self.get_parameter('move_group_action').value,
+        )
 
         self.create_subscription(
             DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
         self.create_subscription(
-            JointState, '/monitor/tracking_error', self._on_tracking_error, 10)
+            JointState, '/monitor/tracking_error', self._on_tracking_error, qos_profile_sensor_data)
 
         self._status_pub = self.create_publisher(RiskStatus, '/risk/status', 10)
         self._alerts_pub = self.create_publisher(String, '/risk/alerts', 10)
@@ -61,7 +69,16 @@ class RiskEngineNode(Node):
         self.create_service(Trigger, '/risk/clear_e_stop', self._handle_clear_e_stop)
 
         self._timer = self.create_timer(0.1, self._publish_risk)
-        self.get_logger().info('risk_engine node started (scaffold).')
+        self.get_logger().info('risk_engine node started.')
+
+    def _trigger_e_stop(self, result, *, reason: str) -> None:
+        if self._e_stop_active:
+            return
+        self._e_stop_active = True
+        self._acknowledged = False
+        if self.get_parameter('cancel_move_group_on_e_stop').value:
+            self._move_cancel.cancel_all()
+        self._publish_alert(reason, result)
 
     def _on_metrics(self, msg: DistributionMetrics) -> None:
         self._latest_metrics = msg
@@ -80,8 +97,9 @@ class RiskEngineNode(Node):
         }
         if self._latest_metrics:
             kl_norm = self._latest_metrics.kl_divergence_mean / 0.30
+            w1_norm = self._latest_metrics.wasserstein_mean / 0.15
             mmd_norm = self._latest_metrics.mmd_statistic / 0.10
-            scores['distribution_shift'] = max(kl_norm, mmd_norm)
+            scores['distribution_shift'] = max(kl_norm, w1_norm, mmd_norm)
             if self._latest_metrics.shift_detected:
                 scores['distribution_shift'] = max(scores['distribution_shift'], 0.5)
 
@@ -99,9 +117,7 @@ class RiskEngineNode(Node):
             and result.level >= 3
             and not self._e_stop_active
         ):
-            self._e_stop_active = True
-            self._acknowledged = False
-            self._publish_alert('e_stop_triggered', result)
+            self._trigger_e_stop(result, reason='e_stop_triggered')
 
         if result.level != self._prev_level:
             self._publish_alert('level_change', result)
@@ -150,8 +166,8 @@ class RiskEngineNode(Node):
         return response
 
     def _handle_force_e_stop(self, request, response):
-        self._e_stop_active = True
-        self._acknowledged = False
+        result = self._aggregator.aggregate(self._compute_raw_scores())
+        self._trigger_e_stop(result, reason='e_stop_forced')
         response.success = True
         response.message = 'E-stop activated.'
         return response

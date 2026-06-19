@@ -1,0 +1,26 @@
+manipulation_actions:
+  ros__parameters:
+    planning_group: manipulator
+    end_effector_link: lbr_iiwa_link_7
+    move_group_action: /move_action
+    use_moveit: true
+    pre_grasp_offset_m: 0.10
+    lift_offset_m: 0.05
+    retreat_offset_m: 0.08
+    grasp_timeout_sec: 45.0
+    joint_names:
+      - lbr_iiwa_joint_1
+      - lbr_iiwa_joint_2
+      - lbr_iiwa_joint_3
+      - lbr_iiwa_joint_4
+      - lbr_iiwa_joint_5
+      - lbr_iiwa_joint_6
+      - lbr_iiwa_joint_7
+    home_positions:
+      - 0.0
+      - 0.785398
+      - 0.0
+      - -1.570796
+      - 0.0
+      - 1.570796
+      - 0.0

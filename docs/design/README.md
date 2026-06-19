@@ -13,11 +13,15 @@
 | 04 | [人机运维控制台设计](./04-hoc-console-design.md) | HOC 技术选型、页面线框、交互流程、WebSocket 协议 |
 | 05 | [ROS2 节点接口与数据流规格](./05-ros2-node-interface-and-dataflow-spec.md) | PyBullet Clock Sync、Topic/Service/Action、MoveIt2 配置、URDF 物理参数、闭环数据流 |
 | 06 | [机器人平台选型评估](./06-robot-platform-selection.md) | KUKA iiwa 统一 vs 多机型；与 episode-data-lab 联动建议 |
+| 07 | [作品集系统 Spec 补充](./07-portfolio-system-spec-supplement.md) | **求职总 Spec**：双源 changeDynamics、W1、Action Library、Fail-Safe、Sprint 路线、编码前置清单、面试讲解稿 |
+| 08 | [双仓库通盘集成设计](./08-dual-repo-portfolio-integration-spec.md) | **episode-data-lab + bridge 一体架构**、LeRobot 契约、Real 三模式、HAL 映射、统一 Sprint |
 
 ## 阅读顺序
 
 ```
 01 系统架构与需求
+        ↓
+08 双仓库通盘集成     ← episode-data-lab 联动时优先读（可与 01 并行）
         ↓
 02 接口设计          ← 实现节点前先读
         ↓
@@ -28,6 +32,10 @@
 03 分布监控算法详设   ← 实现 dist_monitor 前读
         ↓
 04 人机运维控制台设计 ← 实现 hoc_console 前读
+        ↓
+07 作品集系统 Spec 补充  ← 面试准备 / bridge 编码前总览
+        ↓
+08 双仓库通盘集成        ← 与 robot-arm-episode-data-lab 联调 / 作品集一体讲解
 ```
 
 ## 包结构对照
@@ -37,6 +45,7 @@ ros2-moveit-pybullet-bridge/
 ├── pybullet_bridge/     ← 01, 02
 ├── dist_monitor/        ← 02, 03
 ├── risk_engine/         ← 02, 03
+├── manipulation_actions/← 02, 07 (Pick/Place)
 ├── hoc_console/         ← 02, 04
 ├── moveit_config/       ← 01, 02
 └── docs/design/         ← 本目录
@@ -49,3 +58,5 @@ ros2-moveit-pybullet-bridge/
 | v0.1 | 2026-06-19 | 初版：架构、接口、算法、HOC 四篇文档 |
 | v0.2 | 2026-06-19 | 新增 05：PyBullet Clock Sync、MoveIt2 联合配置、闭环数据流 |
 | v0.3 | 2026-06-19 | M5 HOC 实现同步；iiwa 主线配图；样例实验报告 |
+| v0.4 | 2026-06-19 | 新增 07：作品集总 Spec（W1、Action Library、Fail-Safe、前置清单） |
+| v0.5 | 2026-06-19 | 新增 08：双仓库通盘集成（episode-data-lab + bridge） |

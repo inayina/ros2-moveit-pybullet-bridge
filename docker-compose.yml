@@ -1,0 +1,37 @@
+# Bridge integration services. Requires episode-data-lab dataset mount.
+#
+#   export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+#   docker compose run --rm verify
+#   docker compose run --rm portfolio-demo
+
+services:
+  bridge:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    environment:
+      ROS2_WS_ROOT: /ws
+      EPISODE_DATA_LAB_ROOT: /data/episode-data-lab
+      LEROBOT_EXPORT: /data/episode-data-lab/dataset/v1/lerobot_export
+    volumes:
+      - type: bind
+        source: ${EPISODE_DATA_LAB_ROOT:?Set EPISODE_DATA_LAB_ROOT to robot-arm-episode-data-lab checkout}
+        target: /data/episode-data-lab
+        read_only: true
+
+  verify:
+    extends:
+      service: bridge
+    command:
+      - /ws/src/ros2-moveit-pybullet-bridge/scripts/verify_portfolio.sh
+
+  portfolio-demo:
+    extends:
+      service: bridge
+    command:
+      - ros2
+      - launch
+      - pybullet_bridge
+      - portfolio_demo.launch.py
+      - sim_mode:=DIRECT
+      - real_source:=lerobot

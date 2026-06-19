@@ -249,6 +249,12 @@ class SimSource:
             efforts=efforts,
         )
 
+    def capture_camera_jpeg(self, width: int = 640, height: int = 480) -> bytes | None:
+        if not self._initialized or self._p is None or self._client_id is None:
+            return None
+        from pybullet_bridge.sim_camera import capture_jpeg
+        return capture_jpeg(self._p, self._client_id, width=width, height=height)
+
     def _apply_position_control(self) -> None:
         assert self._p is not None and self._robot_id is not None
         p = self._p

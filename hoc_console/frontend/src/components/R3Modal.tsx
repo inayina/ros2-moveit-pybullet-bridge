@@ -31,10 +31,15 @@ export function R3Modal({ sendCommand }: R3ModalProps) {
       from_level: 3,
       to_level: 2,
     });
-    setLoading(false);
     if (res.success) {
       dismissR3Modal();
+      const resume = await sendCommand('resume');
+      if (!resume.success) {
+        setLoading(false);
+        return;
+      }
     }
+    setLoading(false);
   };
 
   return (

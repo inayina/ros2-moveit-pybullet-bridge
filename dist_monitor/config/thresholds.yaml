@@ -3,12 +3,14 @@ dist_monitor:
     window_duration_sec: 5.0
     update_frequency_hz: 10.0
     kl_threshold_mean: 0.15
+    w1_threshold_mean: 0.08
     mmd_threshold: 0.05
     mmd_p_value_alpha: 0.05
     mmd_permutation_count: 50
     mmd_max_samples: 100
     mmd_gamma: 0.0
     use_kl: true
+    use_w1: true
     use_mmd: true
     min_samples: 50
     align_tolerance_sec: 0.02

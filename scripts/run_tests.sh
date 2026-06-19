@@ -4,20 +4,17 @@ set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-WS_ROOT="${HOME}/ros2_ws"
 
-# ROS Jazzy rclpy + launch_testing require system Python 3.12 (not conda 3.13)
-export PATH="/usr/bin:/bin:/opt/ros/jazzy/bin:${PATH}"
-unset CONDA_PREFIX CONDA_DEFAULT_ENV VIRTUAL_ENV
-export ROS_LOG_DIR="${ROOT}/.ros_log"
-mkdir -p "${ROS_LOG_DIR}"
-
-source /opt/ros/jazzy/setup.bash
-if [ -f "${WS_ROOT}/install/setup.bash" ]; then
-  source "${WS_ROOT}/install/setup.bash"
-fi
+# shellcheck source=verify_env.sh
+source "${SCRIPT_DIR}/verify_env.sh"
+verify_env_init "${ROOT}"
 
 PYTHON="/usr/bin/python3"
+
+echo "==> Preflight: ROS packages"
+for pkg in bridge_monitor_msgs pybullet_bridge dist_monitor risk_engine hoc_console manipulation_actions; do
+  verify_env_require_pkg "${pkg}" || exit 1
+done
 
 if ! "${PYTHON}" -c "import pybullet" 2>/dev/null; then
   echo "==> Installing pybullet for ${PYTHON} (required by bridge tests)"
@@ -25,7 +22,7 @@ if ! "${PYTHON}" -c "import pybullet" 2>/dev/null; then
     || "${PYTHON}" -m pip install pybullet --user -q
 fi
 
-PACKAGES=(dist_monitor risk_engine pybullet_bridge hoc_console)
+PACKAGES=(dist_monitor risk_engine pybullet_bridge hoc_console manipulation_actions)
 LAUNCH_IGNORE=(--ignore=test/test_m1_launch.py --ignore=test/test_full_system_launch.py)
 FAILED=0
 
@@ -53,6 +50,9 @@ fi
 
 if [ "${FAILED}" -ne 0 ]; then
   echo "[FAIL] 部分测试未通过"
+  echo "若报 package 'pybullet_bridge' not found，请清理后重建：" >&2
+  echo "  rm -rf ~/ros2_ws/build/pybullet_bridge ~/ros2_ws/install/pybullet_bridge" >&2
+  echo "  cd ~/ros2_ws && colcon build --packages-select pybullet_bridge --symlink-install" >&2
   exit 1
 fi
 
