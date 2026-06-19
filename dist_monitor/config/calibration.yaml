@@ -1,0 +1,11 @@
+# Reference calibration metadata (not loaded by monitor_node launch).
+thresholds:
+  kl_threshold_mean: 0.15
+  mmd_threshold: 0.05
+  mmd_p_value_alpha: 0.05
+
+calibration:
+  baseline_kl_p99: null
+  baseline_mmd_p99: null
+  calibration_date: null
+  calibration_scenario: "SC-01"

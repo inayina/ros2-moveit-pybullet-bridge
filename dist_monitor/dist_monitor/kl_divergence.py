@@ -5,13 +5,27 @@ from __future__ import annotations
 import numpy as np
 
 
-def histogram_probs(samples: np.ndarray, bins: int = 30, alpha: float = 1e-6) -> np.ndarray:
-    """Build a smoothed normalized histogram."""
+def histogram_probs(
+    samples: np.ndarray,
+    bins: int = 50,
+    alpha: float = 1e-6,
+    bin_range: tuple[float, float] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build a smoothed normalized histogram; returns (probs, bin_edges)."""
     if samples.size == 0:
-        return np.full(bins, 1.0 / bins)
-    counts, _ = np.histogram(samples, bins=bins)
+        probs = np.full(bins, 1.0 / bins)
+        edges = np.linspace(0.0, 1.0, bins + 1) if bin_range is None else np.linspace(
+            bin_range[0], bin_range[1], bins + 1
+        )
+        return probs, edges
+
+    if bin_range is None:
+        counts, edges = np.histogram(samples, bins=bins)
+    else:
+        counts, edges = np.histogram(samples, bins=bins, range=bin_range)
+
     probs = (counts.astype(float) + alpha) / (counts.sum() + alpha * bins)
-    return probs
+    return probs, edges
 
 
 def kl_divergence(p: np.ndarray, q: np.ndarray) -> float:
@@ -24,16 +38,23 @@ def kl_divergence(p: np.ndarray, q: np.ndarray) -> float:
 def kl_per_joint(
     baseline_samples: np.ndarray,
     current_samples: np.ndarray,
-    bins: int = 30,
+    bins: int = 50,
 ) -> list[float]:
-    """Compute per-joint KL divergence between baseline and current error windows."""
+    """Compute per-joint KL(P || Q) with shared bin edges per joint."""
     if baseline_samples.size == 0 or current_samples.size == 0:
         return []
 
     n_joints = baseline_samples.shape[1]
     results: list[float] = []
     for j in range(n_joints):
-        p = histogram_probs(baseline_samples[:, j], bins=bins)
-        q = histogram_probs(current_samples[:, j], bins=bins)
+        p_samples = baseline_samples[:, j]
+        q_samples = current_samples[:, j]
+        combined = np.concatenate([p_samples, q_samples])
+        bin_range = (float(combined.min()), float(combined.max()))
+        if bin_range[0] == bin_range[1]:
+            bin_range = (bin_range[0] - 0.5, bin_range[1] + 0.5)
+
+        p, _ = histogram_probs(p_samples, bins=bins, bin_range=bin_range)
+        q, _ = histogram_probs(q_samples, bins=bins, bin_range=bin_range)
         results.append(kl_divergence(p, q))
     return results

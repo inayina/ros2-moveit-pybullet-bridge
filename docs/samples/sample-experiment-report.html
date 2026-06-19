@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <title>HOC Experiment Report — exp_20260619_sample</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #141414; color: #e8e8e8; margin: 24px; }
+    h1, h2 { color: #69b1ff; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #434343; padding: 8px; text-align: left; }
+    th { background: #1f1f1f; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric-card { background: #1f1f1f; padding: 16px; border-radius: 8px; }
+    .metric-value { font-size: 24px; font-weight: bold; color: #95de64; }
+  </style>
+</head>
+<body>
+  <h1>Sim2Real HOC Experiment Report</h1>
+  <p>Generated: 2026-06-19T18:44:38</p>
+  <p>Experiment ID: <strong>exp_20260619_sample</strong></p>
+
+  <h2>Metadata</h2>
+  <ul>
+    <li>Scenario: SC-01</li>
+    <li>Seed: 42</li>
+    <li>Randomization strength: 0.5</li>
+    <li>Duration (sec): 120.5</li>
+  </ul>
+
+  <h2>Summary</h2>
+  <div class="metric-grid">
+    <div class="metric-card"><div>Max Risk</div><div class="metric-value">R2</div></div>
+    <div class="metric-card"><div>Max Score</div><div class="metric-value">0.680</div></div>
+    <div class="metric-card"><div>Mean KL</div><div class="metric-value">0.1800</div></div>
+    <div class="metric-card"><div>Mean MMD</div><div class="metric-value">0.0400</div></div>
+  </div>
+  <p>Shift detected: 15 / ratio 12.50%</p>
+  <p>Recommendation: 检查域随机化参数范围；建议在 Real-Source 上复测 SC-01。</p>
+
+  
+
+  <h2>Risk Timeline (last 50)</h2>
+  <table>
+    <tr><th>t (s)</th><th>Level</th><th>Score</th></tr>
+    <tr><td>0.0</td><td>0</td><td>0.05</td></tr>
+<tr><td>32.1</td><td>1</td><td>0.28</td></tr>
+<tr><td>58.4</td><td>2</td><td>0.58</td></tr>
+  </table>
+
+  <h2>Metrics Timeline (last 50)</h2>
+  <table>
+    <tr><th>t (s)</th><th>KL mean</th><th>MMD</th><th>Shift</th></tr>
+    <tr><td>10.0</td><td>0.08</td><td>0.02</td><td>False</td></tr>
+<tr><td>45.0</td><td>0.21</td><td>0.05</td><td>True</td></tr>
+<tr><td>90.0</td><td>0.35</td><td>0.07</td><td>True</td></tr>
+  </table>
+
+  <h2>Latest Snapshot</h2>
+  <pre>{
+  "risk": {
+    "level": 2,
+    "level_name": "R2",
+    "composite_score": 0.58,
+    "primary_driver": "distribution_shift",
+    "recommendation": "检查域随机化参数范围",
+    "e_stop_active": false,
+    "degraded_mode": true,
+    "attribution": []
+  },
+  "metrics": {
+    "joint_names": [
+      "iiwa_joint_1",
+      "iiwa_joint_2",
+      "iiwa_joint_3",
+      "iiwa_joint_4",
+      "iiwa_joint_5",
+      "iiwa_joint_6",
+      "iiwa_joint_7"
+    ],
+    "kl_divergence_mean": 0.21,
+    "mmd_statistic": 0.05,
+    "shift_detected": true
+  }
+}</pre>
+</body>
+</html>

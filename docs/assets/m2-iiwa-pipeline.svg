@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320">
+  <rect width="100%" height="100%" fill="#f8f9fb"/>
+  
+  <text x="450" y="28" text-anchor="middle" font-size="18" font-weight="bold" fill="#2c3e50">M2: MoveIt2 Planning Loop (KUKA iiwa7 — portfolio mainline)</text>
+  <rect x="30" y="70" width="130" height="60" rx="8" fill="#3498db" opacity="0.9"/>
+  <text x="95" y="105" text-anchor="middle" fill="white" font-size="13">RViz / MoveIt2</text>
+  <polygon points="170,100 200,100 200,90 220,110 200,130 200,120 170,120" fill="#95a5a6"/>
+  <rect x="230" y="70" width="150" height="60" rx="8" fill="#e67e22" opacity="0.95"/>
+  <text x="305" y="98" text-anchor="middle" fill="white" font-size="12">FollowJointTrajectory</text>
+  <text x="305" y="116" text-anchor="middle" fill="white" font-size="11">trajectory_controller</text>
+  <polygon points="390,100 420,100 420,90 440,110 420,130 420,120 390,120" fill="#95a5a6"/>
+  <rect x="450" y="70" width="130" height="60" rx="8" fill="#2ecc71" opacity="0.95"/>
+  <text x="515" y="105" text-anchor="middle" fill="white" font-size="13">PyBullet Bridge</text>
+  <polygon points="590,100 620,100 620,90 640,110 620,130 620,120 590,120" fill="#95a5a6"/>
+  <rect x="650" y="70" width="120" height="60" rx="8" fill="#9b59b6" opacity="0.95"/>
+  <text x="710" y="98" text-anchor="middle" fill="white" font-size="12">KUKA iiwa7</text>
+  <text x="710" y="116" text-anchor="middle" fill="white" font-size="11">7-DOF · manipulator</text>
+  <text x="450" y="190" text-anchor="middle" font-size="13" fill="#555">Plan → Execute → PyBullet iiwa profile → /bridge/sim/joint_states</text>
+  <rect x="120" y="220" width="660" height="70" rx="10" fill="#ecf0f1" stroke="#bdc3c7"/>
+  <text x="450" y="248" text-anchor="middle" font-size="12" fill="#2c3e50">ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=GUI</text>
+  <text x="450" y="272" text-anchor="middle" font-size="12" fill="#7f8c8d">Planning Group: manipulator · Interact → Plan → Execute</text>
+
+</svg>

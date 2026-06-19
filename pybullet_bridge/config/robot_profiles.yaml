@@ -1,0 +1,19 @@
+# Robot profile metadata (resolved in code by robot_profiles.py).
+# Launch files pass robot:=planar_2dof | iiwa7
+
+pybullet_bridge:
+  ros__parameters:
+    # Default when launch does not override (portfolio integration line).
+    robot_profile: iiwa7
+
+profiles:
+  planar_2dof:
+    role: "CI / M1 smoke tests"
+    dof: 2
+    urdf: planar_2dof.urdf
+  iiwa7:
+    role: "Portfolio / episode-data-lab / M4 calibration"
+    dof: 7
+    urdf: kuka_iiwa/model.urdf
+    episode_data_lab_export: >-
+      /home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export

@@ -503,14 +503,27 @@ def generate_launch_description():
 
 ## 11. 实现检查清单
 
-- [ ] 初始化 `frontend/`（Vite + React + TS + Ant Design + ECharts）
-- [ ] 实现 `useWebSocket` hook（重连 + 心跳）
-- [ ] 实现 `RiskBanner`、`RiskRadar`、`DistributionPanel`、`EStopButton`
-- [ ] 实现 `hoc_server` ROS 节点 + `ws_hub`
-- [ ] 对接全部 WebSocket 命令与 ROS 服务
-- [ ] 实现 `ExecuteScenario` Action 服务端（或在 `hoc_server` 中）
-- [ ] 暗色主题适配（作品集演示友好）
-- [ ] 录制 3min 演示视频脚本
+- [x] 初始化 `frontend/`（Vite + React + TS + Ant Design + ECharts）
+- [x] 实现 `useWebSocket` hook（重连 + 心跳）
+- [x] 实现 `RiskBanner`、`RiskRadar`、`DistributionPanel`、`EStopButton`、`TrackingChart`、`AlertTimeline`
+- [x] 实现 `hoc_server` ROS 节点 + `ws_hub`
+- [x] 对接 WebSocket 命令与 ROS 服务（急停、确认、导出、录制、随机化、偏移注入、暂停/恢复）
+- [x] 实现 `ExecuteScenario` Action 服务端（`experiment_runner.py`）
+- [x] 暗色主题适配（作品集演示友好）
+- [x] 3min 演示脚本（`scripts/hoc_demo_3min.sh`）
+
+### 11.1 实现说明（v0.2 同步）
+
+| 项 | 设计原文 | 当前实现 |
+|----|----------|----------|
+| WebSocket URL | `ws://localhost:8765/ws` | `ws://localhost:8765`（无 `/ws` 路径） |
+| 开发 UI | `:5173` Vite | `ros2 launch hoc_console hoc.launch.py` |
+| 生产 UI | `:8080` 托管 `dist/` | `ros2 launch hoc_console hoc_prod.launch.py` → `:8080` |
+| 实验报告 | JSON + CSV | **HTML**（含截图）+ 可选 JSON；样例见 `docs/samples/` |
+| `experiment_progress` | Action feedback 推送 | ✅ WebSocket 广播 |
+| `system_state` | 1Hz | ✅ `RUNNING` / `PAUSED` |
+| `pause` | `/bridge/set_mode` | ✅ 已实现 |
+| 真实 UI 截图 | — | 录屏后替换 `docs/assets/m5-hoc-dashboard.png`（可选） |
 
 ---
 

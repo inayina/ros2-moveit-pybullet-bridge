@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'monitor_node = dist_monitor.monitor_node:main',
+            'offline_compare = dist_monitor.offline_compare:main',
         ],
     },
 )

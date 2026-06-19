@@ -23,7 +23,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'hoc_server = hoc_console.server_node:main',
+            'hoc_server = hoc_console.hoc_server:main',
         ],
     },
 )

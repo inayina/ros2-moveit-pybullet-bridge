@@ -1,0 +1,123 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+  background: #0a0a0a;
+  color: #e8e8e8;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-shell--r2 .dashboard-root {
+  box-shadow: inset 0 0 0 2px rgba(250, 140, 22, 0.45);
+}
+
+.dashboard-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.risk-banner {
+  padding: 12px 20px;
+  border-bottom: 2px solid #52c41a;
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.risk-banner--blink {
+  animation: banner-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes banner-blink {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.15);
+  }
+}
+
+.dashboard-content {
+  padding: 16px 20px 24px;
+  flex: 1;
+}
+
+.toolbar {
+  margin-bottom: 12px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dashboard-grid--3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid--3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .dashboard-grid,
+  .dashboard-grid--3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  background: #141414;
+  border: 1px solid #303030;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.panel--wide {
+  margin-bottom: 16px;
+}
+
+.panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #d9d9d9;
+}
+
+.panel-caption {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.estop-btn {
+  min-width: 72px !important;
+  min-height: 64px !important;
+  border-radius: 50% !important;
+  font-weight: 700;
+}
+
+.experiment-control .ant-statistic-title {
+  color: #8c8c8c;
+}
+
+.r3-modal .ant-modal-content {
+  border: 2px solid #f5222d;
+}
+
+.ant-statistic-content {
+  color: #e8e8e8 !important;
+}

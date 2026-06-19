@@ -1,25 +1,73 @@
-"""M2 demo: MoveIt2 planning closed loop with PyBullet execution."""
+"""M2 demo: UR5 + MoveIt2 + PyBullet closed loop."""
+
+from pathlib import Path
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 from moveit_configs_utils import MoveItConfigsBuilder
 
+UR5_HOME = [0.0, -1.5707, 0.0, 0.0, 0.0, 0.0]
+UR5_JOINTS = [
+    'shoulder_pan_joint',
+    'shoulder_lift_joint',
+    'elbow_joint',
+    'wrist_1_joint',
+    'wrist_2_joint',
+    'wrist_3_joint',
+]
+
 
 def generate_launch_description():
-    bridge_pkg = FindPackageShare('pybullet_bridge')
+    ur_type = LaunchConfiguration('ur_type')
     sim_mode = LaunchConfiguration('sim_mode')
     use_rviz = LaunchConfiguration('use_rviz')
+    use_sim_time = LaunchConfiguration('use_sim_time')
 
-    urdf_path = PathJoinSubstitution([bridge_pkg, 'urdf', 'planar_2dof.urdf'])
+    robot_description = {
+        'robot_description': ParameterValue(
+            Command([
+                'xacro ',
+                PathJoinSubstitution([
+                    FindPackageShare('ur_description'),
+                    'urdf',
+                    'ur.urdf.xacro',
+                ]),
+                ' ur_type:=',
+                ur_type,
+                ' name:=ur tf_prefix:="" force_abs_paths:=true',
+            ]),
+            value_type=str,
+        ),
+    }
+
+    robot_description_semantic = {
+        'robot_description_semantic': ParameterValue(
+            Command([
+                'xacro ',
+                PathJoinSubstitution([
+                    FindPackageShare('ur_moveit_config'),
+                    'srdf',
+                    'ur.srdf.xacro',
+                ]),
+                ' name:=ur',
+            ]),
+            value_type=str,
+        ),
+    }
+
+    builder = MoveItConfigsBuilder('ur', package_name='ur_moveit_config')
+    builder._MoveItConfigsBuilder__moveit_configs.robot_description = robot_description
+    builder._MoveItConfigsBuilder__moveit_configs.robot_description_semantic = (
+        robot_description_semantic
+    )
 
     moveit_config = (
-        MoveItConfigsBuilder('planar_2dof', package_name='moveit_config')
-        .robot_description(file_path='urdf/planar_2dof.urdf')
-        .robot_description_semantic(file_path='srdf/planar_2dof.srdf')
+        builder
         .robot_description_kinematics(file_path='config/kinematics.yaml')
         .joint_limits(file_path='config/joint_limits.yaml')
         .planning_pipelines(pipelines=['ompl'])
@@ -29,16 +77,58 @@ def generate_launch_description():
             publish_geometry_updates=True,
             publish_state_updates=True,
             publish_transforms_updates=True,
-            publish_robot_description=True,
-            publish_robot_description_semantic=True,
+            publish_robot_description=False,
+            publish_robot_description_semantic=False,
         )
         .to_moveit_configs()
     )
 
+    moveit_params = moveit_config.to_dict()
+    moveit_params.pop('robot_description', None)
+    moveit_params.pop('robot_description_semantic', None)
+
+    move_group_params = [
+        moveit_params,
+        robot_description,
+        robot_description_semantic,
+        {'use_sim_time': use_sim_time},
+    ]
+
+    rviz_params = [
+        moveit_params,
+        robot_description,
+        robot_description_semantic,
+        moveit_config.robot_description_kinematics,
+        moveit_config.joint_limits,
+        moveit_config.planning_pipelines,
+        {'use_sim_time': use_sim_time},
+    ]
+
+    bridge_pkg = FindPackageShare('pybullet_bridge')
     moveit_pkg = FindPackageShare('moveit_config')
-    rviz_config = PathJoinSubstitution([moveit_pkg, 'config', 'moveit.rviz'])
+    bridge_config = PathJoinSubstitution([bridge_pkg, 'config', 'bridge_config.yaml'])
+    rviz_config = PathJoinSubstitution([moveit_pkg, 'config', 'ur5_pybullet.rviz'])
+
+    move_group_node = Node(
+        package='moveit_ros_move_group',
+        executable='move_group',
+        name='move_group',
+        output='screen',
+        parameters=move_group_params,
+    )
+
+    rviz_node = Node(
+        package='rviz2',
+        executable='rviz2',
+        name='rviz2',
+        output='log',
+        arguments=['-d', rviz_config],
+        parameters=rviz_params,
+        condition=IfCondition(use_rviz),
+    )
 
     return LaunchDescription([
+        DeclareLaunchArgument('ur_type', default_value='ur5'),
         DeclareLaunchArgument('sim_mode', default_value='DIRECT'),
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('use_rviz', default_value='true'),
@@ -50,11 +140,13 @@ def generate_launch_description():
             name='pybullet_bridge',
             output='screen',
             parameters=[
-                PathJoinSubstitution([bridge_pkg, 'config', 'bridge_config.yaml']),
+                bridge_config,
+                robot_description,
                 {
                     'sim_mode': sim_mode,
                     'enable_dual_source': LaunchConfiguration('enable_dual_source'),
-                    'urdf_path': urdf_path,
+                    'urdf_path': '',
+                    'home_positions': UR5_HOME,
                 },
             ],
         ),
@@ -64,8 +156,10 @@ def generate_launch_description():
             name='arm_trajectory_controller',
             output='screen',
             parameters=[{
-                'joint_names': ['joint1', 'joint2'],
-                'action_name': '/arm_controller/follow_joint_trajectory',
+                'joint_names': UR5_JOINTS,
+                'action_name': '/scaled_joint_trajectory_controller/follow_joint_trajectory',
+                'goal_tolerance': 0.02,
+                'execution_duration_scaling': 2.0,
             }],
         ),
         Node(
@@ -73,34 +167,8 @@ def generate_launch_description():
             executable='robot_state_publisher',
             name='robot_state_publisher',
             output='screen',
-            parameters=[moveit_config.robot_description],
+            parameters=[robot_description],
         ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='world_to_base',
-            arguments=['--frame-id', 'world', '--child-frame-id', 'base_link'],
-        ),
-        Node(
-            package='moveit_ros_move_group',
-            executable='move_group',
-            name='move_group',
-            output='screen',
-            parameters=[moveit_config.to_dict()],
-        ),
-        Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz2',
-            output='log',
-            arguments=['-d', rviz_config],
-            parameters=[
-                moveit_config.robot_description,
-                moveit_config.robot_description_semantic,
-                moveit_config.robot_description_kinematics,
-                moveit_config.joint_limits,
-                moveit_config.planning_pipelines,
-            ],
-            condition=IfCondition(use_rviz),
-        ),
+        move_group_node,
+        TimerAction(period=3.0, actions=[rviz_node]),
     ])

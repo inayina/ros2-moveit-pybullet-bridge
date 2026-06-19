@@ -642,7 +642,7 @@ sequenceDiagram
 | `trajectory_controller_node`（FollowJointTrajectory） | ✅ M2 已实现 | 等效 ros2_control relay |
 | MoveIt `m2_demo.launch.py` + RViz | ✅ M2 已实现 | — |
 | FollowJointTrajectory 闭环 | ✅ M2 已实现 | move_group → Action → bridge |
-| 域随机化服务实现 | 🔶 桩 | M3 完整实现 |
+| 域随机化服务实现 | ✅ M3 已实现 | `set_randomization` / `inject_shift` / 双源 Real-Source |
 
 ---
 

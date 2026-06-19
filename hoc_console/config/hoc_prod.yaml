@@ -1,0 +1,3 @@
+hoc_prod:
+  ros__parameters:
+    serve_frontend: true

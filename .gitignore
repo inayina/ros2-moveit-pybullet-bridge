@@ -9,6 +9,7 @@ build/
 # ROS 2
 install/
 log/
+.ros_log/
 *.bag
 *.db3
 

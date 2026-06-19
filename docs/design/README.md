@@ -12,6 +12,7 @@
 | 03 | [分布监控算法详设](./03-distribution-monitoring-algorithm.md) | KL 散度、MMD、滑窗策略、阈值标定 |
 | 04 | [人机运维控制台设计](./04-hoc-console-design.md) | HOC 技术选型、页面线框、交互流程、WebSocket 协议 |
 | 05 | [ROS2 节点接口与数据流规格](./05-ros2-node-interface-and-dataflow-spec.md) | PyBullet Clock Sync、Topic/Service/Action、MoveIt2 配置、URDF 物理参数、闭环数据流 |
+| 06 | [机器人平台选型评估](./06-robot-platform-selection.md) | KUKA iiwa 统一 vs 多机型；与 episode-data-lab 联动建议 |
 
 ## 阅读顺序
 
@@ -21,6 +22,8 @@
 02 接口设计          ← 实现节点前先读
         ↓
 05 节点接口与数据流   ← PyBullet 桥接 + MoveIt2 集成详读
+        ↓
+06 机器人平台选型     ← 与 episode-data-lab 联动前读（iiwa 统一评估）
         ↓
 03 分布监控算法详设   ← 实现 dist_monitor 前读
         ↓
@@ -45,3 +48,4 @@ ros2-moveit-pybullet-bridge/
 |------|------|------|
 | v0.1 | 2026-06-19 | 初版：架构、接口、算法、HOC 四篇文档 |
 | v0.2 | 2026-06-19 | 新增 05：PyBullet Clock Sync、MoveIt2 联合配置、闭环数据流 |
+| v0.3 | 2026-06-19 | M5 HOC 实现同步；iiwa 主线配图；样例实验报告 |

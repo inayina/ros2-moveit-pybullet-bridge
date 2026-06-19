@@ -19,6 +19,7 @@ set(msg_files
   "msg/RiskStatus.msg"
   "msg/DomainRandomizationConfig.msg"
   "msg/ExperimentMetadata.msg"
+  "msg/SimRealError.msg"
 )
 
 set(srv_files

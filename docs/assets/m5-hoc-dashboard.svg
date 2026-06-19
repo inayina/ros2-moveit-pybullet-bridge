@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="450" viewBox="0 0 900 450">
+  <rect width="100%" height="100%" fill="#f8f9fb"/>
+  
+  <rect width="100%" height="100%" fill="#0a0a0a"/>
+  <text x="450" y="32" text-anchor="middle" font-size="18" font-weight="bold" fill="#e8e8e8">M5: HOC Dashboard (dark theme wireframe)</text>
+  <rect x="20" y="48" width="860" height="44" rx="8" fill="#2b1d11" stroke="#fa8c16" stroke-width="2"/>
+  <text x="40" y="76" fill="#faad14" font-size="14">R2 关注 · 综合风险 0.58 ↑ · 主因: distribution_shift</text>
+  <rect x="20" y="104" width="270" height="200" rx="10" fill="#141414" stroke="#303030"/>
+  <text x="155" y="128" text-anchor="middle" fill="#d9d9d9" font-size="13">五维风险雷达</text>
+  <polygon points="155,190 195,160 175,220 135,220 115,160" fill="rgba(105,177,255,0.35)" stroke="#69b1ff"/>
+  <rect x="306" y="104" width="270" height="200" rx="10" fill="#141414" stroke="#303030"/>
+  <text x="441" y="128" text-anchor="middle" fill="#d9d9d9" font-size="13">Sim / Real 分布对比</text>
+  <rect x="330" y="150" width="18" height="60" fill="#69b1ff"/><rect x="352" y="140" width="18" height="70" fill="#95de64"/>
+  <rect x="380" y="150" width="18" height="55" fill="#69b1ff"/><rect x="402" y="145" width="18" height="65" fill="#95de64"/>
+  <rect x="592" y="104" width="288" height="200" rx="10" fill="#141414" stroke="#303030"/>
+  <text x="736" y="128" text-anchor="middle" fill="#d9d9d9" font-size="13">关节跟踪误差</text>
+  <polyline points="620,260 660,220 700,230 740,200 780,210 820,190" fill="none" stroke="#b37feb" stroke-width="2"/>
+  <rect x="20" y="318" width="860" height="90" rx="10" fill="#141414" stroke="#303030"/>
+  <text x="40" y="342" fill="#d9d9d9" font-size="13">KL / MMD 时序（60s）</text>
+  <polyline points="40,390 200,370 360,350 520,330 680,340 840,320" fill="none" stroke="#69b1ff" stroke-width="2"/>
+  <text x="450" y="430" text-anchor="middle" fill="#8c8c8c" font-size="11">Replace with real screenshot: record browser at http://localhost:5173 after hoc.launch.py</text>
+
+</svg>

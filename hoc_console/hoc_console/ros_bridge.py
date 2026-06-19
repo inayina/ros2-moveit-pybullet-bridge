@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from bridge_monitor_msgs.msg import DistributionMetrics, RiskStatus
+from bridge_monitor_msgs.msg import DistributionMetrics, DomainRandomizationConfig, RiskStatus
+from sensor_msgs.msg import JointState
+
+
+def tracking_error_to_dict(msg: JointState) -> dict:
+    return {
+        'joint_names': list(msg.name),
+        'errors': list(msg.position),
+    }
 
 
 def risk_status_to_dict(msg: RiskStatus) -> dict:

@@ -4,4 +4,6 @@ hoc_server:
     http_port: 8080
     push_frequency_hz: 5.0
     rosbag_output_dir: "~/ros2_ws/bags"
-    enable_cors: true
+    report_output_dir: "~/ros2_ws/reports"
+    serve_frontend: true
+    frontend_dist_dir: ""
