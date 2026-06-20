@@ -3,6 +3,10 @@
 **项目**：基于 ROS2 + MoveIt2 + PyBullet 的虚实映射与分布监控系统  
 **环境**：ROS 2 Jazzy · Python 3.12 · PyBullet 3.x · MoveIt2 2.9.x
 
+## 当前阅读提示
+
+本目录既包含早期目标设计，也包含后续实现补全记录。判断“现在还差什么”时，优先看 [验收标准差距台账](../ACCEPTANCE_GAP.md) 与 [作品集剩余工作清单](../PORTFOLIO_REMAINING.md)；判断“为什么这样设计”时，再按下面顺序阅读 01–09。
+
 ## 文档列表
 
 | 序号 | 文档 | 说明 |
@@ -16,6 +20,7 @@
 | 07 | [作品集系统 Spec 补充](./07-portfolio-system-spec-supplement.md) | **求职总 Spec**：双源 changeDynamics、W1、Action Library、Fail-Safe、Sprint 路线、编码前置清单、面试讲解稿 |
 | 08 | [双仓库通盘集成设计](./08-dual-repo-portfolio-integration-spec.md) | **episode-data-lab + bridge 一体架构**、LeRobot 契约、Real 三模式、HAL 映射、统一 Sprint |
 | 09 | [风险监控补全实现 Spec](./09-risk-monitoring-completion-spec.md) | **S5a–S5d 已实现**：五维风险、R2 降级、看门狗/CSV/阈值热更新 |
+| — | [验收标准差距台账](../ACCEPTANCE_GAP.md) | **验收对照**：逐条记录 FR/NFR 当前状态、证据缺口、范围调整与 Phase-2+ |
 | — | [作品集剩余工作清单](../PORTFOLIO_REMAINING.md) | **待办跟踪**：M6 打磨、面试 Demo、双仓库验收（非设计 Spec） |
 | — | [实验与报告指南](../EXPERIMENTS.md) | **实验流水线**：双仓库联调 + 同任务校准、指标解读 |
 | — | [文档总索引](../README.md) | SETUP / INTEGRATION / samples / assets 导航 |
@@ -68,3 +73,4 @@ ros2-moveit-pybullet-bridge/
 | v0.4 | 2026-06-19 | 新增 07：作品集总 Spec（W1、Action Library、Fail-Safe、前置清单） |
 | v0.5 | 2026-06-19 | 新增 08：双仓库通盘集成（episode-data-lab + bridge） |
 | v0.7 | 2026-06-20 | 09 Spec P4 完成：看门狗 HOLD、CSV 导出、verify_risk_complete |
+| v0.8 | 2026-06-20 | 新增验收标准差距台账入口 |

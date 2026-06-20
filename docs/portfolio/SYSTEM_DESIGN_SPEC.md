@@ -22,7 +22,7 @@
 | v0.1 | 2026-06-19 | 架构 / 接口 / 算法 / HOC 四篇初稿 |
 
 **交付定位（一句话）**  
-本系统提供**可脚本化验收**的 Sim2Real 预集成环境：单命令启动、CI 全绿、HOC 可审计报告，降低「无真机条件下的交付不确定性」。
+本系统提供**可脚本化验收**的 Sim2Real 预集成环境：核心 launch、CI 配置、测试/verify 脚本与 HOC 可审计报告，降低「无真机条件下的交付不确定性」。当前工作区已完成本机复验；推送后仍以 GitHub Actions 绿勾为公开交付记录。
 
 ---
 
@@ -290,7 +290,7 @@ R3 → e_stop_active → bridge 停步 → MoveGroup cancel → HOC Acknowledge 
 | **Docker**（推荐） | CI、新环境快速验收 | GUI 需宿主机 X11 |
 | **源码编译** | 开发调试、RViz 录屏 | conda 与 ROS Python 冲突 |
 
-### 4.2 Docker 一键冒烟
+### 4.2 Docker 冒烟入口
 
 ```bash
 export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
@@ -298,6 +298,8 @@ docker compose build
 docker compose run --rm verify          # URDF + offline_compare + portfolio 15s
 docker compose run --rm portfolio-demo  # headless 交互演示
 ```
+
+`verify` 服务实际运行 `scripts/verify_portfolio.sh`；该脚本会清理 ROS 进程并启动 DIRECT smoke，适合干净环境复验，不建议在已有演示进程运行时直接执行。
 
 详见 [docker/README.md](../../docker/README.md)。
 
@@ -400,7 +402,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 
 [![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
 
-**交付要点**：CI 绿勾 = 最低交付门槛；交付前本地复现 CI 环境（系统 Python 3.12）。
+**交付要点**：CI 绿勾 = 最低交付门槛；交付前本地复现 CI 环境（系统 Python 3.12）。2026-06-20 本机已通过 `run_tests.sh`、`verify_portfolio.sh`、`verify_risk_complete.sh` 与 iiwa joint consistency 检查。
 
 ---
 
@@ -411,7 +413,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 | 范围 | 完成度 | 交付状态 |
 |------|--------|----------|
 | M1–M5 核心功能 | ~98% | ✅ 可 Live Demo |
-| S5 五维风险补全 | ~98% | ✅ 可验收 |
+| S5 五维风险补全 | ~98% | 本机 `verify_risk_complete.sh` 已通过 |
 | M6 展示材料 | ~70% | ⚠️ 待真实录屏替换合成图 |
 | 双仓库一体验收 | ~60% | ⚠️ LeRobot 联调需双方就绪 |
 
@@ -423,6 +425,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 | 真机 `real_source:=ros2` | 未实现 | 当前仅仿真验收 |
 | `/clock` + `use_sim_time` | 参数预留 | rosbag 严格同步待 Phase-2 |
 | HOC Settings 调阈值 | 服务已有，UI 未做 | 改 YAML 即可 |
+| `portfolio_demo.launch.py` 自动启动 HOC | 未集成 | 演示时另开 `hoc.launch.py`，非核心链路阻塞 |
 | Docker GUI | 需 X11 或宿主机 | 录屏用源码路径 |
 
 ### 6.3 后续规划（Phase-2+）
@@ -469,7 +472,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 | `/risk/force_e_stop` | `Trigger` | 强制急停 |
 | `/hoc/export_experiment` | `ExportExperiment` | 报告导出 |
 | `/move_action` | `MoveGroup` | MoveIt 规划 |
-| `/pick` · `/place` | Action | 高层 manipulation |
+| `/manipulation/pick` · `/manipulation/place` | Action | 高层 manipulation |
 
 > 完整字段：[docs/design/02-interface-design.md](../design/02-interface-design.md)
 

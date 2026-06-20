@@ -120,8 +120,10 @@ def generate_launch_description():
             parameters=[{
                 'joint_names': iiwa_joints,
                 'action_name': '/arm_controller/follow_joint_trajectory',
-                'goal_tolerance': 0.03,
+                'goal_tolerance': 0.08,
+                'goal_time_margin_sec': 0.5,
                 'execution_duration_scaling': 2.5,
+                'succeed_on_duration': True,
             }],
         ),
         Node(

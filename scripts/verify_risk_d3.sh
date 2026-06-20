@@ -17,9 +17,15 @@ pkill -f "/risk_engine/risk_node" 2>/dev/null || true
 sleep 1
 
 echo "==> Launch portfolio_demo (DIRECT, 12s)"
-ros2 launch pybullet_bridge portfolio_demo.launch.py \
+setsid ros2 launch pybullet_bridge portfolio_demo.launch.py \
   sim_mode:=DIRECT real_source:=topic >/tmp/verify_risk_d3.log 2>&1 &
 LAUNCH_PID=$!
+
+cleanup() {
+  kill -- "-${LAUNCH_PID}" 2>/dev/null || kill "${LAUNCH_PID}" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 sleep 10
 
 echo "==> Check dynamics fields in DistributionMetrics"
@@ -27,7 +33,6 @@ METRICS=$(timeout 5 ros2 topic echo /monitor/distribution_metrics --once 2>/dev/
 for field in dynamics_anomaly_score velocity_jump_per_joint soft_limit_score soft_limit_triggered; do
   if ! echo "$METRICS" | grep -q "$field"; then
     echo "[FAIL] missing field: $field (rebuild bridge_monitor_msgs?)" >&2
-    kill "$LAUNCH_PID" 2>/dev/null || true
     exit 1
   fi
   echo "  $field OK"
@@ -49,12 +54,12 @@ echo "==> Risk engine exposes dynamics_anomaly attribution"
 RISK=$(timeout 5 ros2 topic echo /risk/status --once 2>/dev/null || true)
 if ! echo "$RISK" | grep -q 'dynamics_anomaly'; then
   echo "[FAIL] dynamics_anomaly not in risk attribution" >&2
-  kill "$LAUNCH_PID" 2>/dev/null || true
   exit 1
 fi
 echo "  dynamics_anomaly attribution OK"
 
-kill "$LAUNCH_PID" 2>/dev/null || true
+cleanup
+trap - EXIT
 sleep 1
 
 echo "[PASS] verify_risk_d3.sh complete (D3 + soft limits)"

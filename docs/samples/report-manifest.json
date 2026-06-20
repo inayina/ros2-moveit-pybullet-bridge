@@ -10,7 +10,7 @@
     "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-lerobot-overlay.png",
     "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-lerobot-metrics.png"
   ],
-  "dual_repo_cross_source": "KL mean=0.0000  W1 mean=0.0000  MMD=0.2723 (p=0.010)  n=177  shift=True (mmd)",
-  "same_task_iiwa": "KL mean=0.4681  W1 mean=0.0085  MMD=0.0496 (p=0.010)  n=115  shift=True (kl)",
-  "same_task_lerobot": "KL mean=0.2230  W1 mean=0.0010  MMD=0.1623 (p=0.010)  n=525  shift=True (kl+mmd)"
+  "dual_repo_cross_source": "KL mean=0.0000  W1 mean=0.0000  MMD=0.2314 (p=0.010)  n=408  shift=True (mmd)",
+  "same_task_iiwa": "KL mean=0.0489  W1 mean=0.0049  MMD=0.2036 (p=0.010)  n=897  shift=True (mmd)",
+  "same_task_lerobot": "KL mean=0.0164  W1 mean=0.0001  MMD=0.2222 (p=0.010)  n=1543  shift=True (mmd)"
 }

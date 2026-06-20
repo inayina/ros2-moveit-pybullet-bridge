@@ -25,6 +25,7 @@ jobs:
             python3-pip \
             python3-pytest \
             ros-jazzy-robot-state-publisher \
+            ros-jazzy-moveit-msgs \
             ros-jazzy-launch-testing \
             ros-jazzy-launch-testing-ros \
             ros-jazzy-launch-testing-ament-cmake

@@ -94,11 +94,16 @@ pkill -f "/pybullet_bridge/bridge_node" 2>/dev/null || true
 pkill -f "sim_trajectory_recorder" 2>/dev/null || true
 sleep 1
 
-ros2 launch pybullet_bridge portfolio_demo.launch.py \
+setsid ros2 launch pybullet_bridge portfolio_demo.launch.py \
   sim_mode:=DIRECT real_source:=lerobot \
   lerobot_dataset_path:="${LEROBOT_EXPORT}" \
   >/tmp/dual_repo_lerobot.log 2>&1 &
 LAUNCH_PID=$!
+
+cleanup_launch() {
+  kill -- "-${LAUNCH_PID}" 2>/dev/null || kill "${LAUNCH_PID}" 2>/dev/null || true
+}
+trap cleanup_launch EXIT
 
 CAPTURE_OK=false
 ONLINE_OK=false
@@ -145,8 +150,8 @@ PY
 )"
 fi
 
-kill "${LAUNCH_PID}" 2>/dev/null || true
-wait "${LAUNCH_PID}" 2>/dev/null || true
+cleanup_launch
+trap - EXIT
 sleep 1
 
 python3 - <<PY

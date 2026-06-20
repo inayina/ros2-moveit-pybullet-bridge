@@ -10,6 +10,7 @@ from geometry_msgs.msg import PoseStamped
 from moveit_msgs.action import MoveGroup
 from moveit_msgs.msg import (
     Constraints,
+    JointConstraint,
     MotionPlanRequest,
     MoveItErrorCodes,
     OrientationConstraint,
@@ -54,6 +55,25 @@ def build_pose_constraints(
     orient.absolute_z_axis_tolerance = orientation_tolerance
     orient.weight = 1.0
     constraints.orientation_constraints = [orient]
+    return constraints
+
+
+def build_joint_constraints(
+    joint_names: list[str],
+    positions: list[float],
+    *,
+    tolerance: float = 0.01,
+) -> Constraints:
+    """Build a MoveIt joint-space goal constraint."""
+    constraints = Constraints()
+    for name, position in zip(joint_names, positions, strict=False):
+        joint = JointConstraint()
+        joint.joint_name = name
+        joint.position = float(position)
+        joint.tolerance_above = tolerance
+        joint.tolerance_below = tolerance
+        joint.weight = 1.0
+        constraints.joint_constraints.append(joint)
     return constraints
 
 
@@ -134,6 +154,66 @@ class MoveGroupClient:
         if not trajectory.joint_names:
             trajectory = action_result.executed_trajectory.joint_trajectory
         return True, trajectory, 'MoveGroup succeeded'
+
+    def move_to_joint_positions(
+        self,
+        joint_names: list[str],
+        positions: list[float],
+        *,
+        planning_group: str,
+        timeout_sec: float = 30.0,
+    ) -> tuple[bool, JointTrajectory | None, str]:
+        if len(joint_names) != len(positions):
+            return False, None, 'Joint names and positions length mismatch'
+        if not self._client.server_is_ready():
+            if not self.wait_for_server(timeout_sec=min(timeout_sec, 5.0)):
+                return False, None, f'MoveGroup action server not available: {self._client._action_name}'
+
+        goal = MoveGroup.Goal()
+        goal.request = MotionPlanRequest()
+        goal.request.group_name = planning_group
+        goal.request.num_planning_attempts = self._num_planning_attempts
+        goal.request.allowed_planning_time = self._planning_time_sec
+        goal.request.max_velocity_scaling_factor = 0.4
+        goal.request.max_acceleration_scaling_factor = 0.4
+        goal.request.goal_constraints = [
+            build_joint_constraints(joint_names, positions),
+        ]
+
+        goal.planning_options = PlanningOptions()
+        goal.planning_options.plan_only = False
+        goal.planning_options.replan = True
+        goal.planning_options.replan_attempts = 2
+
+        send_future = self._client.send_goal_async(goal)
+        rclpy.spin_until_future_complete(self._node, send_future, timeout_sec=timeout_sec)
+        if not send_future.done():
+            return False, None, 'Timed out sending MoveGroup joint goal'
+
+        goal_handle = send_future.result()
+        if goal_handle is None or not goal_handle.accepted:
+            return False, None, 'MoveGroup joint goal rejected'
+
+        self._active_goal_handle = goal_handle
+        result_future = goal_handle.get_result_async()
+        rclpy.spin_until_future_complete(self._node, result_future, timeout_sec=timeout_sec)
+        self._active_goal_handle = None
+        if not result_future.done():
+            goal_handle.cancel_goal_async()
+            return False, None, 'Timed out waiting for MoveGroup joint result'
+
+        action_result = result_future.result().result
+        if action_result.error_code.val != MoveItErrorCodes.SUCCESS:
+            return (
+                False,
+                None,
+                f'MoveGroup joint goal failed: error_code={action_result.error_code.val}',
+            )
+
+        trajectory = action_result.planned_trajectory.joint_trajectory
+        if not trajectory.joint_names:
+            trajectory = action_result.executed_trajectory.joint_trajectory
+        return True, trajectory, 'MoveGroup joint goal succeeded'
 
     def cancel_all(self) -> None:
         if self._active_goal_handle is not None:

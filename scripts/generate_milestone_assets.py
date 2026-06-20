@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import math
 import os
 from pathlib import Path
@@ -17,6 +18,22 @@ ASSETS.mkdir(parents=True, exist_ok=True)
 
 LINK1 = 0.35
 LINK2 = 0.30
+
+README_ASSETS = {
+    'm2-iiwa-pybullet.gif',
+    'm2-iiwa-rviz.gif',
+    'm3-dual-source.gif',
+    'm5-hoc-dashboard.png',
+    'm6-pick-and-lift.gif',
+}
+
+
+def _skip_protected_readme_asset(out: Path, *, force: bool) -> bool:
+    """Avoid replacing real README captures with synthetic fallback assets."""
+    if force or out.name not in README_ASSETS or not out.is_file():
+        return False
+    print(f'keep {out} (protected README real asset; use --force-readme-assets to overwrite)')
+    return True
 
 
 def _arm_xy(j1: float, j2: float) -> tuple[np.ndarray, np.ndarray]:
@@ -112,7 +129,59 @@ def generate_m1_pybullet_png() -> None:
     print(f'wrote {out}')
 
 
-def generate_m3_gif() -> None:
+def generate_m3_gif(*, force_readme_assets: bool = False) -> None:
+    out = ASSETS / 'm3-dual-source.gif'
+    if _skip_protected_readme_asset(out, force=force_readme_assets):
+        return
+
+    real_npz = ROOT / 'docs' / 'samples' / 'same-task-iiwa-dual.npz'
+    if real_npz.is_file():
+        data = np.load(real_npz)
+        sim_t = np.asarray(data['sim_timestamps'], dtype=float).ravel()
+        sim_pos = np.asarray(data['sim_positions'], dtype=float)
+        real_t = np.asarray(data['real_timestamps'], dtype=float).ravel()
+        real_pos = np.asarray(data['real_positions'], dtype=float)
+        n = min(len(sim_t), len(real_t), len(sim_pos), len(real_pos))
+        idx = np.arange(0, n, 3)
+        sim_t, sim_pos = sim_t[:n][idx], sim_pos[:n][idx]
+        real_t, real_pos = real_t[:n][idx], real_pos[:n][idx]
+        joint_idx = 1 if sim_pos.shape[1] > 1 else 0
+
+        fig, ax = plt.subplots(figsize=(8, 3.8))
+        fig.patch.set_facecolor('#141414')
+        ax.set_facecolor('#141414')
+        ax.set_title(
+            'M3: Dual-Source Live Capture — Sim vs Domain-Randomized Real',
+            color='#e8e8e8',
+            fontweight='bold',
+            fontsize=11,
+        )
+        ax.set_xlabel('time (s)', color='#bfbfbf')
+        ax.set_ylabel(f'joint {joint_idx + 1} position (rad)', color='#bfbfbf')
+        ax.tick_params(colors='#bfbfbf')
+        ax.grid(True, alpha=0.25, color='#555')
+        (line_sim,) = ax.plot([], [], color='#3498db', lw=2, label='Sim-Source')
+        (line_real,) = ax.plot([], [], color='#e74c3c', lw=2, label='Real-Source')
+        ax.legend(facecolor='#1f1f1f', edgecolor='#434343', labelcolor='#e8e8e8')
+        ax.set_xlim(0, max(sim_t[-1], real_t[-1]) * 1.02)
+        y_all = np.concatenate([sim_pos[:, joint_idx], real_pos[:, joint_idx]])
+        y_pad = max(0.05, (y_all.max() - y_all.min()) * 0.15)
+        ax.set_ylim(y_all.min() - y_pad, y_all.max() + y_pad)
+
+        import matplotlib.animation as animation
+
+        def _update_real(i: int):
+            line_sim.set_data(sim_t[: i + 1], sim_pos[: i + 1, joint_idx])
+            line_real.set_data(real_t[: i + 1], real_pos[: i + 1, joint_idx])
+            return line_sim, line_real
+
+        anim = animation.FuncAnimation(
+            fig, _update_real, frames=len(sim_t), interval=80, blit=True)
+        anim.save(out, writer='pillow', dpi=100)
+        plt.close(fig)
+        print(f'wrote {out} (real dual-source NPZ: {real_npz.name})')
+        return
+
     frames = 36
     t = np.linspace(0, 2 * np.pi, frames)
     sim = 0.5 * np.sin(t)
@@ -138,7 +207,6 @@ def generate_m3_gif() -> None:
         return line_sim, line_real
 
     anim = animation.FuncAnimation(fig, _update, frames=frames, interval=90, blit=True)
-    out = ASSETS / 'm3-dual-source.gif'
     anim.save(out, writer='pillow', dpi=100)
     plt.close(fig)
     print(f'wrote {out}')
@@ -367,7 +435,11 @@ def generate_iiwa7_pybullet_png() -> None:
     print(f'wrote {out}')
 
 
-def generate_iiwa7_motion_gif() -> None:
+def generate_iiwa7_motion_gif(*, force_readme_assets: bool = False) -> None:
+    out = ASSETS / 'm2-iiwa-pybullet.gif'
+    if _skip_protected_readme_asset(out, force=force_readme_assets):
+        return
+
     try:
         import pybullet as p
         import pybullet_data
@@ -414,14 +486,17 @@ def generate_iiwa7_motion_gif() -> None:
         return [im]
 
     anim = animation.FuncAnimation(fig, _update, frames=frames, interval=100, blit=True)
-    out = ASSETS / 'm2-iiwa-pybullet.gif'
     anim.save(out, writer='pillow', dpi=100)
     plt.close(fig)
     print(f'wrote {out}')
 
 
-def generate_m5_dashboard_png() -> None:
+def generate_m5_dashboard_png(*, force_readme_assets: bool = False) -> None:
     """Dark-theme HOC dashboard preview (matplotlib; replace with browser screenshot when available)."""
+    out = ASSETS / 'm5-hoc-dashboard.png'
+    if _skip_protected_readme_asset(out, force=force_readme_assets):
+        return
+
     dims = ['dist_shift', 'tracking', 'dynamics', 'comm', 'planning']
     dim_labels = ['Distribution', 'Tracking', 'Dynamics', 'Comm', 'Planning']
     scores = np.array([0.72, 0.35, 0.28, 0.15, 0.08])
@@ -487,7 +562,6 @@ def generate_m5_dashboard_png() -> None:
     ax_bar.grid(True, axis='y', alpha=0.2)
 
     fig.suptitle('M5: HOC Dashboard Preview', color='#e8e8e8', fontsize=14, fontweight='bold', y=0.98)
-    out = ASSETS / 'm5-hoc-dashboard.png'
     fig.savefig(out, dpi=120, facecolor=fig.get_facecolor(), bbox_inches='tight')
     plt.close(fig)
     print(f'wrote {out}')
@@ -528,18 +602,26 @@ def generate_portfolio_overview_png() -> None:
     print(f'wrote {out}')
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description='Generate milestone assets.')
+    parser.add_argument(
+        '--force-readme-assets',
+        action='store_true',
+        help='Overwrite README real capture assets with generated fallback assets.',
+    )
+    args = parser.parse_args(argv)
+
     generate_m1_gif()
     generate_m1_pybullet_png()
     generate_m2_svg()
     generate_m2_iiwa_svg()
     generate_iiwa7_pybullet_png()
-    generate_iiwa7_motion_gif()
-    generate_m3_gif()
+    generate_iiwa7_motion_gif(force_readme_assets=args.force_readme_assets)
+    generate_m3_gif(force_readme_assets=args.force_readme_assets)
     generate_m4_png()
     generate_m5_svg()
     generate_m5_dashboard_svg()
-    generate_m5_dashboard_png()
+    generate_m5_dashboard_png(force_readme_assets=args.force_readme_assets)
     generate_portfolio_overview_png()
     print(f'done — assets in {ASSETS}')
 

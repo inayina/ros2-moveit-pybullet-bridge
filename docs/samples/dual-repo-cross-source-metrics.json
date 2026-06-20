@@ -1,5 +1,5 @@
 {
-  "sample_count": 177,
+  "sample_count": 408,
   "kl_divergence_per_joint": [
     0.0,
     0.0,
@@ -21,9 +21,10 @@
   ],
   "wasserstein_mean": 0.0,
   "shift_detected_w1": false,
-  "mmd_statistic": 0.2722681566211409,
+  "mmd_statistic": 0.2314016032198578,
   "mmd_p_value": 0.009900990099009901,
   "shift_detected": true,
   "detection_method": "mmd",
-  "n_dof": 7
+  "n_dof": 7,
+  "baseline_frac": 0.0
 }

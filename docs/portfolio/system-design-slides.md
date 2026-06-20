@@ -37,7 +37,7 @@ inayina · v1.0 · 2026-06-20
 
 **交付定位**
 
-> 可脚本化验收的 Sim2Real 预集成环境：单命令启动、CI 全绿、HOC 可审计报告
+> 可脚本化验收的 Sim2Real 预集成环境：核心 launch、CI 配置、verify 脚本、HOC 可审计报告
 
 **仓库** github.com/inayina/ros2-moveit-pybullet-bridge · **License** Apache-2.0
 
@@ -330,7 +330,7 @@ L1 单元（KL/MMD/插值）
 | 范围 | 状态 |
 |------|------|
 | M1–M5 核心 | ✅ ~98% 可 Demo |
-| S5 五维风险 | ✅ 可验收 |
+| S5 五维风险 | 本机复验通过 |
 | M6 展示材料 | ⚠️ 待真实录屏 |
 | 双仓库联动 | ⚠️ ~60% |
 
@@ -339,6 +339,7 @@ L1 单元（KL/MMD/插值）
 - 真机 `real_source:=ros2` 未实现
 - 完整 ros2_control 用 relay 替代
 - HOC 阈值 UI 未做（改 YAML）
+- `portfolio_demo.launch.py` 不自动启动 HOC，演示时另开 `hoc.launch.py`
 
 **Phase-2**：真机 HAL · NavigateToPose · use_sim_time 全栈
 
@@ -359,7 +360,7 @@ L1 单元（KL/MMD/插值）
 
 **Services**：`/bridge/inject_shift` · `/bridge/set_randomization` · `/monitor/reset_baseline` · `/risk/acknowledge` · `/hoc/export_experiment`
 
-**Actions**：`/move_action` · `/pick` · `/place`
+**Actions**：`/move_action` · `/manipulation/pick` · `/manipulation/place`
 
 完整定义 → `docs/design/02-interface-design.md`
 

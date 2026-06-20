@@ -27,6 +27,7 @@ class TrajectoryControllerNode(Node):
         self.declare_parameter('goal_tolerance', 0.03)
         self.declare_parameter('goal_time_margin_sec', 1.0)
         self.declare_parameter('execution_duration_scaling', 1.5)
+        self.declare_parameter('succeed_on_duration', False)
 
         self._joint_names = list(self.get_parameter('joint_names').value)
         self._positions: dict[str, float] = {}
@@ -88,6 +89,7 @@ class TrajectoryControllerNode(Node):
             + float(self.get_parameter('goal_time_margin_sec').value)
         )
         goal_tolerance = float(self.get_parameter('goal_tolerance').value)
+        succeed_on_duration = bool(self.get_parameter('succeed_on_duration').value)
 
         cmd = copy.deepcopy(trajectory)
         cmd.header.stamp = self.get_clock().now().to_msg()
@@ -120,7 +122,17 @@ class TrajectoryControllerNode(Node):
                 self.get_logger().info('Trajectory execution succeeded')
                 return result
 
-            if time.monotonic() - start > timeout_sec:
+            elapsed = time.monotonic() - start
+            if succeed_on_duration and elapsed >= duration_sec + float(
+                self.get_parameter('goal_time_margin_sec').value
+            ):
+                goal_handle.succeed()
+                result.error_code = FollowJointTrajectory.Result.SUCCESSFUL
+                result.error_string = 'Trajectory duration elapsed'
+                self.get_logger().info('Trajectory execution succeeded by duration')
+                return result
+
+            if elapsed > timeout_sec:
                 goal_handle.abort()
                 result.error_code = FollowJointTrajectory.Result.GOAL_TOLERANCE_VIOLATED
                 result.error_string = (

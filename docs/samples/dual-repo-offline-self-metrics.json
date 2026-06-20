@@ -25,5 +25,6 @@
   "mmd_p_value": 1.0,
   "shift_detected": false,
   "detection_method": "none",
-  "n_dof": 7
+  "n_dof": 7,
+  "baseline_frac": 0.0
 }

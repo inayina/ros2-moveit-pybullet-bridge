@@ -3,6 +3,7 @@
 预生成的 HTML 报告、JSON 指标与 NPZ 轨迹，供 README / 作品集 / 面试演示引用。
 
 > 总索引：[docs/README.md](../README.md) · 实验说明：[docs/EXPERIMENTS.md](../EXPERIMENTS.md)
+> 最新复验：`run_dual_repo_integration.sh` 与 `run_same_task_calibration.sh` 已通过；online LeRobot smoke 样本 `sim=421` / `real=421`。
 
 ---
 
@@ -27,7 +28,7 @@
 | [dual-repo-offline-self-metrics.json](./dual-repo-offline-self-metrics.json) | **负对照**：LeRobot 自对比（预期 ≈ 0） |
 | [dual-repo-cross-source-metrics.json](./dual-repo-cross-source-metrics.json) | **跨源**：bridge Sim NPZ vs LeRobot Real |
 | [bridge-sim-trajectory.npz](./bridge-sim-trajectory.npz) | 联调时录制的 `/bridge/sim/joint_states` |
-| [dual-repo-online-smoke.json](./dual-repo-online-smoke.json) | `real_source:=lerobot` 在线监控快照 |
+| [dual-repo-online-smoke.json](./dual-repo-online-smoke.json) | `real_source:=lerobot` 在线监控快照（sim/real 均有样本） |
 
 ```bash
 export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
@@ -50,7 +51,7 @@ python3 scripts/regenerate_all_reports.py
 |------|------|
 | [same-task-iiwa-dual.npz](./same-task-iiwa-dual.npz) | B-A：iiwa 正弦 · Sim + Real 双源 |
 | [same-task-iiwa-metrics.json](./same-task-iiwa-metrics.json) | B-A 指标（baseline_frac=0.3） |
-| [same-task-lerobot-dual.npz](./same-task-lerobot-dual.npz) | B-B：LeRobot ep0 回放 · 双源 |
+| [same-task-lerobot-dual.npz](./same-task-lerobot-dual.npz) | B-B：LeRobot ep0 回放 · 双源（sim=1543 / real=1542） |
 | [same-task-lerobot-metrics.json](./same-task-lerobot-metrics.json) | B-B 指标 |
 
 ```bash

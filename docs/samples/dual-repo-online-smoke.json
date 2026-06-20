@@ -8,23 +8,23 @@
   "online_metrics": {
     "kl_divergence_mean": 0.0,
     "wasserstein_mean": 0.0,
-    "mmd_statistic": 0.0,
+    "mmd_statistic": 0.22897533337511677,
     "shift_detected": false,
-    "sample_count_sim": 169.0,
-    "sample_count_real": 0.0
+    "sample_count_sim": 421.0,
+    "sample_count_real": 421.0
   },
   "log_tail": [
-    "[bridge_node-1] [WARN] [1781940288.566694462] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940288.578120307] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
-    "[bridge_node-1] [WARN] [1781940288.639141487] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940288.643551960] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
-    "[bridge_node-1] [WARN] [1781940288.969449186] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940288.976064962] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
-    "[bridge_node-1] [WARN] [1781940289.062508237] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940289.071856632] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
-    "[bridge_node-1] [WARN] [1781940289.156017401] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940289.218302461] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
-    "[bridge_node-1] [WARN] [1781940289.242656727] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
-    "[bridge_node-1] [INFO] [1781940289.252013865] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed"
+    "[monitor_node-3] [INFO] [1781948385.809289602] [dist_monitor]: Loaded soft limits for profile=iiwa7: 7 joints",
+    "[bridge_node-1] pybullet build time: Jun 19 2026 17:47:28",
+    "[bridge_node-1] [INFO] [1781948385.884172695] [pybullet_bridge]: PyBullet ready (sim-only): profile=iiwa7, joints=['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3', 'lbr_iiwa_joint_4', 'lbr_iiwa_joint_5', 'lbr_iiwa_joint_6', 'lbr_iiwa_joint_7'], urdf=/home/ina/ros2_ws/install/pybullet_bridge/share/pybullet_bridge/urdf/kuka_iiwa/model.urdf",
+    "[monitor_node-3] [INFO] [1781948385.912769907] [dist_monitor]: Loaded LeRobot Real trajectory: 1600 samples, joints=['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3', 'lbr_iiwa_joint_4', 'lbr_iiwa_joint_5', 'lbr_iiwa_joint_6', 'lbr_iiwa_joint_7']",
+    "[monitor_node-3] [INFO] [1781948386.292165950] [dist_monitor]: dist_monitor node started.",
+    "[risk_node-4] [INFO] [1781948386.327638747] [risk_engine]: risk_engine node started.",
+    "[bridge_node-1] [WARN] [1781948387.318778665] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[INFO] [iiwa_motion_demo-5]: process started with pid [553632]",
+    "[INFO] [manipulation_node-6]: process started with pid [553657]",
+    "[iiwa_motion_demo-5] [INFO] [1781948388.995500699] [iiwa_motion_demo]: Published iiwa motion: joints=7, duration=6.0s, points=51",
+    "[manipulation_node-6] [WARN] [1781948389.215293707] [manipulation_actions]: MoveGroup unavailable; using /bridge/command fallback planner",
+    "[manipulation_node-6] [INFO] [1781948389.215601973] [manipulation_actions]: Pick/Place action servers ready: /manipulation/pick, /manipulation/place"
   ]
 }

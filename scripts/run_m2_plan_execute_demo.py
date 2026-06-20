@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 import math
+import os
 import sys
 import time
 
 import rclpy
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from rclpy.node import Node
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from manipulation_actions.move_group_client import MoveGroupClient
 from pybullet_bridge.robot_profiles import IIWA_HOME, IIWA_JOINTS
@@ -25,45 +27,55 @@ def _pose(x: float, y: float, z: float, *, frame: str = 'lbr_iiwa_link_0') -> Po
     return msg
 
 
-def _joint_goal(positions: list[float]) -> None:
-    """Fallback: FollowJointTrajectory via ros2 CLI (no extra deps)."""
-    import subprocess
-
-    names = ','.join(IIWA_JOINTS[: len(positions)])
-    pos = ','.join(str(float(v)) for v in positions)
-    cmd = (
-        f"ros2 action send_goal /arm_controller/follow_joint_trajectory "
-        f"control_msgs/action/FollowJointTrajectory "
-        f"\"{{trajectory: {{joint_names: [{names}], "
-        f"points: [{{positions: [{pos}], time_from_start: {{sec: 4}}}}]}}}}\" "
-        f"--feedback"
-    )
-    subprocess.run(['bash', '-lc', cmd], check=False, timeout=30)
-
-
 class M2PlanExecuteDemo(Node):
     def __init__(self) -> None:
         super().__init__('m2_plan_execute_demo')
         self._mg = MoveGroupClient(self, action_name='/move_action')
+        self._bridge_pub = self.create_publisher(JointTrajectory, '/bridge/command', 10)
+
+    def _publish_visible_joint_motion(self) -> None:
+        """Fallback for recording: drive bridge directly with a smooth multi-point trajectory."""
+        home = list(IIWA_HOME)
+        traj = JointTrajectory()
+        traj.header.stamp = self.get_clock().now().to_msg()
+        traj.joint_names = list(IIWA_JOINTS)
+
+        for idx in range(80):
+            phase = idx / 79.0
+            point = JointTrajectoryPoint()
+            point.positions = home[:]
+            point.positions[1] += 0.35 * math.sin(2.0 * math.pi * phase)
+            point.positions[3] += 0.28 * math.sin(4.0 * math.pi * phase + 0.4)
+            point.positions[5] += 0.20 * math.sin(3.0 * math.pi * phase)
+            point.time_from_start.sec = int(8.0 * phase)
+            point.time_from_start.nanosec = int((8.0 * phase - point.time_from_start.sec) * 1e9)
+            traj.points.append(point)
+
+        deadline = time.time() + 2.0
+        while self._bridge_pub.get_subscription_count() == 0 and time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+        self.get_logger().info('Publishing direct /bridge/command fallback trajectory for recording')
+        self._bridge_pub.publish(traj)
 
     def run(self) -> int:
         if not self._mg.wait_for_server(timeout_sec=30.0):
             self.get_logger().error('MoveGroup /move_action not available')
             return 1
 
-        poses = [
-            ('reach_a', _pose(0.42, 0.0, 0.38)),
-            ('reach_b', _pose(0.40, 0.18, 0.42)),
-            ('reach_c', _pose(0.36, -0.12, 0.36)),
+        home = list(IIWA_HOME)
+        joint_goals = [
+            ('joint_a', [home[0] + 0.55, home[1] - 0.25, home[2] + 0.45, home[3] + 0.38, home[4] + 0.25, home[5] - 0.30, home[6] + 0.35]),
+            ('joint_b', [home[0] - 0.55, home[1] + 0.25, home[2] - 0.45, home[3] - 0.35, home[4] - 0.25, home[5] + 0.25, home[6] - 0.35]),
+            ('joint_c', [home[0] + 0.35, home[1] - 0.15, home[2] + 0.55, home[3] + 0.25, home[4] - 0.45, home[5] - 0.20, home[6] + 0.50]),
         ]
         ok_any = False
-        for label, pose in poses:
-            pose.header.stamp = self.get_clock().now().to_msg()
-            self.get_logger().info(f'MoveGroup plan & execute: {label}')
-            ok, _, msg = self._mg.move_to_pose(
-                pose,
+        for label, positions in joint_goals:
+            self.get_logger().info(f'MoveGroup joint plan & execute: {label}')
+            ok, _, msg = self._mg.move_to_joint_positions(
+                list(IIWA_JOINTS),
+                positions,
                 planning_group='manipulator',
-                end_effector_link='lbr_iiwa_link_7',
                 timeout_sec=45.0,
             )
             self.get_logger().info(f'  {label}: ok={ok} — {msg}')
@@ -71,16 +83,13 @@ class M2PlanExecuteDemo(Node):
             time.sleep(0.8)
 
         if not ok_any:
-            self.get_logger().warn('MoveGroup failed — joint sweep fallback')
-            home = list(IIWA_HOME)
-            for i in range(3):
-                joints = home[:]
-                joints[1] += 0.25 * math.sin(i * 1.2)
-                joints[3] += 0.2 * math.cos(i * 0.9)
-                joints[5] += 0.15 * math.sin(i * 1.5)
-                _joint_goal(joints)
-                time.sleep(4.5)
-            ok_any = True
+            if os.environ.get('ALLOW_DIRECT_FALLBACK', '').lower() == 'true':
+                self.get_logger().warn('MoveGroup failed — direct bridge trajectory fallback')
+                self._publish_visible_joint_motion()
+                time.sleep(8.5)
+                ok_any = True
+            else:
+                self.get_logger().error('MoveGroup failed and direct fallback is disabled')
 
         return 0 if ok_any else 2
 

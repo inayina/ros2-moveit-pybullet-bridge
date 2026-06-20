@@ -13,6 +13,7 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
+from dist_monitor.lerobot_loader import LeRobotTrajectory
 from dist_monitor.monitor_node import DistMonitorNode
 
 
@@ -156,3 +157,33 @@ def test_monitor_node_threshold_hot_reload(monitor_node):
     assert cfg.kl_threshold_mean == pytest.approx(0.99)
     assert cfg.w1_threshold_mean == pytest.approx(0.50)
     assert cfg.mmd_threshold == pytest.approx(0.20)
+
+
+def test_lerobot_source_uses_first_sim_stamp_as_time_origin(monitor_node):
+    monitor, _publisher = monitor_node
+    monitor.set_parameters([
+        rclpy.parameter.Parameter('real_source', rclpy.Parameter.Type.STRING, 'lerobot'),
+    ])
+    monitor._joint_names = ['joint1', 'joint2']
+    monitor._lerobot_traj = LeRobotTrajectory(
+        timestamps=np.array([0.0, 0.05, 0.10], dtype=float),
+        positions=np.array([
+            [1.0, 2.0],
+            [1.1, 2.1],
+            [1.2, 2.2],
+        ], dtype=float),
+        velocities=np.zeros((3, 2), dtype=float),
+        joint_names=['joint1', 'joint2'],
+        fps=20.0,
+    )
+    monitor._lerobot_origin = None
+
+    for idx in range(3):
+        msg = JointState()
+        stamp = monitor.get_clock().now() + rclpy.duration.Duration(seconds=100.0 + idx * 0.05)
+        msg.header.stamp = stamp.to_msg()
+        msg.name = ['joint1', 'joint2']
+        msg.position = [0.0, 0.0]
+        monitor._on_sim(msg)
+
+    assert monitor._real_window.count() == 3

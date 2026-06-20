@@ -11,12 +11,12 @@
 | 范围 | 完成度 | 说明 |
 |------|--------|------|
 | **M1–M5 核心功能** | ~98% | 桥接、MoveIt、双源、监控、HOC、Pick/Place 已落地 |
-| **S5 风险补全（09 Spec）** | ~98% | 五维风险、R2 降速、看门狗、CSV、verify 脚本已 commit `a6cb248` |
-| **M6 作品集打磨** | ~70% | 基础配图/样例报告已入库；待真实录屏与 Demo 视频 |
-| **双仓库一体叙事** | ~60% | LeRobot 路径与脚本已有；联调验收与 HAL 收敛未做 |
+| **S5 风险补全（09 Spec）** | ~98% | 五维风险、R2 降速、看门狗、CSV、verify 脚本已落地；2026-06-20 本机复验通过 |
+| **M6 作品集打磨** | ~95% | pick-and-lift 抓取 GIF、真实 HOC 浏览器截图、双仓报告与样例报告已入库；RViz 仅作可选本地演示证据，待 Demo 视频与公开 CI 证据 |
+| **双仓库一体叙事** | ~95% | episode-data-lab 数据集、LeRobot export、bridge online/offline 联调与同任务校准已通过；HAL 属 Phase-2 |
 | **Phase-2+ 扩展** | ~15% | 真机、独立虚拟相机、NavigateToPose 等 — **刻意预留，非面试必做** |
 
-> **结论**：系统已能 Live Demo；剩余工作主要是 **展示材料 + 排练 + 双仓库验收**，不是补核心代码。
+> **结论**：系统已能 Live Demo；核心与双仓联调已本机验收。剩余工作主要是 **展示材料 + 排练 + 公开 CI/Docker 证据**，不是补核心代码。
 
 ---
 
@@ -35,8 +35,9 @@
 
 ### 3.1 确认 CI 通过
 
-- [ ] Push 后打开 [Actions](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions)，确认 `a6cb248` 的 **build-and-test** 全绿  
+- [ ] Push 后打开 [Actions](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions)，确认最新提交的 **build-and-test** 全绿  
 - [ ] 若仍失败：查看失败步骤日志；`ci.yml` 已改为 `"${GITHUB_WORKSPACE}"`，常见剩余问题是依赖或 launch 测试超时
+- [x] 本机已复现：`./scripts/run_tests.sh` 通过（单元 + 节点 + launch 集成）
 
 **本地复现 CI：**
 
@@ -59,6 +60,13 @@ ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
 # 终端 2
 source ~/ros2_ws/install/setup.bash
 ros2 launch hoc_console hoc.launch.py
+# 浏览器 → http://localhost:5173
+```
+
+如果需要单命令本地实验入口，可用代码中已有的组合 launch：
+
+```bash
+ros2 launch hoc_console hoc_experiment.launch.py sim_mode:=DIRECT
 # 浏览器 → http://localhost:5173
 ```
 
@@ -87,7 +95,7 @@ cd ~/ros2_ws/src/ros2-moveit-pybullet-bridge
 python3 scripts/check_iiwa_joint_consistency.py
 ```
 
-- [ ] 上述脚本 PASS  
+- [x] 上述脚本 PASS（`verify_portfolio.sh`、`verify_risk_complete.sh`、`check_iiwa_joint_consistency.py`）  
 - [ ] conda 用户：演示前 `unset CONDA_PREFIX`，用系统 Python 3.12  
 - [ ] HOC：`cd hoc_console/frontend && npm install`（`hoc.launch.py` 会自动 `npm run dev`）
 
@@ -96,12 +104,25 @@ python3 scripts/check_iiwa_joint_consistency.py
 | 问题 | 影响 | 建议 |
 |------|------|------|
 | `hoc_demo_3min.sh` 用 `full_system.launch.py` | Pick 演示被 SKIP | 面试改用 `portfolio_demo` + `hoc.launch.py`；或改脚本默认 launch |
+| `portfolio_demo.launch.py` 不自动启动 HOC | “一键演示”容易被误解为含浏览器控制台 | README 已标注；需要单命令时改用 `hoc_experiment.launch.py` |
 
 ---
 
-## 4. P1 · 作品集展示材料
+## 4. 当前收尾优先级
 
-### 4.1 README / GitHub 配图
+| 优先级 | 任务 | 当前判断 |
+|--------|------|----------|
+| **S0** | GitHub Actions 最新提交绿勾 | 必做，作为公开交付证据 |
+| **S0** | 5–8 分钟备用 Demo 视频 | 必做，现场环境异常时兜底 |
+| **S1** | HOC 浏览器真实截图 / 抓取 GIF | 已补；RViz 仅作可选本地演示证据 |
+| **S1** | Docker `compose run verify` | 已通过，证明干净容器环境可复现 |
+| **S2** | README 增加双仓报告入口与一句话讲解 | 低成本，建议做 |
+
+---
+
+## 5. P1 · 作品集展示材料
+
+### 5.1 README / GitHub 配图
 
 当前 `docs/assets/` 已入库基础配图（见 [`docs/assets/README.md`](assets/README.md)）。
 
@@ -111,25 +132,29 @@ python3 scripts/check_iiwa_joint_consistency.py
 | `m1-pybullet.png` | ✅ 已生成 | 可选 |
 | `m3-dual-source.gif` | ✅ 已生成（合成） | **建议** `portfolio_demo` 录屏替换 |
 | `m4-monitor-metrics.png` | ✅ 已生成（合成） | 可选 |
-| `m2-iiwa-pybullet.gif/png` | ✅ 已生成（PyBullet） | **建议** RViz 录屏 → `m2-iiwa-rviz.gif` |
-| `m5-hoc-dashboard.png` | ✅ 已生成（matplotlib 预览） | **建议** 浏览器真实截图替换 |
+| `m2-iiwa-pybullet.gif/png` | ✅ 已生成（PyBullet） | 可选补更清晰 RViz 录屏；README 主图改用抓取 GIF |
+| `m6-pick-and-lift.gif` | ✅ 已生成（episode-data-lab 成功抓取 episode） | README 首图展示任务过程 |
+| `m5-hoc-dashboard.png` | ✅ 已替换为 HOC 浏览器真实截图 | Playwright + `hoc_prod` 截图 |
 | `portfolio-overview.png` | ✅ 已生成 | README 顶部栈图 |
 | `m5-hoc-*.svg` | ✅ 已有 | 架构/线框保留 |
 
 - [x] 运行 `python3 scripts/generate_milestone_assets.py`  
 - [x] 运行 `python3 scripts/generate_sample_report.py`（含 dashboard 嵌入）  
 - [x] **P1-1** `./scripts/capture_readme_assets.sh` — 从真实 NPZ/指标生成 m3、m2-iiwa-*、m5  
-- [ ] 可选：RViz Plan & Execute 手动录屏替换 `m2-iiwa-rviz.gif`  
-- [ ] 可选：HOC 浏览器真实截图（脚本已尝试 `hoc_prod` + Playwright）  
+- [x] **P1-2** `python3 scripts/capture_pick_lift_asset.py` — 从 episode-data-lab 成功抓取 episode 生成 `m6-pick-and-lift.gif`
+- [ ] 可选：若需要 RViz 证据，再录一版清晰可见的 MoveIt **Plan → Execute** 过程
+- [x] HOC 浏览器真实截图（`hoc_prod` + Playwright）
 - [ ] 将 Demo 视频上传并在 README 加链接
 
-### 4.2 演示视频与样例报告
+### 5.2 演示视频与样例报告
 
 - [ ] 录制 **5–8 分钟** 完整 Demo（iiwa7 + HOC + 注入 + 急停）  
 - [ ] 上传：GitHub Release / 个人网盘 / B站（README 加链接）  
 - [x] [`docs/samples/sample-experiment-report.html`](samples/sample-experiment-report.html) 已更新（五维 + git hash + 截图）
+- [x] [`docs/samples/dual-repo-integration-report.html`](samples/dual-repo-integration-report.html) 已更新（online smoke: sim=421 / real=421）
+- [x] [`docs/samples/same-task-calibration-report.html`](samples/same-task-calibration-report.html) 已更新（LeRobot replay: sim=1543 / real=1542）
 
-### 4.3 HOC 生产构建（可选，录屏用 dev 模式可跳过）
+### 5.3 HOC 生产构建（可选，录屏用 dev 模式可跳过）
 
 ```bash
 cd hoc_console/frontend && npm install && npm run build
@@ -138,28 +163,29 @@ ros2 launch hoc_console hoc_prod.launch.py   # http://localhost:8080
 
 - [ ] 前端五维/HOLD/CSV 改动已 `npm run build`（仅 `hoc_prod` 需要）
 
-### 4.4 文档索引
+### 5.4 文档索引
 
 - [ ] 在 [`docs/design/README.md`](design/README.md) 增加本文链接（便于自己回顾）  
 - [ ] README 里程碑表可增加 **M6** 一行（打磨中 / 待录屏）
 
 ---
 
-## 5. P2 · 双仓库联动（episode-data-lab）
+## 6. P2 · 双仓库联动（episode-data-lab）
 
 与 [`docs/design/08-dual-repo-portfolio-integration-spec.md`](design/08-dual-repo-portfolio-integration-spec.md) §10 对齐。
 
 ### 5.1 episode-data-lab 侧
 
-- [ ] `dataset/v1/lerobot_export` 已导出且 `validate_dataset.py` 通过  
-- [ ] Episode 使用 `robot=kuka_iiwa`、7-DOF、`grasp_mode=constraint`  
-- [ ] `metadata.json` 含 `task_name`、`success`、`random_seed`
+- [x] `dataset/v1/lerobot_export` 已导出且 `validate_dataset.py` 通过（20 episodes，20/20 success）  
+- [x] Episode 使用 `robot=kuka_iiwa`、7-DOF、LeRobot `observation.state` / `action` 关节名对齐 `lbr_iiwa_joint_1..7`  
+- [x] LeRobot meta 含任务、episode、video、state/action schema；原始 episode metadata 仍由 episode-data-lab 侧维护
 
 ### 5.2 bridge 侧
 
-- [ ] `export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab`  
-- [ ] `./scripts/run_integration_demo.sh` 或至少 `offline_compare` PASS  
-- [ ] `real_source:=topic` 与 `real_source:=lerobot` **各跑通一次**
+- [x] `export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab`  
+- [x] `./scripts/run_dual_repo_integration.sh` PASS，生成 `dual-repo-integration-report.html` / `dual-repo-experiment-report.html`  
+- [x] `./scripts/run_same_task_calibration.sh` PASS，生成 `same-task-calibration-report.html`  
+- [x] `real_source:=topic` 与 `real_source:=lerobot` 均跑通；online smoke 最新样本 `sim=421`、`real=421`
 
 ```bash
 export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
@@ -169,42 +195,46 @@ ros2 launch pybullet_bridge portfolio_demo.launch.py real_source:=lerobot
 ### 5.3 一体讲解
 
 - [ ] 熟练 [08 §11 面试一体讲解稿](design/08-dual-repo-portfolio-integration-spec.md#11-面试一体讲解稿3-分钟)（offline 采集 + online 监控两条腿）
+- [ ] 可选：把最新双仓报告截图/链接放入 README 或演示视频脚本
 
 ---
 
-## 6. P3 · 可选扩展（不必为求职阻塞）
+## 7. Phase-2+ 可选扩展（收尾取舍）
 
 来自设计文档、**已实现占位或未实现**的项：
 
-| 项 | 设计来源 | 当前状态 | 备注 |
-|----|----------|----------|------|
-| `NavigateToPose` Action | 07 §3 | 未实现 | 人形/底盘预留 |
-| `real_source:=ros2` 真机模式 | 08 §4 | 未实现 | 接真机时再开 |
-| episode-data-lab `Ros2Robot` HAL | 08 S5 | 未实现 | `batch_collect --backend ros2` |
-| 独立 `virtual_camera_node` | 07 §5 | 部分 | bridge 已有 `enable_camera` + `verify_camera.sh` |
-| 完整 `ros2_control` 接入 | 05 §3.5 | relay 替代 | MoveIt 闭环已通 |
-| `/clock` + `use_sim_time` | 05 §7 | 参数预留 | 仿真时间同步 |
-| 真实夹爪物理 / `/gripper/command` | 07 Pick | `GripperStub` | Pick/Place 演示够用 |
-| 力矩饱和 D3 增强 | 09 §6 | 未做 | PyBullet POSITION_CONTROL 限制 |
-| HOC Settings 面板调阈值 | 09 G7 | 服务已有 | UI 未做 |
-| NFR 状态快照持久化 | 01 NFR-R02 | 未做 | 节点重启恢复 |
-| Docker `compose run verify` | README | 待验证 | 可选冒烟 |
+| 项 | 当前状态 | 对收尾帮助 | 建议 |
+|----|----------|------------|------|
+| Docker `compose run verify` | 已通过 | **高**：证明干净环境可复现 | 已收口 |
+| HOC 浏览器真实截图 / pick-and-lift 抓取 GIF | 已补 | **高**：直接提升 GitHub/面试观感 | 已收口；RViz 可选再录 |
+| episode-data-lab `Ros2Robot` HAL | 未实现 | 中：叙事加分，但工作量大 | 不建议现在做；保留 Phase-2 |
+| 独立 `virtual_camera_node` | 部分，bridge 已有 camera | 低：已有相机/HOC 证据可讲 | 不建议为收尾做 |
+| HOC Settings 面板调阈值 | 服务已有，UI 未做 | 低：不影响 Demo 主线 | 不建议为收尾做 |
+| `/clock` + `use_sim_time` | 参数预留 | 低：偏工程严谨性 | 不建议为收尾做 |
+| 完整 `ros2_control` 接入 | relay 替代 | 低：当前 MoveIt 闭环已通 | 不建议为收尾做 |
+| 真实夹爪物理 / `/gripper/command` | `GripperStub` | 低：Pick/Place 演示够用 | 不建议为收尾做 |
+| `real_source:=ros2` 真机模式 | 未实现 | 低/高风险：无真机条件下难验收 | 明确作为未来迁移 |
+| `NavigateToPose` Action | 未实现 | 低：偏人形/底盘扩展 | 不建议为收尾做 |
+| NFR 状态快照持久化 | 未做 | 低：面试演示不明显 | 不建议为收尾做 |
+| 力矩饱和 D3 增强 | PyBullet POSITION_CONTROL 限制 | 低：现有 D3 已可验收 | 不建议为收尾做 |
+
+> 面试口径：Phase-2+ 不是“欠缺没做完”，而是未来迁移边界。当前收尾应优先做交付证据：CI、Docker smoke、真实截图/视频、报告入口。
+> 验证提醒：`verify_portfolio.sh` / `verify_risk_*.sh` 会清理并启动 ROS 进程，适合干净终端复验；如果本机已有录屏、HOC 或 launch 流程在跑，先确认再执行。
 
 ---
 
-## 7. 建议推进顺序（时间盒）
+## 8. 建议推进顺序（时间盒）
 
 ```
-第 1 天   P0.1 CI 绿勾 + P0.3 verify 脚本
-第 2 天   P0.2 Demo 排练 2 遍 + 录备用视频
-第 3–4 天 P1 配图/录屏入库 + README 链接 Demo 视频
-第 5 天   P2 双仓库联调（若 episode-data-lab 已就绪）
-面试前   背诵 07 §8 + 08 §11；打印/备忘 Demo 操作顺序
+立即     GitHub Actions 绿勾 + Docker verify（若本机 Docker 可用）
+当天     录备用视频 + 截 HOC/RViz 真实图
+当天     README 加双仓报告入口 / Demo 视频链接
+面试前   排练 2 遍；背 07 §8 + 08 §11；打印/备忘 Demo 操作顺序
 ```
 
 ---
 
-## 8. 快速命令备忘
+## 9. 快速命令备忘
 
 ```bash
 # 环境
@@ -222,6 +252,8 @@ ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=GUI
 ./scripts/verify_portfolio.sh
 ./scripts/verify_risk_complete.sh
 ./scripts/run_tests.sh
+./scripts/run_dual_repo_integration.sh
+./scripts/run_same_task_calibration.sh
 
 # 资产生成
 python3 scripts/generate_milestone_assets.py
@@ -230,7 +262,7 @@ python3 scripts/generate_sample_report.py
 
 ---
 
-## 9. 相关文档
+## 10. 相关文档
 
 | 文档 | 用途 |
 |------|------|
@@ -242,7 +274,7 @@ python3 scripts/generate_sample_report.py
 
 ---
 
-## 10. 版本记录
+## 11. 版本记录
 
 | 日期 | 变更 |
 |------|------|

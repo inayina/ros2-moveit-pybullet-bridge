@@ -24,7 +24,19 @@
 | 仿真与 Sim2Real | KUKA iiwa7 双源 PyBullet，domain randomization，LeRobot 跨仓库回放 |
 | 监控算法 | KL / W1 / MMD、滑动窗口、时间对齐、离线与在线对比 |
 | 风险与运维 | 五维风险聚合、急停/确认服务、React + ECharts HOC Dashboard |
-| 工程交付 | Docker、CI、三层测试、HTML 报告、真实截图与可复现实验脚本 |
+| 工程交付 | Docker/CI 配置、三层测试脚本、HTML 报告、README 资产生成与可复现实验脚本 |
+
+### 当前状态与交付边界
+
+| 范围 | 当前状态 | 说明 |
+|------|----------|------|
+| 核心 Demo 链路 | 本机 smoke 已通过 | `portfolio_demo.launch.py` 拉起 iiwa7 双源 PyBullet、监控、风险引擎与运动 demo |
+| HOC 控制台 | 有单独入口和组合入口 | 单独运行 `hoc.launch.py` / `hoc_prod.launch.py`，或用 `hoc_experiment.launch.py` 组合 portfolio demo + HOC |
+| MoveIt 闭环 | 可演示 | `m2_iiwa_demo.launch.py` 通过 `FollowJointTrajectory` relay 驱动 PyBullet |
+| 双仓 LeRobot 联动 | 本机 offline compare 已通过 | 依赖 `EPISODE_DATA_LAB_ROOT` 和导出的 LeRobot 数据集；完整双仓流程仍需按目标环境复验 |
+| 展示材料 M6 | 打磨中 | README 已有 pick-and-lift 抓取 GIF、HOC 浏览器截图与双仓报告；RViz 录屏作为可选本地演示证据，仍建议补完整 Demo 视频 |
+
+**本版本交付边界**：仿真预集成 + 分布监控 + 风险闭环 + HOC 运维控制台。真机 `real_source:=ros2`、完整 `ros2_control` 硬件接口、episode-data-lab `Ros2Robot` HAL、`/clock` + `use_sim_time` 全链路属于 Phase-2+，不作为当前面试 Demo 的阻塞项。
 
 ---
 
@@ -143,15 +155,19 @@ cd ~/ros2_ws && colcon build --symlink-install && source install/setup.bash
 cd ~/ros2_ws/src/ros2-moveit-pybullet-bridge && source setup.sh
 ```
 
-### 2. 一键启动演示
+### 2. 启动演示
 
-源码 / 本机 GUI：
+核心链路（不含浏览器 HOC）：
 
 ```bash
 ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
 ```
 
-启动后约 3 s 自动运行 iiwa7 运动 demo，同时拉起双源监控与风险引擎。
+启动后约 3 s 自动运行 iiwa7 运动 demo，同时拉起双源监控与风险引擎。HOC 控制台不会由该 launch 自动启动；需要另开终端执行 `ros2 launch hoc_console hoc.launch.py`，或直接使用下面的组合入口：
+
+```bash
+ros2 launch hoc_console hoc_experiment.launch.py sim_mode:=DIRECT
+```
 
 Docker headless：
 
@@ -199,7 +215,7 @@ RViz 中选择 **Planning Group → manipulator**，Interact 拖动末端 → **
 1. **端到端闭环**：运行 `portfolio_demo.launch.py`，展示 iiwa7 轨迹进入 PyBullet，Sim/Real 双源同时发布。
 2. **规划接入仿真**：打开 `m2_iiwa_demo.launch.py`，在 RViz 中 Plan & Execute，说明 MoveIt 输出如何经 `FollowJointTrajectory` 到 `/bridge/command`。
 3. **偏移监控与风险**：展示 HOC Dashboard，解释 KL / W1 / MMD 如何进入 `/risk/status`，以及急停、确认、报告导出如何闭环。
-4. **工程验证**：展示 `./scripts/run_tests.sh`、Docker verify、HTML 实验报告和真实 README 截图来源。
+4. **工程验证**：展示 `./scripts/run_tests.sh`、Docker verify 配置、HTML 实验报告和 README 资产来源；最新提交是否通过以本机/CI 复验为准。
 
 详细学习路线见 [docs/PROJECT_LEARNING_GUIDE.md](docs/PROJECT_LEARNING_GUIDE.md)，完整系统设计材料见 [docs/portfolio/](docs/portfolio/README.md)。
 
@@ -223,24 +239,28 @@ HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`h
 
 单元测试（纯算法）→ 节点测试（rclpy 单节点）→ 集成测试（`launch_testing` 全链路），CI 于 `ros:jazzy-ros-base` 容器内自动执行。
 
+> 发布或面试前建议复跑 `./scripts/run_tests.sh`、`./scripts/verify_portfolio.sh`、`./scripts/verify_risk_complete.sh`，并以 GitHub Actions 最新绿勾作为最终验收记录。
+> 最近复验（2026-06-20）：`./scripts/run_tests.sh`、`./scripts/verify_portfolio.sh`、`./scripts/verify_risk_complete.sh`、`python3 scripts/check_iiwa_joint_consistency.py` 均通过；`docker compose run --rm verify` 在挂载 episode-data-lab 后通过。
+
 ---
 
 ## 截图展示
 
-> 配图由 `./scripts/capture_readme_assets.sh` 从**真实运行数据**生成（dual-source NPZ + 实验指标 / 可选 HOC 浏览器截图）。
-> README 仅保留最能证明工程能力的 4 张图；完整实验图表集中在 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) 与 [docs/assets/](docs/assets/README.md)。
+> 配图由 `./scripts/capture_readme_assets.sh` 与 `python3 scripts/capture_pick_lift_asset.py` 从**真实运行数据**生成（pick-and-lift episode、dual-source NPZ、HOC 浏览器截图）。
+> 抓取 GIF 来自 `robot-arm-episode-data-lab` 的成功 episode；RViz/MoveIt 录屏保留为本地演示证据，不再作为 README 主图。
+> README 仅保留最能证明工程能力的核心图片；完整实验图表集中在 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) 与 [docs/assets/](docs/assets/README.md)。
+
+### Pick-and-Lift 任务 Episode
+
+![KUKA iiwa7 抓取并抬升方块](docs/assets/m6-pick-and-lift.gif)
+
+**证明点**：采集仓库生成成功 `pick_and_lift` episode（语言指令、阶段标签、constraint grasp、物体抬升量），本仓库消费同一套 episode / LeRobot 数据做 Sim2Real 监控、双源对齐和报告展示。
 
 ### HOC 运维控制台
 
 ![HOC 风险雷达与分布对比](docs/assets/m5-hoc-dashboard.png)
 
 **证明点**：具备机器人运行态势可视化、风险闭环和实验运维能力。HOC 将 `/risk/status`、`/monitor/distribution_metrics`、`/monitor/tracking_error` 聚合到一屏，并支持域随机化、急停、录制与报告导出。
-
-### RViz + PyBullet 联动
-
-![iiwa7 实时仿真与关节曲线](docs/assets/m2-iiwa-rviz.gif)
-
-**证明点**：MoveIt 2 规划不是停留在 RViz，而是通过 `FollowJointTrajectory` / `/bridge/command` 驱动 PyBullet 物理执行，并把 `/joint_states` 回灌给 MoveIt / TF。
 
 ### 双源监控与一键演示
 
@@ -250,7 +270,7 @@ HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`h
 
 ![KUKA iiwa7 PyBullet 演示](docs/assets/m2-iiwa-pybullet.gif)
 
-**证明点**：`portfolio_demo.launch.py` 可一键复现 KUKA iiwa7 双源仿真、监控和风险引擎，适合作品集演示与自动化验证。
+**证明点**：`portfolio_demo.launch.py` 可复现 KUKA iiwa7 双源仿真、监控和风险引擎；需要同时展示浏览器 HOC 时使用 `hoc_experiment.launch.py` 或另开 `hoc.launch.py`。
 
 重新捕获 README 展示图：`./scripts/capture_readme_assets.sh`。更多实验配图：[docs/assets/](docs/assets/README.md)
 
@@ -264,7 +284,7 @@ HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`h
 
 | 实验 | 命令 | 报告 |
 |------|------|------|
-| 双仓库联调（连通性 + 跨源 MMD） | `./scripts/run_dual_repo_integration.sh` | [dual-repo-experiment-report.html](docs/samples/dual-repo-experiment-report.html) |
+| 双仓库联调（连通性 + online LeRobot smoke + 跨源 MMD） | `./scripts/run_dual_repo_integration.sh` | [dual-repo-integration-report.html](docs/samples/dual-repo-integration-report.html) · [正式解读](docs/samples/dual-repo-experiment-report.html) |
 | 同任务校准（双源同命令，KL/W1 可解释） | `./scripts/run_same_task_calibration.sh` | [same-task-calibration-report.html](docs/samples/same-task-calibration-report.html) |
 
 ```bash
@@ -275,6 +295,8 @@ export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 ```
 
 实验设计、指标解读与图表对照：[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) · 产物索引：[docs/samples/](docs/samples/README.md)
+
+最近本机双仓复验：episode-data-lab `validate_dataset.py` 通过（20 episodes，20/20 success）；online `real_source:=lerobot` smoke 样本 `sim=421` / `real=421`；same-task LeRobot replay 样本 `sim=1543` / `real=1542`。
 
 ---
 

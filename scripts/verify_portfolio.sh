@@ -56,26 +56,35 @@ else
 fi
 
 echo "==> Launch portfolio_demo (DIRECT, smoke + action servers)"
-ros2 launch pybullet_bridge portfolio_demo.launch.py \
+setsid ros2 launch pybullet_bridge portfolio_demo.launch.py \
   sim_mode:=DIRECT real_source:=topic >/tmp/portfolio_verify.log 2>&1 &
 PORT_PID=$!
-sleep 8
-if ros2 action list 2>/dev/null | grep -q '/manipulation/pick'; then
-  echo "  /manipulation/pick OK"
-else
-  echo "[FAIL] /manipulation/pick not available after portfolio_demo launch" >&2
-  kill "$PORT_PID" 2>/dev/null || true
-  exit 1
-fi
-if ros2 action list 2>/dev/null | grep -q '/manipulation/place'; then
-  echo "  /manipulation/place OK"
-else
-  echo "[FAIL] /manipulation/place not available after portfolio_demo launch" >&2
-  kill "$PORT_PID" 2>/dev/null || true
-  exit 1
-fi
+
+cleanup() {
+  kill -- "-${PORT_PID}" 2>/dev/null || kill "${PORT_PID}" 2>/dev/null || true
+}
+trap cleanup EXIT
+
+wait_for_action() {
+  local action_name="$1"
+  local deadline=$((SECONDS + 25))
+  while [ "${SECONDS}" -lt "${deadline}" ]; do
+    if ros2 action list 2>/dev/null | grep -qx "${action_name}"; then
+      echo "  ${action_name} OK"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "[FAIL] ${action_name} not available after portfolio_demo launch" >&2
+  tail -30 /tmp/portfolio_verify.log || true
+  return 1
+}
+
+wait_for_action '/manipulation/pick'
+wait_for_action '/manipulation/place'
 tail -15 /tmp/portfolio_verify.log || true
-kill "$PORT_PID" 2>/dev/null || true
+cleanup
+trap - EXIT
 sleep 1
 
 echo "[PASS] Portfolio verification complete"

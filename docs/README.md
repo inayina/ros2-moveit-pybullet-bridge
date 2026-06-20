@@ -10,6 +10,7 @@
 | 安装与 Launch 参数 | [SETUP.md](./SETUP.md) |
 | 与 episode-data-lab 联调 | [INTEGRATION.md](./INTEGRATION.md) |
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
+| 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |
 | 阅读系统架构 | [design/README.md](./design/README.md) |
 | 导出 PPT/PDF 说明书 | [portfolio/README.md](./portfolio/README.md) |
 | 查看 HTML 报告与 JSON 产物 | [samples/README.md](./samples/README.md) |
@@ -24,6 +25,7 @@ docs/
 ├── SETUP.md               安装、编译、Launch、阈值配置
 ├── INTEGRATION.md         双仓库环境变量与联调步骤
 ├── EXPERIMENTS.md         实验流水线、指标解读、报告对照
+├── ACCEPTANCE_GAP.md      验收标准差距台账
 ├── PORTFOLIO_REMAINING.md 待办跟踪
 ├── design/                01–09 技术设计 Spec
 ├── portfolio/             系统设计说明书 + Marp 幻灯片
@@ -48,6 +50,7 @@ docs/
 | `run_same_task_calibration.sh` | 同任务校准：双源采集 → baseline 分割对比 → 报告 |
 | `regenerate_all_reports.py` | **对齐**：从 JSON/NPZ 重生成图 1–9 + 三份 HTML |
 | `capture_readme_assets.sh` | **P1-1**：README 真实配图（m3 / m2-iiwa-* / m5） |
+| `capture_pick_lift_asset.py` | **P1-2**：从 episode-data-lab 成功抓取 episode 生成 `m6-pick-and-lift.gif` |
 | `run_integration_demo.sh` | 本地冒烟 / 可选采集 |
 | `run_tests.sh` | 单元 + 节点 + 集成测试 |
 | `verify_portfolio.sh` | URDF + offline_compare + 15s demo |

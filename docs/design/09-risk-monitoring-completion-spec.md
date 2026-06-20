@@ -6,6 +6,8 @@
 **依赖**：[01 · 系统架构与需求](./01-system-architecture-and-requirements.md)、[02 · 接口设计](./02-interface-design.md)、[07 · 作品集 Spec 补充](./07-portfolio-system-spec-supplement.md)
 
 > **背景**：M3–M5 主线已打通（双源监控 + KL/W1/MMD + R3 急停 + HOC）。本文档针对 **五维风险中 D3–D5 占位、R2 降级未执行、部分 NFR 未落地** 给出分阶段实现方案，目标是在 **最小 diff** 前提下补全作品集叙事闭环。
+>
+> **当前阅读方式**：第 1.2 节保留的是 S5 开始前的历史缺口；后续实现状态以第 13、15 节以及 [../PORTFOLIO_REMAINING.md](../PORTFOLIO_REMAINING.md) 的复验清单为准。
 
 ---
 
@@ -20,7 +22,9 @@
 | Fail-Safe 主链 | R3 → `e_stop_active` → bridge 停步 → MoveGroup cancel → HOC acknowledge |
 | `hoc_console` | 雷达图、R3 模态、inject_shift、rosbag 录制、HTML/JSON 报告 |
 
-### 1.2 缺口清单（本文档范围）
+### 1.2 原始缺口清单（历史记录）
+
+下表记录 S5 补全启动时的缺口，用于说明设计动机；不是当前代码的未完成清单。当前仍属于 Phase-2+ 的边界见 [../PORTFOLIO_REMAINING.md](../PORTFOLIO_REMAINING.md) §6。
 
 | ID | 类别 | 设计来源 | 当前状态 | 优先级 |
 |----|------|----------|----------|--------|
@@ -462,7 +466,7 @@ float64[] velocity_jump_per_joint
 
 ### 12.4 CI
 
-`.github/workflows/ci.yml` 保持 `./scripts/run_tests.sh`；Phase 完成后追加 `verify_risk_complete.sh`（headless DIRECT）。
+`.github/workflows/ci.yml` 当前运行 `./scripts/run_tests.sh` 与资产生成 smoke；`verify_risk_complete.sh` 仍作为发布/面试前的本地复验脚本，因其会清理并启动 ROS 进程，不默认放入 CI。
 
 ---
 
@@ -493,12 +497,14 @@ float64[] velocity_jump_per_joint
 
 ## 15. 完成定义（Definition of Done）
 
+> 这里描述 S5 功能落地时的代码完成定义。当前工作区已在 2026-06-20 本机复跑通过；推送后仍需以 GitHub Actions 绿勾作为最终公开验收记录。
+
 - [x] `risk_node._compute_raw_scores()` 五维均可能 > 0（有输入时）
 - [x] R2 时 bridge 轨迹墙钟时间 ≥ 1.8× 正常（50% 缩放，容差 20%）
 - [x] `/monitor/comm_health` 与 `/risk/planning_stats` 在 `ros2 topic list` 可见
-- [x] `./scripts/run_tests.sh` 全绿 + `verify_risk_complete.sh` PASS
+- [x] 当前工作区最新版本复跑 `./scripts/run_tests.sh` + `verify_risk_complete.sh` 并记录结果
 - [x] HOC 雷达图五维均有非零演示场景（portfolio_demo + inject_shift / Pick）
-- [x] 本文档状态改为 **已实现**，README 里程碑表更新
+- [x] 本文档状态改为 **已实现**，README/作品集文档保留“发布前复验”口径
 
 ---
 

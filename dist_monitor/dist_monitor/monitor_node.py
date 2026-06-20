@@ -186,7 +186,7 @@ class DistMonitorNode(Node):
             return
         try:
             self._lerobot_traj = load_lerobot_dataset(path)
-            self._lerobot_origin = time.monotonic()
+            self._lerobot_origin = None
             self._joint_names = list(self._lerobot_traj.joint_names)
             self.get_logger().info(
                 f'Loaded LeRobot Real trajectory: {len(self._lerobot_traj.timestamps)} samples, '
@@ -202,7 +202,9 @@ class DistMonitorNode(Node):
         self._sim_window.push(t, _extract_full_state(msg, self._joint_names or None))
 
         if self.get_parameter('real_source').value == 'lerobot' and self._lerobot_traj is not None:
-            rel_t = t - (self._lerobot_origin or t)
+            if self._lerobot_origin is None:
+                self._lerobot_origin = t
+            rel_t = t - self._lerobot_origin
             pos = self._lerobot_traj.lookup_nearest_position(rel_t, self._aligner.tolerance)
             if pos is not None:
                 full = self._lerobot_traj.lookup_nearest(rel_t, self._aligner.tolerance)

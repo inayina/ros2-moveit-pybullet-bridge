@@ -65,7 +65,7 @@ _run_capture() {
   local log_tag="$4"
 
   _stop_launch
-  ros2 launch pybullet_bridge portfolio_demo.launch.py \
+  setsid ros2 launch pybullet_bridge portfolio_demo.launch.py \
     sim_mode:=DIRECT \
     real_source:=topic \
     motion_source:="${motion}" \
@@ -74,10 +74,14 @@ _run_capture() {
     >/tmp/same_task_"${log_tag}".log 2>&1 &
   LAUNCH_PID=$!
 
+  _cleanup_capture() {
+    kill -- "-${LAUNCH_PID}" 2>/dev/null || kill "${LAUNCH_PID}" 2>/dev/null || true
+  }
+  trap _cleanup_capture RETURN
+
   if ! _wait_for_bridge; then
     echo "[FAIL] Bridge topics not ready (${log_tag})" >&2
     tail -30 "/tmp/same_task_${log_tag}.log" || true
-    kill "${LAUNCH_PID}" 2>/dev/null || true
     return 1
   fi
 
@@ -88,12 +92,11 @@ _run_capture() {
       --min-samples 50; then
     echo "[FAIL] Dual capture failed (${log_tag})" >&2
     tail -30 "/tmp/same_task_${log_tag}.log" || true
-    kill "${LAUNCH_PID}" 2>/dev/null || true
     return 1
   fi
 
-  kill "${LAUNCH_PID}" 2>/dev/null || true
-  wait "${LAUNCH_PID}" 2>/dev/null || true
+  _cleanup_capture
+  trap - RETURN
   sleep 1
   return 0
 }

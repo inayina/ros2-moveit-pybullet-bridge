@@ -32,7 +32,7 @@
 
 - **无真实硬件**：所有「真实侧」数据由**双源仿真 + 参数随机化**构造；
 - **可复现**：随机种子、参数配置、实验记录可版本化管理；
-- **可演示**：单命令启动完整 Demo，含 RViz2 可视化与风险面板；
+- **可演示**：核心链路可由 `portfolio_demo.launch.py` 启动；HOC 组合入口为 `hoc_experiment.launch.py`，RViz/MoveIt 展示走 `m2_iiwa_demo.launch.py`；
 - **可迁移**：架构预留真实硬件接入点（`ros2_control`、真实驱动接口）。
 
 ---

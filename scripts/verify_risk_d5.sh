@@ -16,9 +16,15 @@ pkill -f "/risk_engine/risk_node" 2>/dev/null || true
 sleep 1
 
 echo "==> Launch portfolio_demo (DIRECT)"
-ros2 launch pybullet_bridge portfolio_demo.launch.py \
+setsid ros2 launch pybullet_bridge portfolio_demo.launch.py \
   sim_mode:=DIRECT real_source:=topic >/tmp/verify_risk_d5.log 2>&1 &
 LAUNCH_PID=$!
+
+cleanup() {
+  kill -- "-${LAUNCH_PID}" 2>/dev/null || kill "${LAUNCH_PID}" 2>/dev/null || true
+}
+trap cleanup EXIT
+
 sleep 12
 
 echo "==> Send Pick goal then cancel (record planning failure)"
@@ -80,12 +86,10 @@ echo "==> Check /risk/planning_stats"
 STATS=$(timeout 8 ros2 topic echo /risk/planning_stats --once 2>/dev/null || true)
 if ! echo "$STATS" | grep -q 'planning_stats'; then
   echo "[FAIL] /risk/planning_stats not publishing" >&2
-  kill "$LAUNCH_PID" 2>/dev/null || true
   exit 1
 fi
 if ! echo "$STATS" | grep -q 'failure_rate'; then
   echo "[FAIL] failure_rate missing from planning_stats" >&2
-  kill "$LAUNCH_PID" 2>/dev/null || true
   exit 1
 fi
 echo "  planning_stats topic OK"
@@ -94,12 +98,12 @@ echo "==> Check planning_failure in /risk/status attribution"
 RISK=$(timeout 8 ros2 topic echo /risk/status --once 2>/dev/null || true)
 if ! echo "$RISK" | grep -q 'planning_failure'; then
   echo "[FAIL] planning_failure missing from risk attribution" >&2
-  kill "$LAUNCH_PID" 2>/dev/null || true
   exit 1
 fi
 echo "  planning_failure attribution OK"
 
-kill "$LAUNCH_PID" 2>/dev/null || true
+cleanup
+trap - EXIT
 sleep 1
 
 echo "[PASS] verify_risk_d5.sh complete (D5 planning failure stats)"

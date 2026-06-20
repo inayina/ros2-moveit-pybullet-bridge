@@ -373,6 +373,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--hoc-url', default='http://127.0.0.1:8080')
     parser.add_argument('--skip-hoc-browser', action='store_true')
     parser.add_argument(
+        '--require-hoc-browser',
+        action='store_true',
+        help='Fail instead of falling back to metrics when browser screenshot is unavailable.',
+    )
+    parser.add_argument(
         '--skip-rviz-gif',
         action='store_true',
         help='Keep existing m2-iiwa-rviz.gif (e.g. after real RViz screen capture)',
@@ -385,6 +390,9 @@ def main(argv: list[str] | None = None) -> int:
         browser_ok = False
         if not args.skip_hoc_browser:
             browser_ok = capture_m5_browser(m5, url=args.hoc_url)
+        if args.require_hoc_browser and not browser_ok:
+            print('[ERROR] HOC browser screenshot failed', file=sys.stderr)
+            return 1
         if not browser_ok:
             if not capture_m5_from_metrics(m5):
                 print('[ERROR] HOC capture failed', file=sys.stderr)

@@ -9,7 +9,13 @@ def test_resolve_frontend_source_finds_package_json():
     assert (path / 'package.json').is_file()
 
 
-def test_resolve_frontend_dist_finds_index_html():
+def test_resolve_frontend_dist_finds_index_html(monkeypatch, tmp_path):
+    pkg = tmp_path / 'frontend'
+    dist = pkg / 'dist'
+    dist.mkdir(parents=True)
+    (dist / 'index.html').write_text('<div id="root"></div>', encoding='utf-8')
+    monkeypatch.setenv('HOC_FRONTEND_DIR', str(pkg))
+
     path = resolve_frontend_dist()
     assert path is not None
     assert (path / 'index.html').is_file()
