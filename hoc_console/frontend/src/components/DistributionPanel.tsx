@@ -61,6 +61,10 @@ export const DistributionPanel = memo(function DistributionPanel() {
         top: 0,
       },
       grid: { left: 48, right: 16, top: 40, bottom: 48 },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, height: 14, bottom: 6, textStyle: { color: '#aaa' } },
+      ],
       xAxis: {
         type: 'category',
         data: joints.length ? joints : ['J1', 'J2', 'J3'],
@@ -110,6 +114,9 @@ export const DistributionPanel = memo(function DistributionPanel() {
         top: 0,
       },
       grid: { left: 40, right: 10, top: 28, bottom: 30 },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+      ],
       xAxis: { type: 'category', data: joints, axisLabel: { color: '#aaa', fontSize: 10 } },
       yAxis: { type: 'value', axisLabel: { color: '#aaa', fontSize: 10 }, splitLine: { show: false } },
       series: [
@@ -140,10 +147,10 @@ export const DistributionPanel = memo(function DistributionPanel() {
         )}
       </Space>
       <div className="distribution-charts">
-        <StableChart option={boxplotOption} height={220} className="chart-boxplot" />
-        <StableChart option={barOption} height={120} className="chart-bars" />
+        <StableChart option={boxplotOption} height={180} className="chart-boxplot" />
+        <StableChart option={barOption} height={100} className="chart-bars" />
       </div>
-      <Space size="large" wrap className="distribution-stats">
+      <div className="distribution-stats">
         <Statistic title="KL mean" value={metrics?.kl_divergence_mean ?? 0} precision={4} />
         <Statistic title="W1 mean" value={metrics?.wasserstein_mean ?? 0} precision={4} />
         <Statistic title="MMD" value={metrics?.mmd_statistic ?? 0} precision={4} />
@@ -174,7 +181,7 @@ export const DistributionPanel = memo(function DistributionPanel() {
           status={metrics?.shift_detected ? 'warning' : 'success'}
           text={metrics?.shift_detected ? '偏移' : '正常'}
         />
-      </Space>
+      </div>
     </div>
   );
 });

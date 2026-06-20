@@ -1,0 +1,14 @@
+{
+  "output": "docs/samples/portfolio-demo-zh-dynamic.mp4",
+  "duration_sec": 120.0,
+  "fps": 20,
+  "frames": 2400,
+  "sources": [
+    "docs/samples/hoc-verification-reports/fr_hoc_verify.csv",
+    "docs/samples/moveit-closure-metrics.json",
+    "docs/samples/monitor-metrics.json",
+    "docs/samples/risk-management-metrics.json",
+    "docs/samples/safety-nfr-metrics.json",
+    "docs/samples/hoc-console-metrics.json"
+  ]
+}

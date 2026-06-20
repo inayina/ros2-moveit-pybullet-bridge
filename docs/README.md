@@ -12,7 +12,10 @@
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
 | 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |
 | 阅读系统架构 | [design/README.md](./design/README.md) |
-| 导出 PPT/PDF 说明书 | [portfolio/README.md](./portfolio/README.md) |
+| 整理作品集材料 | [portfolio/README.md](./portfolio/README.md) |
+| 录制或讲解 Demo | [portfolio/DEMO_SCRIPT.md](./portfolio/DEMO_SCRIPT.md) |
+| 查看验收摘要 | [portfolio/ACCEPTANCE_SUMMARY.md](./portfolio/ACCEPTANCE_SUMMARY.md) |
+| 写简历项目描述 | [portfolio/RESUME_SUMMARY.md](./portfolio/RESUME_SUMMARY.md) |
 | 查看 HTML 报告与 JSON 产物 | [samples/README.md](./samples/README.md) |
 | 查看图表资源 | [assets/README.md](./assets/README.md) |
 
@@ -28,7 +31,7 @@ docs/
 ├── ACCEPTANCE_GAP.md      验收标准差距台账
 ├── PORTFOLIO_REMAINING.md 待办跟踪
 ├── design/                01–09 技术设计 Spec
-├── portfolio/             系统设计说明书 + Marp 幻灯片
+├── portfolio/             作品集入口、Demo 脚本、验收摘要、代码导览、简历描述、系统设计说明书 + Marp 幻灯片
 ├── samples/               HTML 报告、JSON 指标、NPZ 轨迹
 └── assets/                PNG/GIF/SVG 配图
 ```
@@ -53,6 +56,15 @@ docs/
 | `capture_pick_lift_asset.py` | **P1-2**：从 episode-data-lab 成功抓取 episode 生成 `m6-pick-and-lift.gif` |
 | `run_integration_demo.sh` | 本地冒烟 / 可选采集 |
 | `run_tests.sh` | 单元 + 节点 + 集成测试 |
+| `verify_bridge_comm.sh` | `FR-BRG-01/02`：bridge 延迟、100Hz 频率与 jitter 验收 |
+| `verify_moveit_closure.sh` | `FR-MOV-01..04`：MoveIt 成功率、执行 RMSE、TF 与碰撞拒绝验收 |
+| `verify_monitor_metrics.sh` | `FR-MON-01..05`：分布指标频率、MMD、阈值热更新、rosbag 与注入检出率 |
+| `verify_risk_management.sh` | `FR-RSK-01..04`：R0-R3 延迟、R3 急停、归因与 acknowledge 互锁 |
+| `verify_hoc_console.sh` | `FR-HOC-01..05`：HOC WebSocket 刷新/延迟、控制命令、在线参数与 JSON/CSV 导出 |
+| `verify_performance_nfr.sh` | `NFR-P01..05`：控制回路 P95、100Hz/10Hz/5Hz 刷新、双源 240Hz 与实时因子 |
+| `verify_reliability_nfr.sh` | `NFR-R01..04`：watchdog HOLD、reset 恢复、短时 smoke/RSS、HOC 独立 rosbag |
+| `verify_safety_nfr.sh` | `NFR-S01..05`：急停速度归零、软限位 R2、watchdog HOLD、R2 降速、ack 恢复 |
+| `verify_maintainability_nfr.sh` | `NFR-M/REP`：YAML/launch/package 结构、动态配置、coverage、确定性脚本产物 |
 | `verify_portfolio.sh` | URDF + offline_compare + 15s demo |
 
 详见 [EXPERIMENTS.md](./EXPERIMENTS.md)。

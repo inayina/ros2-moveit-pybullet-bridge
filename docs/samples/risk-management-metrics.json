@@ -1,0 +1,74 @@
+{
+  "timestamp_unix": 1781962487.396,
+  "criteria": {
+    "level_transition_latency_ms_max": 500.0,
+    "velocity_zero_latency_ms_max": 100.0,
+    "velocity_zero_threshold_rms": 0.02,
+    "attribution_dimensions_expected": 5
+  },
+  "transitions": [
+    {
+      "target_level": 0,
+      "reached": true,
+      "latency_ms": 100.113,
+      "composite_score": 0.0,
+      "primary_driver": "distribution_shift",
+      "attribution_count": 5,
+      "message": "target level reached"
+    },
+    {
+      "target_level": 1,
+      "reached": true,
+      "latency_ms": 99.49,
+      "composite_score": 0.35,
+      "primary_driver": "distribution_shift",
+      "attribution_count": 5,
+      "message": "target level reached"
+    },
+    {
+      "target_level": 2,
+      "reached": true,
+      "latency_ms": 100.686,
+      "composite_score": 0.6,
+      "primary_driver": "distribution_shift",
+      "attribution_count": 5,
+      "message": "target level reached"
+    },
+    {
+      "target_level": 3,
+      "reached": true,
+      "latency_ms": 351.452,
+      "composite_score": 1.0,
+      "primary_driver": "distribution_shift",
+      "attribution_count": 5,
+      "message": "target level reached"
+    }
+  ],
+  "level_latency_passes": true,
+  "r3_status": {
+    "e_stop_active": true,
+    "degraded_mode": true,
+    "primary_driver": "distribution_shift",
+    "attribution_count": 5,
+    "composite_score": 1.0
+  },
+  "e_stop": {
+    "risk_status_passes": true,
+    "risk_status_latency_ms": 3.297,
+    "bridge_system_state_passes": true,
+    "bridge_system_state_latency_ms": 1.887,
+    "velocity_zero_passes": true,
+    "velocity_zero_latency_ms": 0.796,
+    "best_velocity_rms": 0.0
+  },
+  "acknowledge_flow": {
+    "clear_before_ack_success": false,
+    "clear_before_ack_message": "Must acknowledge before clearing e-stop.",
+    "ack_success": true,
+    "ack_message": "Acknowledged by fr_rsk_verify.",
+    "clear_after_ack_success": true,
+    "clear_after_ack_message": "E-stop cleared.",
+    "passes": true
+  },
+  "overall_passes": true
+}

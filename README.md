@@ -262,15 +262,19 @@ HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`h
 
 **证明点**：具备机器人运行态势可视化、风险闭环和实验运维能力。HOC 将 `/risk/status`、`/monitor/distribution_metrics`、`/monitor/tracking_error` 聚合到一屏，并支持域随机化、急停、录制与报告导出。
 
-### 双源监控与一键演示
+### 双源监控证据
 
-![Dual-Source Sim vs Real](docs/assets/m3-dual-source.gif)
+![同任务双源轨迹叠加](docs/assets/same-task-iiwa-overlay.png)
 
-**证明点**：同一条轨迹下，Sim-Source 与 domain-randomized Real-Source 的关节分布差异可以被采集、对齐并量化，为 KL / W1 / MMD 监控提供真实输入。
+![同任务双源分布指标](docs/assets/same-task-iiwa-metrics.png)
 
-![KUKA iiwa7 PyBullet 演示](docs/assets/m2-iiwa-pybullet.gif)
+**证明点**：同一条 JointTrajectory 下，Sim-Source 与 domain-randomized Real-Source 的 7-DOF 关节轨迹可以对齐比较，并输出 KL / W1 / MMD 指标；这比单个动画更能说明“偏移可量化、可复验”。
 
-**证明点**：`portfolio_demo.launch.py` 可复现 KUKA iiwa7 双源仿真、监控和风险引擎；需要同时展示浏览器 HOC 时使用 `hoc_experiment.launch.py` 或另开 `hoc.launch.py`。
+### 一键展示链路
+
+![Portfolio Stack](docs/assets/portfolio-overview.png)
+
+**证明点**：`portfolio_demo.launch.py` 负责启动 iiwa7 双源 PyBullet、分布监控、风险引擎与运动 demo；需要同时展示浏览器 HOC 时使用 `hoc_experiment.launch.py`，或另开 `hoc.launch.py`。本图用于说明演示链路，完整公开视频仍按作品集收尾项补充。
 
 重新捕获 README 展示图：`./scripts/capture_readme_assets.sh`。更多实验配图：[docs/assets/](docs/assets/README.md)
 

@@ -1,0 +1,81 @@
+{
+  "timestamp_unix": 1781963912.983,
+  "criteria": {
+    "velocity_zero_latency_ms_max": 100.0,
+    "velocity_zero_threshold_rms": 0.02,
+    "watchdog_latency_ms_max": 650.0,
+    "degraded_motion_ratio_max": 0.75
+  },
+  "soft_limit_r2": {
+    "passes": true,
+    "latency_ms": 99.8,
+    "status": {
+      "level": 2,
+      "composite_score": 0.12,
+      "primary_driver": "dynamics_anomaly",
+      "degraded_mode": true,
+      "e_stop_active": false,
+      "attribution_count": 5
+    }
+  },
+  "r2_degraded_motion": {
+    "risk_status_passes": true,
+    "risk_latency_ms": 39.807,
+    "status": {
+      "level": 2,
+      "composite_score": 0.64,
+      "primary_driver": "distribution_shift",
+      "degraded_mode": true,
+      "e_stop_active": false,
+      "attribution_count": 5
+    },
+    "normal_motion": {
+      "elapsed_sec": 0.359,
+      "delta_rad": 0.038422
+    },
+    "degraded_motion": {
+      "elapsed_sec": 0.35,
+      "delta_rad": 0.019242
+    },
+    "degraded_to_normal_delta_ratio": 0.501
+  },
+  "watchdog_hold": {
+    "passes": true,
+    "latency_ms": 509.678
+  },
+  "r3_e_stop": {
+    "risk_status_passes": true,
+    "risk_status_latency_ms": 321.325,
+    "risk_status": {
+      "level": 3,
+      "composite_score": 1.0,
+      "primary_driver": "distribution_shift",
+      "degraded_mode": true,
+      "e_stop_active": true,
+      "attribution_count": 5
+    },
+    "bridge_system_state_passes": true,
+    "bridge_system_state_latency_ms": 9.498,
+    "velocity_zero_passes": true,
+    "velocity_zero_latency_ms": 0.367,
+    "best_velocity_rms": 0.0
+  },
+  "acknowledge_recovery": {
+    "clear_before_ack_success": false,
+    "clear_before_ack_message": "Must acknowledge before clearing e-stop.",
+    "ack_success": true,
+    "ack_message": "Acknowledged by nfr_s_verify.",
+    "clear_after_ack_success": true,
+    "clear_after_ack_message": "E-stop cleared.",
+    "running_after_clear": true,
+    "running_latency_ms": 35.902
+  },
+  "passes": {
+    "NFR-S01_e_stop_zero_velocity": true,
+    "NFR-S02_soft_limit_r2": true,
+    "NFR-S03_watchdog_hold": true,
+    "NFR-S04_r2_degraded_50pct": true,
+    "NFR-S05_acknowledge_self_check_recovery": true
+  },
+  "overall_passes": true
+}

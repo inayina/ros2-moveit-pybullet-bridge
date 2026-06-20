@@ -1,0 +1,127 @@
+{
+  "timestamp_unix": 1781962854.452,
+  "criteria": {
+    "websocket_latency_ms_max": 200.0,
+    "push_frequency_hz_min": 4.5,
+    "control_latency_ms_max": 100.0
+  },
+  "streams": {
+    "/risk/status": {
+      "count": 41,
+      "mean_hz": 5.0,
+      "p95_latency_ms": 11.702,
+      "max_latency_ms": 16.131
+    },
+    "/monitor/distribution_metrics": {
+      "count": 41,
+      "mean_hz": 5.0,
+      "p95_latency_ms": 25.806,
+      "max_latency_ms": 54.503
+    },
+    "/monitor/tracking_error": {
+      "count": 41,
+      "mean_hz": 5.0,
+      "p95_latency_ms": 9.02,
+      "max_latency_ms": 70.712
+    }
+  },
+  "latest_payloads": {
+    "risk_has_five_dim_radar": true,
+    "risk_level": 2,
+    "primary_driver": "distribution_shift",
+    "metrics_has_distribution_boxplot": true,
+    "metrics_has_curves": true,
+    "tracking_error_joints": 7
+  },
+  "commands": {
+    "set_randomization": {
+      "type": "command_result",
+      "action": "set_randomization",
+      "success": true,
+      "message": "Domain randomization updated and episode resampled.",
+      "latency_ms": 71.852
+    },
+    "inject_shift": {
+      "type": "command_result",
+      "action": "inject_shift",
+      "success": true,
+      "message": "Injected joint_damping +20.0% for 4.0s",
+      "latency_ms": 10.794
+    },
+    "pause": {
+      "type": "command_result",
+      "action": "pause",
+      "success": true,
+      "message": "PAUSED",
+      "state": "PAUSED",
+      "latency_ms": 66.236
+    },
+    "e_stop": {
+      "type": "command_result",
+      "action": "e_stop",
+      "success": true,
+      "message": "E-stop activated.",
+      "latency_ms": 12.557
+    },
+    "acknowledge": {
+      "type": "command_result",
+      "action": "acknowledge",
+      "success": true,
+      "message": "Acknowledged by fr_hoc_verify.",
+      "latency_ms": 5.34
+    },
+    "resume": {
+      "type": "command_result",
+      "action": "resume",
+      "success": true,
+      "message": "E-stop cleared.",
+      "state": "RUNNING",
+      "latency_ms": 30.152
+    },
+    "export_json": {
+      "type": "command_result",
+      "action": "export_report",
+      "success": true,
+      "message": "Report exported to /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.json",
+      "file_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.json",
+      "format": "json",
+      "latency_ms": 12.692
+    },
+    "export_csv": {
+      "type": "command_result",
+      "action": "export_report",
+      "success": true,
+      "message": "Report exported to /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.csv",
+      "file_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.csv",
+      "format": "csv",
+      "latency_ms": 5.407
+    }
+  },
+  "reports": {
+    "json": {
+      "exists": true,
+      "path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.json",
+      "risk_timeline_len": 91,
+      "metrics_timeline_len": 92,
+      "has_summary": true
+    },
+    "csv": {
+      "exists": true,
+      "path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/hoc-verification-reports/fr_hoc_verify.csv",
+      "rows": 92,
+      "has_risk_columns": true,
+      "has_metric_columns": true
+    }
+  },
+  "passes": {
+    "websocket_latency": true,
+    "push_frequency": true,
+    "risk_radar_payload": true,
+    "distribution_payload": true,
+    "pause_zoom_contract": true,
+    "control_latency": true,
+    "parameter_adjustment": true,
+    "report_export": true
+  },
+  "overall_passes": true
+}

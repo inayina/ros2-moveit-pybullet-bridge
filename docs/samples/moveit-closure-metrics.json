@@ -1,0 +1,65 @@
+{
+  "timestamp_unix": 1781960432.728,
+  "criteria": {
+    "standard_goal_success_rate_min": 0.95,
+    "rmse_rad_max": 0.05,
+    "tf_required": "lbr_iiwa_link_0->lbr_iiwa_link_7",
+    "collision_rejection": "blocking collision scene should make plan-only request fail"
+  },
+  "move_group": {
+    "goals": [
+      {
+        "label": "joint_a",
+        "success": true,
+        "message": "MoveGroup joint goal succeeded",
+        "rmse_rad": 0.005798,
+        "max_abs_error_rad": 0.009882,
+        "planned_points": 41
+      },
+      {
+        "label": "joint_b",
+        "success": true,
+        "message": "MoveGroup joint goal succeeded",
+        "rmse_rad": 0.006004,
+        "max_abs_error_rad": 0.009644,
+        "planned_points": 26
+      },
+      {
+        "label": "joint_c",
+        "success": true,
+        "message": "MoveGroup joint goal succeeded",
+        "rmse_rad": 0.005964,
+        "max_abs_error_rad": 0.009543,
+        "planned_points": 23
+      },
+      {
+        "label": "return_home",
+        "success": true,
+        "message": "MoveGroup joint goal succeeded",
+        "rmse_rad": 0.004899,
+        "max_abs_error_rad": 0.009712,
+        "planned_points": 17
+      }
+    ],
+    "successes": 4,
+    "trials": 4,
+    "success_rate": 1.0,
+    "passes_success_rate": true
+  },
+  "execution": {
+    "max_rmse_rad": 0.006004,
+    "passes_rmse": true
+  },
+  "tf": {
+    "passes": true,
+    "message": "lbr_iiwa_link_0->lbr_iiwa_link_7"
+  },
+  "collision_rejection": {
+    "passes": true,
+    "scene_applied": true,
+    "rejected": true,
+    "error_code": 99999,
+    "message": "Collision scene rejected plan as expected: error_code=99999"
+  },
+  "overall_passes": true
+}

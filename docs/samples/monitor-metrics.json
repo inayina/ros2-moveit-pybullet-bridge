@@ -1,0 +1,81 @@
+{
+  "timestamp_unix": 1781960806.023,
+  "criteria": {
+    "update_frequency_hz": 10.0,
+    "frequency_tolerance_pct": 10.0,
+    "window_duration_sec_expected": 5.0,
+    "injection_delta_percent": 20.0,
+    "detection_rate_min": 0.9
+  },
+  "frequency": {
+    "samples": 92,
+    "mean_hz": 10.0,
+    "mean_error_pct": 0.004,
+    "jitter_pct": 0.221,
+    "max_gap_ms": 100.649,
+    "passes": true
+  },
+  "latest_metrics": {
+    "window_duration_sec": 5.0,
+    "sample_count_sim": 500,
+    "sample_count_real": 500,
+    "kl_mean": 1.068997212873612,
+    "w1_mean": 0.008533975906380064,
+    "mmd_statistic": 0.29717240041755955,
+    "mmd_p_value": 0.0196078431372549,
+    "mmd_threshold": 0.005,
+    "shift_detected": true,
+    "detection_method": "kl+mmd"
+  },
+  "threshold_hot_reload": {
+    "passes": true,
+    "message": "kl=0.02, w1=0.01, mmd=0.005",
+    "values": {
+      "kl_threshold_mean": 0.02,
+      "w1_threshold_mean": 0.01,
+      "mmd_threshold": 0.005
+    }
+  },
+  "baseline_reset": {
+    "passes": true,
+    "message": "Baseline reset with 500 aligned samples."
+  },
+  "injection_trials": [
+    {
+      "index": 1,
+      "success": true,
+      "latency_sec": 0.059,
+      "max_kl": 0.0,
+      "max_w1": 0.0,
+      "max_mmd": 0.111894,
+      "min_mmd_p": 0.019608,
+      "method": "mmd",
+      "message": "Injected joint_damping +20.0% for 4.0s"
+    },
+    {
+      "index": 2,
+      "success": true,
+      "latency_sec": 0.058,
+      "max_kl": 0.484743,
+      "max_w1": 0.006983,
+      "max_mmd": 0.21921,
+      "min_mmd_p": 0.019608,
+      "method": "kl+mmd",
+      "message": "Injected joint_damping +20.0% for 4.0s"
+    },
+    {
+      "index": 3,
+      "success": true,
+      "latency_sec": 0.044,
+      "max_kl": 1.068997,
+      "max_w1": 0.008534,
+      "max_mmd": 0.329346,
+      "min_mmd_p": 0.019608,
+      "method": "kl+mmd",
+      "message": "Injected joint_damping +20.0% for 4.0s"
+    }
+  ],
+  "detection_rate": 1.0,
+  "timeline_csv": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/monitor-metrics-timeline.csv",
+  "overall_passes": true
+}

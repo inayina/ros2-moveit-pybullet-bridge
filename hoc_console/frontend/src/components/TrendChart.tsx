@@ -20,6 +20,10 @@ export const TrendChart = memo(function TrendChart() {
         top: 0,
       },
       grid: { left: 48, right: 48, top: 36, bottom: 28 },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, textStyle: { color: '#aaa' } },
+      ],
       xAxis: {
         type: 'time',
         axisLabel: { color: '#888' },

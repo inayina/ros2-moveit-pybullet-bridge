@@ -1,0 +1,17 @@
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_01_cover.png'
+duration 26.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_02_architecture.png'
+duration 30.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_03_process.png'
+duration 34.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_04_moveit.png'
+duration 32.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_05_monitor.png'
+duration 36.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_06_risk.png'
+duration 36.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_07_hoc.png'
+duration 32.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_08_close.png'
+duration 28.000
+file '/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/portfolio-demo-zh-visual/slide_08_close.png'

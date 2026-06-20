@@ -76,7 +76,13 @@ export function useWebSocket() {
 
   const handleFrame = useCallback(
     (frame: WsFrame) => {
+      if (frame.type === 'connected') {
+        setConnected(true);
+        return;
+      }
+
       if (frame.type === 'data' && 'topic' in frame && frame.payload) {
+        setConnected(true);
         if (frame.topic === '/risk/status' && isRiskPayload(frame.payload)) {
           ingestRisk(frame.payload);
         } else if (
@@ -96,26 +102,32 @@ export function useWebSocket() {
       }
 
       if (frame.type === 'risk_status' && 'payload' in frame && isRiskPayload(frame.payload)) {
+        setConnected(true);
         ingestRisk(frame.payload);
       } else if (
         frame.type === 'distribution_metrics' &&
         'payload' in frame &&
         isMetricsPayload(frame.payload)
       ) {
+        setConnected(true);
         ingestMetrics(frame.payload);
       } else if (
         frame.type === 'tracking_error' &&
         'payload' in frame &&
         isTrackingPayload(frame.payload)
       ) {
+        setConnected(true);
         ingestTracking(frame.payload);
       } else if (frame.type === 'alert_event' && 'payload' in frame && isAlertPayload(frame.payload)) {
+        setConnected(true);
         ingestAlert(frame.payload);
       } else if (frame.type === 'recording_status' && 'recording' in frame) {
+        setConnected(true);
         setRecording(Boolean(frame.recording), String(frame.bag_path ?? ''));
       } else if (frame.type === 'experiment_progress' && 'payload' in frame) {
         const payload = frame.payload;
         if (isExperimentProgress(payload)) {
+          setConnected(true);
           ingestExperimentProgress(payload);
           if (payload.current_metrics) {
             ingestMetrics(payload.current_metrics);
@@ -132,6 +144,7 @@ export function useWebSocket() {
           'image_b64' in payload &&
           typeof payload.image_b64 === 'string'
         ) {
+          setConnected(true);
           setCameraFrame(`data:image/jpeg;base64,${payload.image_b64}`);
         }
       } else if (frame.type === 'system_state' && 'payload' in frame) {
@@ -142,11 +155,12 @@ export function useWebSocket() {
           'state' in payload &&
           typeof payload.state === 'string'
         ) {
+          setConnected(true);
           setSystemState(payload.state);
         }
       }
     },
-    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setRecording, setSystemState],
+    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
   );
 
   const connect = useCallback(() => {
@@ -155,13 +169,20 @@ export function useWebSocket() {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    ws.onopen = () => {
+    const markDisconnected = () => {
       if (disconnectRef.current) {
         clearTimeout(disconnectRef.current);
         disconnectRef.current = null;
       }
+      if (pingRef.current) {
+        clearInterval(pingRef.current);
+        pingRef.current = null;
+      }
+      setConnected(false);
+    };
+
+    ws.onopen = () => {
       retryRef.current = 0;
-      setConnected(true);
       ws.send(
         JSON.stringify({
           type: 'subscribe',
@@ -185,23 +206,17 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      if (pingRef.current) {
-        clearInterval(pingRef.current);
-        pingRef.current = null;
-      }
-      if (!disconnectRef.current) {
-        disconnectRef.current = window.setTimeout(() => {
-          disconnectRef.current = null;
-          setConnected(false);
-        }, 1500);
-      }
+      markDisconnected();
       if (!mountedRef.current) return;
       const delay = BACKOFF_MS[Math.min(retryRef.current, BACKOFF_MS.length - 1)];
       retryRef.current += 1;
       window.setTimeout(connect, delay);
     };
 
-    ws.onerror = () => ws.close();
+    ws.onerror = () => {
+      markDisconnected();
+      ws.close();
+    };
   }, [handleFrame, setConnected]);
 
   useEffect(() => {

@@ -20,6 +20,7 @@ def _launch_setup(context, *args, **kwargs):
     robot = LaunchConfiguration('robot').perform(context)
     sim_mode = LaunchConfiguration('sim_mode').perform(context)
     enable_dual = LaunchConfiguration('enable_dual_source').perform(context) == 'true'
+    enable_camera = LaunchConfiguration('enable_camera').perform(context) == 'true'
 
     bridge_pkg = FindPackageShare('pybullet_bridge').perform(context)
     cfg = resolve_profile_config(robot)
@@ -37,6 +38,7 @@ def _launch_setup(context, *args, **kwargs):
                 {
                     'sim_mode': sim_mode,
                     'enable_dual_source': enable_dual,
+                    'enable_camera': enable_camera,
                     'robot_profile': cfg['robot_profile'],
                     'urdf_path': urdf_path,
                     'home_positions': cfg['home_positions'],
@@ -64,5 +66,6 @@ def generate_launch_description():
         declare_robot_launch_arg(default_profile='iiwa7'),
         DeclareLaunchArgument('sim_mode', default_value='DIRECT'),
         DeclareLaunchArgument('enable_dual_source', default_value='true'),
+        DeclareLaunchArgument('enable_camera', default_value='true'),
         OpaqueFunction(function=_launch_setup),
     ])

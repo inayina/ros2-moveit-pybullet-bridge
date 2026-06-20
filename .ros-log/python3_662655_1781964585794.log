@@ -1,0 +1,1 @@
+[INFO] [1781964585.929409856] [pybullet_bridge]: PyBullet ready (sim-only): profile=planar_2dof, joints=['joint1', 'joint2'], urdf=/home/ina/ros2_ws/install/pybullet_bridge/share/pybullet_bridge/urdf/planar_2dof.urdf

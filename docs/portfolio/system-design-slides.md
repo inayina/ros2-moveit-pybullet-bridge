@@ -68,6 +68,32 @@ inayina · v1.0 · 2026-06-20
 
 ---
 
+## 双仓库作品集架构
+
+```
+robot-arm-episode-data-lab
+  PyBullet 采集 → 任务 FSM / HAL → LeRobot v2.1 export
+                                      │
+                                      ▼
+ros2-moveit-pybullet-bridge
+  MoveIt 2 → pybullet_bridge → Sim / Real Proxy
+                                      │
+                                      ▼
+  dist_monitor (KL/W1/MMD) → risk_engine (R0-R3)
+                                      │
+                                      ▼
+  HOC 控制台 → HTML / JSON / CSV / rosbag 验收证据
+```
+
+| 仓库 | 职责 |
+|------|------|
+| `robot-arm-episode-data-lab` | episode 采集、任务数据、LeRobot 导出 |
+| `ros2-moveit-pybullet-bridge` | ROS 2 联调、MoveIt 闭环、监控、风险、HOC |
+
+**边界**：LeRobot 回放是外部数据接入证据，不等同于真机接入。
+
+---
+
 <!-- _class: lead -->
 
 # 2. 系统整体架构（1/2）
@@ -313,7 +339,7 @@ L1 单元（KL/MMD/插值）
 | 节点 | rclpy 单节点 |
 | 集成 | bridge→monitor→risk |
 
-**So What**：CI 绿勾 = **最低交付门槛**
+**So What**：本机复验已完成；公开视频投递前仍以最新 Actions 绿勾作为最低公开证据
 
 ![bg right:40% 80%](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)
 
@@ -331,13 +357,14 @@ L1 单元（KL/MMD/插值）
 |------|------|
 | M1–M5 核心 | ✅ ~98% 可 Demo |
 | S5 五维风险 | 本机复验通过 |
-| M6 展示材料 | ⚠️ 待真实录屏 |
-| 双仓库联动 | ⚠️ ~60% |
+| M6 展示材料 | ~95%，待 5–8 分钟公开视频链接 |
+| 双仓库联动 | ~95%，本机样例通过，HAL / 真机属 Phase-2+ |
 
 **已知限制**（写入验收说明）
 
 - 真机 `real_source:=ros2` 未实现
 - 完整 ros2_control 用 relay 替代
+- Bridge jitter 严格 5% 阈值略超，当前标为部分满足
 - HOC 阈值 UI 未做（改 YAML）
 - `portfolio_demo.launch.py` 不自动启动 HOC，演示时另开 `hoc.launch.py`
 

@@ -25,6 +25,7 @@ def _launch_setup(context, *args, **kwargs):
     motion_source = LaunchConfiguration('motion_source').perform(context)
     lerobot_path = LaunchConfiguration('lerobot_dataset_path').perform(context)
     episode_index = int(LaunchConfiguration('episode_index').perform(context))
+    enable_camera = LaunchConfiguration('enable_camera').perform(context) == 'true'
 
     bridge_pkg = FindPackageShare('pybullet_bridge').perform(context)
     dist_pkg = FindPackageShare('dist_monitor').perform(context)
@@ -56,6 +57,7 @@ def _launch_setup(context, *args, **kwargs):
                 {
                     'sim_mode': sim_mode,
                     'enable_dual_source': real_source == 'topic',
+                    'enable_camera': enable_camera,
                     'robot_profile': cfg['robot_profile'],
                     'urdf_path': urdf_path,
                     'home_positions': cfg['home_positions'],
@@ -153,5 +155,6 @@ def generate_launch_description():
             default_value='0',
             description='LeRobot episode index when motion_source:=lerobot',
         ),
+        DeclareLaunchArgument('enable_camera', default_value='true'),
         OpaqueFunction(function=_launch_setup),
     ])

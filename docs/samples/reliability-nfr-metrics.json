@@ -1,0 +1,85 @@
+{
+  "timestamp_unix": 1781963511.04,
+  "criteria": {
+    "watchdog_hold_timeout_sec": 2.0,
+    "smoke_duration_sec": 10.0,
+    "recording_duration_sec": 4.0,
+    "max_joint_gap_sec": 0.2,
+    "max_monitor_gap_sec": 0.3,
+    "full_soak_target_sec": 7200
+  },
+  "phase2_scope": {
+    "process_supervisor_crash_stop": "not implemented; current evidence covers watchdog HOLD and risk e-stop only",
+    "persistent_state_snapshot": "not implemented; current evidence covers reset-to-safe-home recovery only",
+    "full_2h_soak": "not run in this verification; short smoke records continuity and RSS snapshot"
+  },
+  "watchdog_hold": {
+    "command_published": true,
+    "passes": true,
+    "latency_ms": 513.392
+  },
+  "reset_recovery": {
+    "reset_success": true,
+    "reset_message": "Simulation reset to home with new domain randomization.",
+    "running_after_reset": true,
+    "running_latency_ms": 6.953
+  },
+  "rosbag_recording": {
+    "start_success": true,
+    "start_message": "Recording to /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/reliability-nfr-rosbags/hoc_20260620_215136",
+    "stop_success": true,
+    "stop_message": "Recording stopped: /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/reliability-nfr-rosbags/hoc_20260620_215136",
+    "bag": {
+      "path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/reliability-nfr-rosbags/hoc_20260620_215136",
+      "exists": true,
+      "metadata_exists": true,
+      "storage_files": [
+        "hoc_20260620_215136_0.mcap"
+      ],
+      "required_topics_present": true,
+      "metadata_size_bytes": 2830
+    }
+  },
+  "short_smoke": {
+    "topics": {
+      "/joint_states": {
+        "samples": 1005,
+        "mean_hz": 100.452,
+        "max_gap_sec": 0.017
+      },
+      "/monitor/distribution_metrics": {
+        "samples": 101,
+        "mean_hz": 10.037,
+        "max_gap_sec": 0.155
+      },
+      "/risk/status": {
+        "samples": 100,
+        "mean_hz": 10.001,
+        "max_gap_sec": 0.101
+      },
+      "/bridge/performance": {
+        "samples": 10,
+        "mean_hz": 1.0,
+        "max_gap_sec": 1.004
+      }
+    },
+    "memory_before": {
+      "processes_observed": 4,
+      "total_rss_mb": 412.422,
+      "max_process_rss_mb": 152.535
+    },
+    "memory_after": {
+      "processes_observed": 4,
+      "total_rss_mb": 416.953,
+      "max_process_rss_mb": 153.387
+    },
+    "rss_delta_mb": 4.531
+  },
+  "passes": {
+    "watchdog_hold": true,
+    "reset_recovery": true,
+    "short_smoke_continuity": true,
+    "rosbag_independent_recording": true
+  },
+  "overall_passes": true
+}

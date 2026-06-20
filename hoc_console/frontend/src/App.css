@@ -41,7 +41,7 @@ html[data-risk-level='3'] .dashboard-root {
 }
 
 .dashboard-content {
-  padding: 16px 20px 24px;
+  padding: 12px 20px 16px;
   flex: 1;
   max-width: 1600px;
   width: 100%;
@@ -49,12 +49,12 @@ html[data-risk-level='3'] .dashboard-root {
 }
 
 .toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .dashboard-grid {
   display: grid;
-  gap: 16px;
+  gap: 12px;
 }
 
 .dashboard-grid--main {
@@ -66,7 +66,7 @@ html[data-risk-level='3'] .dashboard-root {
 .dashboard-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -103,7 +103,7 @@ html[data-risk-level='3'] .dashboard-root {
   background: #141414;
   border: 1px solid #303030;
   border-radius: 10px;
-  padding: 14px 16px;
+  padding: 12px 14px;
   min-height: 0;
   contain: layout style paint;
 }
@@ -146,7 +146,7 @@ html[data-risk-level='3'] .dashboard-root {
 .camera-viewport {
   width: 100%;
   aspect-ratio: 4 / 3;
-  min-height: 220px;
+  min-height: 180px;
   background: #0a0a0a;
   border: 1px solid #262626;
   border-radius: 8px;
@@ -178,18 +178,37 @@ html[data-risk-level='3'] .dashboard-root {
 .distribution-charts {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: 10px;
   align-items: start;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .distribution-stats {
-  margin-top: 4px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 10px;
+  align-items: end;
+  margin-top: 2px;
+}
+
+.distribution-stats .ant-statistic-title {
+  margin-bottom: 0;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.distribution-stats .ant-statistic-content {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.distribution-stats .ant-badge {
+  align-self: center;
 }
 
 .experiment-progress-slot {
-  min-height: 44px;
-  margin-bottom: 12px;
+  min-height: 28px;
+  margin-bottom: 8px;
   padding: 4px 0;
 }
 
@@ -203,7 +222,7 @@ html[data-risk-level='3'] .dashboard-root {
 
 .estop-btn {
   min-width: 72px !important;
-  min-height: 64px !important;
+  min-height: 52px !important;
   border-radius: 50% !important;
   font-weight: 700;
 }

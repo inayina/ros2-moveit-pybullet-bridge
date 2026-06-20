@@ -45,6 +45,39 @@ python3 scripts/regenerate_all_reports.py
 
 ---
 
+## 验收指标产物
+
+| 文件 | 说明 |
+|------|------|
+| [bridge-comm-metrics.json](./bridge-comm-metrics.json) | `FR-BRG-01/02` 复验输出：command→feedback P99 10.524ms；三路 joint state 100.0Hz；jitter 5.501% 尚未达 5% |
+| [moveit-closure-metrics.json](./moveit-closure-metrics.json) | `FR-MOV-01/02/03/04` 复验输出：4/4 MoveGroup 成功；最大 RMSE 0.006004rad；TF lookup 通过；blocking collision scene 被拒绝 |
+| [monitor-metrics.json](./monitor-metrics.json) | `FR-MON-01..05` 复验输出：10Hz、MMD p-value、阈值热更新、3/3 注入检出 |
+| [monitor-metrics-timeline.csv](./monitor-metrics-timeline.csv) | FR-MON 指标时序 CSV，可与 rosbag2 录制交叉检查 |
+| `monitor-metrics-rosbag/` | `/monitor/distribution_metrics` 短录制 rosbag2，含 `metadata.yaml` |
+| [risk-management-metrics.json](./risk-management-metrics.json) | `FR-RSK-01..04` 复验输出：R0-R3 延迟、R3 急停、速度归零、primary_driver 与 acknowledge 互锁 |
+| [hoc-console-metrics.json](./hoc-console-metrics.json) | `FR-HOC-01..05` 复验输出：WS 5Hz/延迟、五维雷达 payload、分布 boxplot、控制命令、参数调节与报告导出 |
+| `hoc-verification-reports/` | HOC 复验导出的 `fr_hoc_verify.json` / `fr_hoc_verify.csv`，含风险时序与分布指标 |
+| [performance-nfr-metrics.json](./performance-nfr-metrics.json) | `NFR-P01..05` 复验输出：控制回路 P95、joint state 100Hz、monitor 10Hz、HOC 5Hz、双源 240Hz/RTF |
+| [reliability-nfr-metrics.json](./reliability-nfr-metrics.json) | `NFR-R01..04` 复验输出：watchdog HOLD、reset 恢复、短时 smoke/RSS、HOC 独立 rosbag |
+| `reliability-nfr-rosbags/` | HOC 录制的可靠性复验 rosbag2，含 `metadata.yaml` 与 `.mcap` |
+| [safety-nfr-metrics.json](./safety-nfr-metrics.json) | `NFR-S01..05` 复验输出：急停速度归零、软限位 R2、watchdog HOLD、R2 降速、ack 恢复 |
+| [maintainability-nfr-metrics.json](./maintainability-nfr-metrics.json) | `NFR-M/REP` 复验输出：YAML/launch/package 结构、动态配置、coverage、确定性脚本产物 |
+| `maintainability-coverage/` | coverage JSON/XML 报告；当前核心包测试 130 passed，coverage=72.2% |
+
+```bash
+./scripts/verify_bridge_comm.sh
+./scripts/verify_moveit_closure.sh
+./scripts/verify_monitor_metrics.sh
+./scripts/verify_risk_management.sh
+./scripts/verify_hoc_console.sh
+./scripts/verify_performance_nfr.sh
+./scripts/verify_reliability_nfr.sh
+./scripts/verify_safety_nfr.sh
+./scripts/verify_maintainability_nfr.sh
+```
+
+---
+
 ## 实验 B · 同任务校准产物
 
 | 文件 | 说明 |

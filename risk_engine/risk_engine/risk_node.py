@@ -16,7 +16,7 @@ from std_srvs.srv import Trigger
 from bridge_monitor_msgs.msg import DistributionMetrics, RiskAttribution, RiskStatus
 from bridge_monitor_msgs.srv import AcknowledgeRisk
 
-from risk_engine.aggregator import RiskAggregator, RiskWeights
+from risk_engine.aggregator import RECOMMENDATIONS, RiskAggregator, RiskWeights
 from risk_engine.move_group_cancel import MoveGroupCancelClient
 from risk_engine.planning_stats import PlanningStatsCollector
 
@@ -161,6 +161,12 @@ class RiskEngineNode(Node):
 
     def _publish_risk(self) -> None:
         result = self._aggregator.aggregate(self._compute_raw_scores())
+        if self._latest_metrics and self._latest_metrics.soft_limit_triggered and result.level < 2:
+            # A soft-limit breach is a safety override: require degraded operation even
+            # when the weighted aggregate score would otherwise stay below R2.
+            result.level = 2
+            result.primary_driver = 'dynamics_anomaly'
+            result.recommendation = RECOMMENDATIONS['dynamics_anomaly']
 
         if (
             self.get_parameter('auto_e_stop_on_r3').value

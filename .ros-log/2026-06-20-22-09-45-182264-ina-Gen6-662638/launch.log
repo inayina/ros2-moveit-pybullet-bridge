@@ -1,0 +1,4 @@
+1781964585.1836152 [INFO] [launch]: All log files can be found below /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/.ros-log/2026-06-20-22-09-45-182264-ina-Gen6-662638
+1781964585.1837959 [INFO] [launch]: Default logging verbosity is set to INFO
+1781964585.2670596 [INFO] [bridge_node-1]: process started with pid [662655]
+1781964585.2672877 [INFO] [robot_state_publisher-2]: process started with pid [662656]

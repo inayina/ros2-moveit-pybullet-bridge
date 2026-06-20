@@ -109,6 +109,8 @@ def generate_launch_description():
                     'urdf_path': urdf_path,
                     'home_positions': iiwa_home,
                     'end_effector_link': 'lbr_iiwa_link_7',
+                    'watchdog_timeout_ms': 10000,
+                    'enable_camera': False,
                 },
             ],
         ),

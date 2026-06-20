@@ -1,0 +1,245 @@
+{
+  "timestamp_unix": 1781964178.249,
+  "criteria": {
+    "yaml_config_min_files": 10,
+    "coverage_percent_min": 70.0,
+    "expected_ros_packages": [
+      "bridge_monitor_msgs",
+      "pybullet_bridge",
+      "dist_monitor",
+      "risk_engine",
+      "hoc_console",
+      "manipulation_actions",
+      "moveit_config"
+    ],
+    "expected_verify_scripts": [
+      "scripts/verify_bridge_comm.sh",
+      "scripts/verify_moveit_closure.sh",
+      "scripts/verify_monitor_metrics.sh",
+      "scripts/verify_risk_management.sh",
+      "scripts/verify_hoc_console.sh",
+      "scripts/verify_performance_nfr.sh",
+      "scripts/verify_reliability_nfr.sh",
+      "scripts/verify_safety_nfr.sh",
+      "scripts/verify_portfolio.sh"
+    ]
+  },
+  "yaml_config": {
+    "files": [
+      "dist_monitor/config/calibration.yaml",
+      "dist_monitor/config/joint_limits.yaml",
+      "dist_monitor/config/joint_name_map.yaml",
+      "dist_monitor/config/thresholds.yaml",
+      "hoc_console/config/hoc_config.yaml",
+      "hoc_console/config/hoc_prod.yaml",
+      "manipulation_actions/config/manipulation_config.yaml",
+      "moveit_config/config/iiwa_joint_limits.yaml",
+      "moveit_config/config/iiwa_kinematics.yaml",
+      "moveit_config/config/iiwa_moveit_controllers.yaml",
+      "moveit_config/config/iiwa_ompl_planning.yaml",
+      "moveit_config/config/joint_limits.yaml",
+      "moveit_config/config/kinematics.yaml",
+      "moveit_config/config/moveit_controllers.yaml",
+      "moveit_config/config/ompl_planning.yaml",
+      "pybullet_bridge/config/bridge_config.yaml",
+      "pybullet_bridge/config/robot_profiles.yaml",
+      "risk_engine/config/risk_config.yaml"
+    ],
+    "count": 18,
+    "failures": [],
+    "passes": true
+  },
+  "launch_inventory": {
+    "files": [
+      "dist_monitor/launch/dist_monitor.launch.py",
+      "hoc_console/launch/hoc.launch.py",
+      "hoc_console/launch/hoc_experiment.launch.py",
+      "hoc_console/launch/hoc_prod.launch.py",
+      "manipulation_actions/launch/manipulation_actions.launch.py",
+      "moveit_config/launch/m2_demo.launch.py",
+      "moveit_config/launch/m2_iiwa_demo.launch.py",
+      "moveit_config/launch/move_group.launch.py",
+      "pybullet_bridge/launch/bridge.launch.py",
+      "pybullet_bridge/launch/full_system.launch.py",
+      "pybullet_bridge/launch/m1_demo.launch.py",
+      "pybullet_bridge/launch/portfolio_demo.launch.py",
+      "pybullet_bridge/launch/test_monitoring.launch.py",
+      "risk_engine/launch/risk_engine.launch.py"
+    ],
+    "count": 14,
+    "hoc_experiment_includes_portfolio": true,
+    "hoc_experiment_includes_hoc": true,
+    "compile_failures": [],
+    "passes": true
+  },
+  "package_structure": {
+    "packages": [
+      {
+        "package": "bridge_monitor_msgs",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/bridge_monitor_msgs"
+      },
+      {
+        "package": "pybullet_bridge",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/pybullet_bridge"
+      },
+      {
+        "package": "dist_monitor",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/dist_monitor"
+      },
+      {
+        "package": "risk_engine",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/risk_engine"
+      },
+      {
+        "package": "hoc_console",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/hoc_console"
+      },
+      {
+        "package": "manipulation_actions",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/manipulation_actions"
+      },
+      {
+        "package": "moveit_config",
+        "package_xml": true,
+        "build_file": true,
+        "ros2_pkg_prefix_ok": true,
+        "prefix_output": "/home/ina/ros2_ws/install/moveit_config"
+      }
+    ],
+    "passes": true
+  },
+  "dynamic_config_and_metadata": {
+    "threshold_hot_reload": {
+      "passes": true,
+      "message": "kl=0.02, w1=0.01, mmd=0.005",
+      "values": {
+        "kl_threshold_mean": 0.02,
+        "w1_threshold_mean": 0.01,
+        "mmd_threshold": 0.005
+      }
+    },
+    "hoc_set_randomization": {
+      "type": "command_result",
+      "action": "set_randomization",
+      "success": true,
+      "message": "Domain randomization updated and episode resampled.",
+      "latency_ms": 71.852
+    },
+    "rosbag_metadata": {
+      "path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/reliability-nfr-rosbags/hoc_20260620_215136/metadata.yaml",
+      "exists": true
+    },
+    "passes": true
+  },
+  "verify_scripts_and_outputs": {
+    "scripts": [
+      {
+        "script": "scripts/verify_bridge_comm.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_moveit_closure.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_monitor_metrics.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_risk_management.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_hoc_console.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_performance_nfr.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_reliability_nfr.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_safety_nfr.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      },
+      {
+        "script": "scripts/verify_portfolio.sh",
+        "exists": true,
+        "executable": true,
+        "bash_n_ok": true
+      }
+    ],
+    "sample_outputs": [
+      "docs/samples/bridge-comm-metrics.json",
+      "docs/samples/moveit-closure-metrics.json",
+      "docs/samples/monitor-metrics.json",
+      "docs/samples/risk-management-metrics.json",
+      "docs/samples/hoc-console-metrics.json",
+      "docs/samples/performance-nfr-metrics.json",
+      "docs/samples/reliability-nfr-metrics.json",
+      "docs/samples/safety-nfr-metrics.json"
+    ],
+    "passes": true
+  },
+  "coverage": {
+    "command": [
+      "bash",
+      "-lc",
+      "export COVERAGE_FILE=\"/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/maintainability-coverage/.coverage\"; /usr/bin/python3 -m coverage erase; /usr/bin/python3 -m coverage run --source=\"pybullet_bridge,dist_monitor,risk_engine,hoc_console,manipulation_actions\" -m pytest dist_monitor/test risk_engine/test pybullet_bridge/test hoc_console/test manipulation_actions/test --ignore=pybullet_bridge/test/test_m1_launch.py --ignore=pybullet_bridge/test/test_full_system_launch.py -q; /usr/bin/python3 -m coverage json -o \"/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/maintainability-coverage/coverage.json\"; /usr/bin/python3 -m coverage xml -o \"/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/maintainability-coverage/coverage.xml\""
+    ],
+    "returncode": 0,
+    "elapsed_sec": 21.157,
+    "coverage_json": "docs/samples/maintainability-coverage/coverage.json",
+    "coverage_xml": "docs/samples/maintainability-coverage/coverage.xml",
+    "percent_covered": 72.2,
+    "output_tail": "pybullet build time: Jun 19 2026 17:47:28\n........................................................................ [ 55%]\n..........................................................               [100%]\n=============================== warnings summary ===============================\ntest_manipulation_node.py::test_manipulation_pick_action_server_accepts_goal\n  Warning: Exception in thread Thread-13 (_run_scenario)\n  \n  Traceback (most recent call last):\n    File \"/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py\", line 1540, in create_publisher\n      final_topic = self.resolve_topic_name(topic)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    File \"/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py\", line 1492, in resolve_topic_name\n      with self.handle:\n  rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested\n  \n  During handling of the above exception, another exception occurred:\n  \n  Traceback (most recent call last):\n    File \"/usr/lib/python3.12/threading.py\", line 1073, in _bootstrap_inner\n      self.run()\n    File \"/usr/lib/python3.12/threading.py\", line 1010, in run\n      self._target(*self._args, **self._kwargs)\n    File \"/home/ina/ros2_ws/build/hoc_console/hoc_console/experiment_runner.py\", line 222, in _run_scenario\n      self._run_scenario_motion(req)\n    File \"/home/ina/ros2_ws/build/hoc_console/hoc_console/experiment_runner.py\", line 175, in _run_scenario_motion\n      publish_iiwa_trajectory_track(\n    File \"/home/ina/ros2_ws/build/hoc_console/hoc_console/scenario_motion.py\", line 80, in publish_iiwa_trajectory_track\n      publish_iiwa_sweep(\n    File \"/home/ina/ros2_ws/build/hoc_console/hoc_console/scenario_motion.py\", line 34, in publish_iiwa_sweep\n      pub = node.create_publisher(JointTrajectory, '/bridge/command', 10)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    File \"/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py\", line 1544, in create_publisher\n      self._validate_topic_or_service_name(topic)\n    File \"/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py\", line 1446, in _validate_topic_or_service_name\n      name = self.get_name()\n             ^^^^^^^^^^^^^^^\n    File \"/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/node.py\", line 341, in get_name\n      with self.handle:\n  rclpy._rclpy_pybind11.InvalidHandle: cannot use Destroyable because destruction was requested\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n130 passed, 1 warning in 18.74s\nWrote JSON report to /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/maintainability-coverage/coverage.json\nWrote XML report to /home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/maintainability-coverage/coverage.xml\n",
+    "passes": true
+  },
+  "passes": {
+    "NFR-M01_yaml_dynamic_config": true,
+    "NFR-M02_one_click_launch": true,
+    "NFR-M03_standard_packages_buildable": true,
+    "NFR-M04_unit_coverage_70pct": true,
+    "NFR-REP01_seed_configurable": true,
+    "NFR-REP02_config_result_linked": true,
+    "NFR-REP03_deterministic_demo_outputs": true
+  },
+  "overall_passes": true
+}

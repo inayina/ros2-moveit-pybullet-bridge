@@ -72,8 +72,8 @@ class SimSource:
         if not self._joint_indices:
             return False
 
-        self.reset()
         self._initialized = True
+        self.reset()
         return True
 
     @staticmethod

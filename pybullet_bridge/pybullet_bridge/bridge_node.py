@@ -10,6 +10,7 @@ import time
 import numpy as np
 import rclpy
 from builtin_interfaces.msg import Time as BuiltinTime
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, qos_profile_sensor_data
 from sensor_msgs.msg import CompressedImage, JointState
@@ -82,6 +83,8 @@ class PyBulletBridgeNode(Node):
             SimRealError, '/bridge/sim_real_error', qos_profile_sensor_data)
         self._torque_pub = self.create_publisher(
             JointState, '/bridge/sim/joint_torques', qos_profile_sensor_data)
+        self._performance_pub = self.create_publisher(
+            DiagnosticArray, '/bridge/performance', 10)
 
         self._system_state_pub = self.create_publisher(
             String, '/bridge/system_state', reliable_qos)
@@ -161,12 +164,16 @@ class PyBulletBridgeNode(Node):
         self._last_command_time = time.monotonic()
         self._watchdog_tripped = False
         self._sim_start_mono = time.monotonic()
+        self._physics_step_count = 0
+        self._perf_last_count = 0
+        self._perf_last_mono = time.monotonic()
 
         physics_hz = self.get_parameter('physics_frequency').value
         pub_hz = self.get_parameter('publish_frequency').value
         self._physics_timer = self.create_timer(1.0 / physics_hz, self._on_physics_step)
         self._publish_timer = self.create_timer(1.0 / pub_hz, self._on_publish)
         self._meta_timer = self.create_timer(1.0, self._publish_metadata)
+        self._performance_timer = self.create_timer(1.0, self._publish_performance)
         if self._enable_camera and self._camera_pub is not None:
             cam_hz = float(self.get_parameter('camera_fps').value)
             self._camera_width = int(self.get_parameter('camera_width').value)
@@ -306,10 +313,14 @@ class PyBulletBridgeNode(Node):
             targets = self._trajectory.sample(t_sim, time_scale=time_scale)
             self._sim.set_position_targets_by_name(targets)
             self._latest_sim_snapshot = self._sim.step()
+            step_count = 1
 
             if self._dual_source and self._real is not None:
                 self._real.set_position_targets_by_name(targets)
                 self._latest_real_snapshot = self._real.step(t_sim)
+                step_count += 1
+
+            self._physics_step_count += step_count
 
             self.get_logger().debug(
                 f'physics: targets={targets} pos={self._latest_sim_snapshot.positions}',
@@ -468,6 +479,48 @@ class PyBulletBridgeNode(Node):
         })
         self._metadata_pub.publish(meta)
         self._randomization_pub.publish(self._sample_to_domain_config(stamp))
+
+    def _publish_performance(self) -> None:
+        now = time.monotonic()
+        elapsed = now - self._perf_last_mono
+        if elapsed <= 0.0:
+            return
+
+        total_delta = self._physics_step_count - self._perf_last_count
+        expected_hz = float(self.get_parameter('physics_frequency').value)
+        source_count = 2 if self._dual_source and self._real is not None else 1
+        expected_total_hz = expected_hz * source_count
+        actual_total_hz = total_delta / elapsed
+        per_source_hz = actual_total_hz / source_count if source_count > 0 else 0.0
+        realtime_factor = per_source_hz / expected_hz if expected_hz > 0.0 else 0.0
+
+        status = DiagnosticStatus()
+        status.name = 'pybullet_bridge.performance'
+        status.hardware_id = str(self.get_parameter('robot_profile').value)
+        status.level = DiagnosticStatus.OK if realtime_factor >= 0.8 else DiagnosticStatus.WARN
+        status.message = (
+            f'physics_per_source_hz={per_source_hz:.3f}, '
+            f'realtime_factor={realtime_factor:.3f}'
+        )
+        status.values = [
+            KeyValue(key='physics_frequency_target_hz', value=f'{expected_hz:.3f}'),
+            KeyValue(key='source_count', value=str(source_count)),
+            KeyValue(key='dual_source_enabled', value=str(bool(self._dual_source)).lower()),
+            KeyValue(key='physics_steps_total_delta', value=str(total_delta)),
+            KeyValue(key='physics_total_hz', value=f'{actual_total_hz:.3f}'),
+            KeyValue(key='physics_per_source_hz', value=f'{per_source_hz:.3f}'),
+            KeyValue(key='realtime_factor', value=f'{realtime_factor:.3f}'),
+            KeyValue(key='paused', value=str(self._paused).lower()),
+            KeyValue(key='e_stop', value=str(self._e_stop).lower()),
+        ]
+
+        diag = DiagnosticArray()
+        diag.header.stamp = self.get_clock().now().to_msg()
+        diag.status.append(status)
+        self._performance_pub.publish(diag)
+
+        self._perf_last_count = self._physics_step_count
+        self._perf_last_mono = now
 
     def _handle_set_randomization(self, request, response):
         cfg = request.config

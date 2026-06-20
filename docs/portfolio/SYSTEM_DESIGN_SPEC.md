@@ -54,6 +54,39 @@
 
 ## 2. 系统整体架构
 
+### 2.0 双仓库作品集架构
+
+本作品集由两个独立仓库组成：`robot-arm-episode-data-lab` 负责操作数据采集与 LeRobot 导出，`ros2-moveit-pybullet-bridge` 负责 ROS 2 联调、MoveIt 闭环、分布监控、风险管理和 HOC 报告。
+
+```mermaid
+flowchart LR
+    subgraph DataRepo["robot-arm-episode-data-lab · 数据采集仓库"]
+        PBCollect["PyBullet 离线采集"]
+        FSM["任务 FSM / HAL"]
+        LeRobot["LeRobot v2.1 export"]
+    end
+
+    subgraph BridgeRepo["ros2-moveit-pybullet-bridge · ROS 2 联调仓库"]
+        MoveIt["MoveIt 2 / RViz"]
+        Bridge["pybullet_bridge"]
+        SimReal["Sim / Real Proxy"]
+        Monitor["dist_monitor<br/>KL / W1 / MMD"]
+        Risk["risk_engine<br/>R0-R3"]
+        HOC["HOC 控制台"]
+        Reports["HTML / JSON / CSV / rosbag"]
+    end
+
+    PBCollect --> FSM --> LeRobot
+    LeRobot -->|"LEROBOT_EXPORT"| SimReal
+    MoveIt --> Bridge --> SimReal
+    SimReal --> Monitor --> Risk --> HOC
+    Monitor --> Reports
+    Risk --> Reports
+    HOC --> Reports
+```
+
+**边界说明**：采集仓库提供外部数据源与 LeRobot 格式契约；本仓库不宣称当前版本已完成真机接入，而是证明外部数据可进入 ROS 2 监控与验收报告链路。
+
 ### 2.1 分层模块图
 
 ```mermaid
@@ -402,7 +435,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 
 [![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
 
-**交付要点**：CI 绿勾 = 最低交付门槛；交付前本地复现 CI 环境（系统 Python 3.12）。2026-06-20 本机已通过 `run_tests.sh`、`verify_portfolio.sh`、`verify_risk_complete.sh` 与 iiwa joint consistency 检查。
+**交付要点**：仓库已包含 GitHub Actions CI 配置；公开投递前仍以最新提交的 Actions 绿勾作为最低公开交付证据。2026-06-20 本机已通过 `run_tests.sh`、`verify_portfolio.sh`、`verify_risk_complete.sh` 与 iiwa joint consistency 检查。
 
 ---
 
@@ -414,8 +447,8 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 |------|--------|----------|
 | M1–M5 核心功能 | ~98% | ✅ 可 Live Demo |
 | S5 五维风险补全 | ~98% | 本机 `verify_risk_complete.sh` 已通过 |
-| M6 展示材料 | ~70% | ⚠️ 待真实录屏替换合成图 |
-| 双仓库一体验收 | ~60% | ⚠️ LeRobot 联调需双方就绪 |
+| M6 展示材料 | ~95% | 本地视频、HOC 截图、双仓报告与样例报告已入库；5–8 分钟公开视频链接与公开 CI 仍待补 |
+| 双仓库一体验收 | ~95% | episode-data-lab 数据集、LeRobot export、bridge online/offline 联调与同任务校准已有本机样例证据；HAL / 真机迁移属 Phase-2+ |
 
 ### 6.2 已知限制（写入验收说明）
 
@@ -432,8 +465,8 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 
 | 优先级 | 项 | 目标 |
 |--------|-----|------|
-| P1 | 真实 RViz/PyBullet 录屏 | 提升验收材料专业度 |
-| P2 | episode-data-lab 双仓库联调 | offline + online 一体叙事 |
+| P1 | 5–8 分钟公开 Demo 视频 | 覆盖启动、偏移注入、R2/R3、HOC 恢复与报告导出 |
+| P2 | Bridge jitter 优化或口径说明 | FR-BRG-02 严格 jitter 阈值当前略超 5% |
 | P3 | 真机 HAL / `real_source:=ros2` | 生产迁移 |
 | P3 | NavigateToPose、独立 virtual_camera | 扩展动作库 |
 

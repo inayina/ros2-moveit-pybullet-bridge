@@ -1,0 +1,62 @@
+{
+  "timestamp_unix": 1781963215.319,
+  "criteria": {
+    "control_loop_p95_ms_max": 50.0,
+    "joint_state_hz": 100.0,
+    "joint_state_tolerance_pct": 5.0,
+    "monitor_hz": 10.0,
+    "monitor_tolerance_pct": 10.0,
+    "hoc_hz_min": 5.0,
+    "physics_per_source_hz_target": 240.0,
+    "realtime_factor_min": 0.8
+  },
+  "control_loop_latency": {
+    "trials": 20,
+    "mean_ms": 9.564,
+    "p95_ms": 14.571,
+    "max_ms": 15.777,
+    "threshold_ms": 50.0
+  },
+  "joint_state_frequency": {
+    "samples": 785,
+    "mean_hz": 99.984,
+    "mean_error_pct": 0.016,
+    "jitter_pct": 6.537,
+    "max_gap_ms": 13.134
+  },
+  "monitor_frequency": {
+    "samples": 79,
+    "mean_hz": 10.0,
+    "mean_error_pct": 0.001,
+    "jitter_pct": 0.206,
+    "max_gap_ms": 100.562
+  },
+  "bridge_physics": {
+    "samples": 7,
+    "dual_source_enabled": true,
+    "source_count": 2,
+    "mean_physics_per_source_hz": 240.062,
+    "min_physics_per_source_hz": 239.507,
+    "mean_realtime_factor": 1.0,
+    "min_realtime_factor": 0.998
+  },
+  "hoc_refresh": {
+    "source": "docs/samples/hoc-console-metrics.json",
+    "available": true,
+    "streams_hz": {
+      "/risk/status": 5.0,
+      "/monitor/distribution_metrics": 5.0,
+      "/monitor/tracking_error": 5.0
+    },
+    "min_hz_observed": 5.0,
+    "passes": true
+  },
+  "passes": {
+    "NFR-P01_control_loop_p95": true,
+    "NFR-P02_joint_state_100hz": true,
+    "NFR-P03_monitor_10hz": true,
+    "NFR-P04_hoc_5hz": true,
+    "NFR-P05_dual_240hz_rtf": true
+  },
+  "overall_passes": true
+}
