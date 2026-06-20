@@ -1,5 +1,6 @@
 # Python dependencies (install in .venv: pip install -r requirements.txt)
-numpy>=1.26.0
+# numpy<2: ROS 2 Jazzy / Debian system numpy is 1.26.x; pip must not upgrade to 2.x in CI containers
+numpy>=1.26.0,<2.0
 scipy>=1.11.0
 pybullet>=3.2.5
 pyyaml>=6.0
