@@ -1,0 +1,13 @@
+# Position limits for soft-limit monitoring (match kuka_iiwa/model.urdf).
+iiwa7:
+  lbr_iiwa_joint_1: {lower: -2.96705972839, upper: 2.96705972839}
+  lbr_iiwa_joint_2: {lower: -2.09439510239, upper: 2.09439510239}
+  lbr_iiwa_joint_3: {lower: -2.96705972839, upper: 2.96705972839}
+  lbr_iiwa_joint_4: {lower: -2.09439510239, upper: 2.09439510239}
+  lbr_iiwa_joint_5: {lower: -2.96705972839, upper: 2.96705972839}
+  lbr_iiwa_joint_6: {lower: -2.09439510239, upper: 2.09439510239}
+  lbr_iiwa_joint_7: {lower: -3.05432619099, upper: 3.05432619099}
+
+planar_2dof:
+  joint1: {lower: -3.14159, upper: 3.14159}
+  joint2: {lower: -3.14159, upper: 3.14159}

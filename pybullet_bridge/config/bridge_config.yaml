@@ -8,7 +8,8 @@ pybullet_bridge:
     enable_dual_source: true
     random_seed: 42
     randomization_strength: 1.0
-    watchdog_timeout_ms: 5000
+    watchdog_timeout_ms: 500
+    degraded_velocity_scale: 0.5
     joint_damping_base: 0.04
     joint_friction_base: 0.1
     joint_damping_range: [0.0, 0.5]

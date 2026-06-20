@@ -71,6 +71,7 @@ export function useWebSocket() {
   const setRecording = useDashboardStore((s) => s.setRecording);
   const ingestExperimentProgress = useDashboardStore((s) => s.ingestExperimentProgress);
   const setCameraFrame = useDashboardStore((s) => s.setCameraFrame);
+  const setSystemState = useDashboardStore((s) => s.setSystemState);
 
   const handleFrame = useCallback(
     (frame: WsFrame) => {
@@ -132,9 +133,19 @@ export function useWebSocket() {
         ) {
           setCameraFrame(`data:image/jpeg;base64,${payload.image_b64}`);
         }
+      } else if (frame.type === 'system_state' && 'payload' in frame) {
+        const payload = frame.payload;
+        if (
+          typeof payload === 'object' &&
+          payload !== null &&
+          'state' in payload &&
+          typeof payload.state === 'string'
+        ) {
+          setSystemState(payload.state);
+        }
       }
     },
-    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setRecording],
+    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setRecording, setSystemState],
   );
 
   const connect = useCallback(() => {

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import time
@@ -25,7 +26,10 @@ from bridge_monitor_msgs.msg import (
 from bridge_monitor_msgs.srv import InjectShift, SetRandomization
 
 from pybullet_bridge.domain_randomizer import DomainRandomizerConfig
+from pybullet_bridge.degraded_mode import trajectory_time_scale
+from pybullet_bridge.integration_paths import default_lerobot_export_path
 from pybullet_bridge.real_source import RealSource, RealSourceConfig
+from pybullet_bridge.watchdog import should_trip_watchdog
 from pybullet_bridge.robot_profiles import get_profile, resolve_urdf_path
 from pybullet_bridge.sim_source import SimSource, SimSourceConfig
 from pybullet_bridge.trajectory_executor import TrajectoryExecutor
@@ -45,7 +49,8 @@ class PyBulletBridgeNode(Node):
         self.declare_parameter('enable_dual_source', True)
         self.declare_parameter('random_seed', 42)
         self.declare_parameter('randomization_strength', 1.0)
-        self.declare_parameter('watchdog_timeout_ms', 5000)
+        self.declare_parameter('watchdog_timeout_ms', 500)
+        self.declare_parameter('degraded_velocity_scale', 0.5)
         self.declare_parameter('robot_profile', 'iiwa7')
         self.declare_parameter('home_positions', [0.8, -0.6])
         self.declare_parameter('end_effector_link', 'tool0')
@@ -152,7 +157,9 @@ class PyBulletBridgeNode(Node):
 
         self._paused = False
         self._e_stop = False
+        self._degraded_mode = False
         self._last_command_time = time.monotonic()
+        self._watchdog_tripped = False
         self._sim_start_mono = time.monotonic()
 
         physics_hz = self.get_parameter('physics_frequency').value
@@ -226,6 +233,7 @@ class PyBulletBridgeNode(Node):
         if not self._pybullet_ok or self._e_stop:
             return
         self._last_command_time = time.monotonic()
+        self._watchdog_tripped = False
         self._trajectory.set_trajectory(msg, self._sim_time_sec())
         self.get_logger().info(
             f'Trajectory received: joints={list(msg.joint_names)}, '
@@ -234,11 +242,22 @@ class PyBulletBridgeNode(Node):
     def _on_risk_status(self, msg: RiskStatus) -> None:
         if msg.e_stop_active and not self._e_stop:
             self._e_stop = True
+            self._degraded_mode = False
             self._trajectory.clear()
             self.get_logger().warn('E-stop active from /risk/status — physics halted')
         elif not msg.e_stop_active and self._e_stop and not self._paused:
             self._e_stop = False
             self.get_logger().info('E-stop cleared from /risk/status — physics resumed')
+
+        degraded = bool(msg.degraded_mode and not msg.e_stop_active)
+        if degraded != self._degraded_mode:
+            self._degraded_mode = degraded
+            if degraded:
+                scale = self.get_parameter('degraded_velocity_scale').value
+                self.get_logger().warn(
+                    f'Degraded mode active — trajectory time scale {scale}')
+            else:
+                self.get_logger().info('Degraded mode cleared — normal trajectory speed')
 
     def _sim_time_sec(self) -> float:
         return time.monotonic() - self._sim_start_mono
@@ -263,13 +282,28 @@ class PyBulletBridgeNode(Node):
             if self._dual_source and self._real is not None:
                 self._real.tick_inject_shift(time.monotonic())
 
-            watchdog_ms = self.get_parameter('watchdog_timeout_ms').value
-            if not self._trajectory.has_active_trajectory:
-                if (time.monotonic() - self._last_command_time) * 1000.0 > watchdog_ms:
-                    pass  # idle hold — no active trajectory to clear
+            watchdog_ms = float(self.get_parameter('watchdog_timeout_ms').value)
+            idle_ms = (time.monotonic() - self._last_command_time) * 1000.0
+            if should_trip_watchdog(
+                has_active_trajectory=self._trajectory.has_active_trajectory,
+                idle_ms=idle_ms,
+                timeout_ms=watchdog_ms,
+            ):
+                snap = self._sim.read_state()
+                self._trajectory.set_hold_positions(snap.names, snap.positions)
+                self._trajectory.clear()
+                if not self._watchdog_tripped:
+                    self.get_logger().warn(
+                        f'Watchdog HOLD: no command for {idle_ms:.0f}ms '
+                        f'(timeout {watchdog_ms:.0f}ms)')
+                self._watchdog_tripped = True
 
             t_sim = self._sim_time_sec()
-            targets = self._trajectory.sample(t_sim)
+            time_scale = trajectory_time_scale(
+                degraded=self._degraded_mode,
+                scale=self.get_parameter('degraded_velocity_scale').value,
+            )
+            targets = self._trajectory.sample(t_sim, time_scale=time_scale)
             self._sim.set_position_targets_by_name(targets)
             self._latest_sim_snapshot = self._sim.step()
 
@@ -313,6 +347,8 @@ class PyBulletBridgeNode(Node):
             state.data = 'E_STOP'
         elif self._paused:
             state.data = 'PAUSED'
+        elif self._watchdog_tripped:
+            state.data = 'HOLD'
         elif self._pybullet_ok:
             state.data = 'RUNNING'
         else:
@@ -425,6 +461,11 @@ class PyBulletBridgeNode(Node):
         meta.scenario_id = 'SC-01'
         meta.random_seed = self.get_parameter('random_seed').value
         meta.randomization_strength = self.get_parameter('randomization_strength').value
+        meta.operator_note = json.dumps({
+            'robot_profile': str(self.get_parameter('robot_profile').value),
+            'dual_source_enabled': bool(self.get_parameter('enable_dual_source').value),
+            'lerobot_export_path': default_lerobot_export_path(),
+        })
         self._metadata_pub.publish(meta)
         self._randomization_pub.publish(self._sample_to_domain_config(stamp))
 
@@ -498,6 +539,8 @@ class PyBulletBridgeNode(Node):
             self._trajectory.clear()
             self._trajectory.set_hold_positions(snap.names, snap.positions)
             self._sim_start_mono = time.monotonic()
+            self._last_command_time = time.monotonic()
+            self._watchdog_tripped = False
             self._e_stop = False
             self._paused = False
             if self._real is not None and self._real.latest_sample:

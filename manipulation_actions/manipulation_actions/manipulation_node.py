@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import rclpy
 from bridge_monitor_msgs.action import Pick, Place
 from bridge_monitor_msgs.msg import RiskStatus
@@ -9,6 +11,7 @@ from rclpy.action import ActionServer, CancelResponse, GoalResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.node import Node
+from std_msgs.msg import String
 
 from manipulation_actions.bridge_motion_client import BridgeMotionClient
 from manipulation_actions.gripper_stub import GripperStub
@@ -96,6 +99,8 @@ class ManipulationActionsNode(Node):
             10,
             callback_group=self._cb_group,
         )
+        self._planning_result_pub = self.create_publisher(
+            String, '/manipulation/planning_result', 10)
 
         use_moveit = self.get_parameter('use_moveit').value
         if use_moveit and self._move_group.wait_for_server(timeout_sec=3.0):
@@ -125,20 +130,33 @@ class ManipulationActionsNode(Node):
             self._move_group.cancel_all()
             self._bridge_motion.cancel_all()
 
+    def _publish_planning_result(self, action: str, success: bool, message: str) -> None:
+        msg = String()
+        msg.data = json.dumps({
+            'action': action,
+            'success': success,
+            'message': message,
+        }, separators=(',', ':'))
+        self._planning_result_pub.publish(msg)
+
     def _execute_pick(self, goal_handle):
         goal = goal_handle.request
         if goal.grasp_timeout_sec <= 0:
             goal.grasp_timeout_sec = float(self.get_parameter('grasp_timeout_sec').value)
-        return self._pick_executor.execute(goal, goal_handle, self._planner_for_request())
+        result = self._pick_executor.execute(goal, goal_handle, self._planner_for_request())
+        self._publish_planning_result('pick', result.success, result.message)
+        return result
 
     def _execute_place(self, goal_handle):
         timeout = float(self.get_parameter('grasp_timeout_sec').value)
-        return self._place_executor.execute(
+        result = self._place_executor.execute(
             goal_handle.request,
             goal_handle,
             self._planner_for_request(),
             timeout_sec=timeout,
         )
+        self._publish_planning_result('place', result.success, result.message)
+        return result
 
 
 def main(args=None) -> None:

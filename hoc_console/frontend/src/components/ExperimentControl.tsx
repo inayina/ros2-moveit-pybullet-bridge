@@ -40,6 +40,7 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
   const [scenario, setScenario] = useState('SC-01');
   const [seed, setSeed] = useState(42);
   const [strengthPct, setStrengthPct] = useState(50);
+  const [exportFormat, setExportFormat] = useState<'html' | 'csv'>('html');
   const [loading, setLoading] = useState<string | null>(null);
   const recording = useDashboardStore((s) => s.recording);
   const bagPath = useDashboardStore((s) => s.bagPath);
@@ -162,17 +163,27 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
         >
           Place
         </Button>
+        <Select
+          value={exportFormat}
+          onChange={setExportFormat}
+          options={[
+            { value: 'html', label: 'HTML' },
+            { value: 'csv', label: 'CSV' },
+          ]}
+          style={{ width: 96 }}
+        />
         <Button
           icon={<DownloadOutlined />}
           loading={loading === 'export_report'}
           onClick={async () => {
-            const screenshot_b64 = await captureScreenshot(dashboardRef.current);
+            const screenshot_b64 =
+              exportFormat === 'html' ? await captureScreenshot(dashboardRef.current) : undefined;
             const res = await run('export_report', {
-              format: 'html',
+              format: exportFormat,
               screenshot_b64,
             });
             if (res.success && res.file_path) {
-              message.info(`报告已导出: ${res.file_path}`);
+              message.info(`报告已导出 (${exportFormat.toUpperCase()}): ${res.file_path}`);
             }
           }}
         >

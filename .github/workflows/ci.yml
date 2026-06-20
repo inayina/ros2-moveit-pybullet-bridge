@@ -33,13 +33,13 @@ jobs:
       - name: Install Python dependencies
         shell: bash
         run: |
-          pip3 install --break-system-packages --no-cache-dir -r /github/workspace/requirements.txt
+          pip3 install --break-system-packages --no-cache-dir -r "${GITHUB_WORKSPACE}/requirements.txt"
 
       - name: Build workspace
         shell: bash
         run: |
           mkdir -p /ws/src
-          ln -sfn /github/workspace /ws/src/ros2-moveit-pybullet-bridge
+          ln -sfn "${GITHUB_WORKSPACE}" /ws/src/ros2-moveit-pybullet-bridge
           cd /ws
           . /opt/ros/jazzy/setup.sh
           colcon build \
@@ -49,13 +49,13 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
-          cd /github/workspace
+          cd "${GITHUB_WORKSPACE}"
           ./scripts/run_tests.sh
 
       - name: Generate milestone assets (smoke)
         shell: bash
         run: |
-          cd /github/workspace
+          cd "${GITHUB_WORKSPACE}"
           python3 scripts/generate_milestone_assets.py
           test -f docs/assets/m1-joint-sweep.gif
           test -f docs/assets/m3-dual-source.gif

@@ -62,4 +62,9 @@ def distribution_metrics_to_dict(msg: DistributionMetrics) -> dict:
         'real_position_max_per_joint': list(msg.real_position_max_per_joint),
         'shift_detected': msg.shift_detected,
         'detection_method': msg.detection_method,
+        'comm_health_score': msg.comm_health_score,
+        'dynamics_anomaly_score': msg.dynamics_anomaly_score,
+        'velocity_jump_per_joint': list(msg.velocity_jump_per_joint),
+        'soft_limit_score': msg.soft_limit_score,
+        'soft_limit_triggered': msg.soft_limit_triggered,
     }

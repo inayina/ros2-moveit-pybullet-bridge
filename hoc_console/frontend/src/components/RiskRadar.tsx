@@ -23,8 +23,8 @@ export const RiskRadar = memo(function RiskRadar() {
     const cutoff = Date.now() / 1000 - 30;
     const oldPoint = [...riskHistory].reverse().find((p) => p.t <= cutoff);
     const prevScores = oldPoint
-      ? scores.map((v) => Math.max(v * 0.85, 0))
-      : scores.map(() => 0);
+      ? AXES.map((dim) => Math.min(oldPoint.attribution[dim] ?? 0, 1))
+      : AXES.map(() => 0);
     return { current: scores, previous: prevScores };
   }, [risk, riskHistory]);
 

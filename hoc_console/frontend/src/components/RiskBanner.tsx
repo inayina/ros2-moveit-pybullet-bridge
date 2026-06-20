@@ -21,6 +21,7 @@ export const RiskBanner = memo(function RiskBanner() {
   const trend = useDashboardStore((s) => s.trend);
   const connected = useDashboardStore((s) => s.connected);
   const sessionStart = useDashboardStore((s) => s.sessionStart);
+  const systemState = useDashboardStore((s) => s.systemState);
 
   const level = risk?.level ?? 0;
   const blink = level >= 2;
@@ -55,6 +56,15 @@ export const RiskBanner = memo(function RiskBanner() {
         <Text type="secondary">
           主因: {DRIVER_LABELS[risk?.primary_driver ?? ''] ?? risk?.primary_driver ?? '—'}
         </Text>
+        {risk?.degraded_mode ? (
+          <Text type="warning">降级运行 · 速度 50%</Text>
+        ) : null}
+        {systemState === 'HOLD' ? (
+          <Text type="warning">看门狗 HOLD · 位置保持</Text>
+        ) : null}
+        {systemState === 'E_STOP' ? (
+          <Text type="danger">急停 E_STOP</Text>
+        ) : null}
         <SessionClock sessionStart={sessionStart} />
       </Space>
     </div>

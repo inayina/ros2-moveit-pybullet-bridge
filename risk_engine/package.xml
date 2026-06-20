@@ -13,6 +13,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <depend>std_srvs</depend>
+  <depend>diagnostic_msgs</depend>
   <depend>bridge_monitor_msgs</depend>
   <depend>moveit_msgs</depend>
 

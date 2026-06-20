@@ -11,6 +11,7 @@ risk_engine:
     torque_saturation_ratio: 0.9
     comm_latency_threshold_ms: 100.0
     planning_failure_rate_threshold: 0.1
+    planning_stats_window_size: 20
     alert_cooldown_sec: 2.0
     auto_e_stop_on_r3: true
     cancel_move_group_on_e_stop: true

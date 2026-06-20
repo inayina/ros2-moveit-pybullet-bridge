@@ -23,7 +23,7 @@ from std_msgs.msg import String
 from std_srvs.srv import SetBool, Trigger
 
 from bridge_monitor_msgs.action import ExecuteScenario, Pick, Place
-from bridge_monitor_msgs.msg import DistributionMetrics, DomainRandomizationConfig, RiskStatus
+from bridge_monitor_msgs.msg import DistributionMetrics, DomainRandomizationConfig, ExperimentMetadata, RiskStatus
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from rclpy.action import ActionClient
 from bridge_monitor_msgs.srv import AcknowledgeRisk, ExportExperiment, InjectShift, SetRandomization
@@ -31,6 +31,7 @@ from sensor_msgs.msg import CompressedImage, JointState
 
 from hoc_console.experiment_runner import ExperimentRunner
 from hoc_console.http_static import register_camera_routes, resolve_frontend_dist, start_static_server
+from hoc_console.report_csv import render_csv_report
 from hoc_console.report_html import render_html_report
 from hoc_console.ros_bridge import (
     distribution_metrics_to_dict,
@@ -151,6 +152,9 @@ class HocServerNode(Node):
         self.create_subscription(
             CompressedImage, '/bridge/camera/image_compressed', self._on_camera, qos_profile_sensor_data)
         self.create_subscription(String, '/risk/alerts', self._on_alert, 10)
+        self.create_subscription(
+            ExperimentMetadata, '/bridge/experiment_metadata', self._on_experiment_metadata, 10)
+        self.create_subscription(String, '/bridge/system_state', self._on_bridge_system_state, 10)
 
         self._e_stop_client = self.create_client(Trigger, '/risk/force_e_stop')
         self._ack_client = self.create_client(AcknowledgeRisk, '/risk/acknowledge')
@@ -271,6 +275,23 @@ class HocServerNode(Node):
             self._ws_hub.broadcast('system_state', {'state': self._system_state}),
             loop,
         )
+
+    def _on_experiment_metadata(self, msg: ExperimentMetadata) -> None:
+        self._experiment_metadata = {
+            'experiment_id': msg.experiment_id,
+            'scenario_id': msg.scenario_id,
+            'random_seed': msg.random_seed,
+            'randomization_strength': msg.randomization_strength,
+            'git_commit_hash': msg.git_commit_hash,
+        }
+        if msg.operator_note:
+            try:
+                self._experiment_metadata.update(json.loads(msg.operator_note))
+            except json.JSONDecodeError:
+                self._experiment_metadata['operator_note'] = msg.operator_note
+
+    def _on_bridge_system_state(self, msg: String) -> None:
+        self._system_state = msg.data
 
     def _on_risk(self, msg: RiskStatus) -> None:
         self._latest_risk = msg
@@ -744,7 +765,12 @@ class HocServerNode(Node):
 
         experiment_id = request.experiment_id or f'exp_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
         fmt = (request.format or 'html').lower()
-        ext = 'html' if fmt in ('html', 'pdf') else 'json'
+        if fmt == 'csv':
+            ext = 'csv'
+        elif fmt in ('html', 'pdf'):
+            ext = 'html'
+        else:
+            ext = 'json'
         out_path = request.output_path
         if not out_path:
             out_path = str(report_dir / f'{experiment_id}.{ext}')
@@ -770,6 +796,12 @@ class HocServerNode(Node):
                 'recommendation': recommendation,
             }
             Path(out_path).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
+        elif ext == 'csv':
+            csv_text = render_csv_report(
+                risk_timeline=list(self._history.risk_timeline),
+                metrics_timeline=list(self._history.metrics_timeline),
+            )
+            Path(out_path).write_text(csv_text, encoding='utf-8')
         else:
             html = render_html_report(
                 experiment_id=experiment_id,

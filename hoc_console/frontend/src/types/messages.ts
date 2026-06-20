@@ -57,6 +57,14 @@ export interface DistributionMetricsPayload {
   real_position_max_per_joint: number[];
   shift_detected: boolean;
   detection_method: string;
+  /** D4 通信健康 [0,1]，越高越差 */
+  comm_health_score?: number;
+  /** D3 动力学异常 [0,1] */
+  dynamics_anomaly_score?: number;
+  velocity_jump_per_joint?: number[];
+  /** 软限位接近度 [0,1] */
+  soft_limit_score?: number;
+  soft_limit_triggered?: boolean;
 }
 
 export interface DataFrame {
@@ -93,22 +101,24 @@ export interface MetricsHistoryPoint {
   kl_mean: number;
   w1_mean: number;
   mmd_stat: number;
+  comm_health_score: number;
 }
 
 export interface RiskHistoryPoint {
   t: number;
   level: number;
   score: number;
+  attribution: Record<string, number>;
 }
 
 export type TrendDirection = 'up' | 'down' | 'stable';
 
 export const DIMENSION_LABELS: Record<string, string> = {
-  distribution_shift: '关节误差KL',
-  tracking_error: '跟踪延迟',
-  dynamics_anomaly: '负载变化率',
+  distribution_shift: '分布偏移',
+  tracking_error: '跟踪误差',
+  dynamics_anomaly: '动力学异常',
   comm_health: '通信健康',
-  planning_failure: '重复精度',
+  planning_failure: '规划失败',
 };
 
 export const RISK_COLORS: Record<number, string> = {

@@ -6,6 +6,7 @@ import json
 
 import numpy as np
 import rclpy
+from diagnostic_msgs.msg import DiagnosticArray
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import JointState
@@ -17,6 +18,7 @@ from bridge_monitor_msgs.srv import AcknowledgeRisk
 
 from risk_engine.aggregator import RiskAggregator, RiskWeights
 from risk_engine.move_group_cancel import MoveGroupCancelClient
+from risk_engine.planning_stats import PlanningStatsCollector
 
 
 class RiskEngineNode(Node):
@@ -32,6 +34,8 @@ class RiskEngineNode(Node):
         self.declare_parameter('weights.planning_failure', 0.10)
         self.declare_parameter('level_thresholds', [0.25, 0.50, 0.75])
         self.declare_parameter('tracking_rmse_threshold', 0.05)
+        self.declare_parameter('planning_failure_rate_threshold', 0.1)
+        self.declare_parameter('planning_stats_window_size', 20)
         self.declare_parameter('auto_e_stop_on_r3', True)
         self.declare_parameter('move_group_action', '/move_action')
         self.declare_parameter('cancel_move_group_on_e_stop', True)
@@ -55,21 +59,48 @@ class RiskEngineNode(Node):
             self,
             action_name=self.get_parameter('move_group_action').value,
         )
+        self._planning_stats = PlanningStatsCollector(
+            window_size=int(self.get_parameter('planning_stats_window_size').value),
+        )
+        self._bridge_system_state = 'RUNNING'
 
         self.create_subscription(
             DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
         self.create_subscription(
             JointState, '/monitor/tracking_error', self._on_tracking_error, qos_profile_sensor_data)
+        self.create_subscription(
+            String, '/manipulation/planning_result', self._on_planning_result, 10)
+        self.create_subscription(
+            String, '/bridge/system_state', self._on_bridge_system_state, 10)
 
         self._status_pub = self.create_publisher(RiskStatus, '/risk/status', 10)
         self._alerts_pub = self.create_publisher(String, '/risk/alerts', 10)
+        self._planning_stats_pub = self.create_publisher(
+            DiagnosticArray, '/risk/planning_stats', 10)
 
         self.create_service(AcknowledgeRisk, '/risk/acknowledge', self._handle_acknowledge)
         self.create_service(Trigger, '/risk/force_e_stop', self._handle_force_e_stop)
         self.create_service(Trigger, '/risk/clear_e_stop', self._handle_clear_e_stop)
 
         self._timer = self.create_timer(0.1, self._publish_risk)
+        self._planning_timer = self.create_timer(1.0, self._publish_planning_stats)
         self.get_logger().info('risk_engine node started.')
+
+    def _on_planning_result(self, msg: String) -> None:
+        try:
+            payload = json.loads(msg.data)
+        except json.JSONDecodeError:
+            self.get_logger().warn(f'Invalid planning_result JSON: {msg.data[:120]}')
+            return
+        self._planning_stats.record(
+            success=bool(payload.get('success', False)),
+            message=str(payload.get('message', '')),
+            action=str(payload.get('action', '')),
+        )
+
+    def _publish_planning_stats(self) -> None:
+        stamp = self.get_clock().now().to_msg()
+        self._planning_stats_pub.publish(self._planning_stats.to_diagnostic_array(stamp))
 
     def _trigger_e_stop(self, result, *, reason: str) -> None:
         if self._e_stop_active:
@@ -87,6 +118,9 @@ class RiskEngineNode(Node):
         if msg.position:
             self._latest_tracking_rmse = float(np.sqrt(np.mean(np.square(msg.position))))
 
+    def _on_bridge_system_state(self, msg: String) -> None:
+        self._bridge_system_state = msg.data
+
     def _compute_raw_scores(self) -> dict[str, float]:
         scores = {
             'distribution_shift': 0.0,
@@ -102,10 +136,26 @@ class RiskEngineNode(Node):
             scores['distribution_shift'] = max(kl_norm, w1_norm, mmd_norm)
             if self._latest_metrics.shift_detected:
                 scores['distribution_shift'] = max(scores['distribution_shift'], 0.5)
+            scores['comm_health'] = float(self._latest_metrics.comm_health_score)
+            if self._bridge_system_state == 'HOLD':
+                scores['comm_health'] = max(scores['comm_health'], 0.4)
+            dyn_score = float(self._latest_metrics.dynamics_anomaly_score)
+            if self._latest_metrics.soft_limit_triggered:
+                dyn_score = max(dyn_score, 0.6)
+            else:
+                dyn_score = max(dyn_score, float(self._latest_metrics.soft_limit_score))
+            scores['dynamics_anomaly'] = dyn_score
 
         rmse_thresh = self.get_parameter('tracking_rmse_threshold').value
         if rmse_thresh > 0:
             scores['tracking_error'] = self._latest_tracking_rmse / rmse_thresh
+
+        pf_thresh = self.get_parameter('planning_failure_rate_threshold').value
+        if pf_thresh > 0 and self._planning_stats.sample_count > 0:
+            scores['planning_failure'] = min(
+                self._planning_stats.failure_rate() / pf_thresh,
+                1.0,
+            )
 
         return scores
 

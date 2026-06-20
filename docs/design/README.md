@@ -15,6 +15,7 @@
 | 06 | [机器人平台选型评估](./06-robot-platform-selection.md) | KUKA iiwa 统一 vs 多机型；与 episode-data-lab 联动建议 |
 | 07 | [作品集系统 Spec 补充](./07-portfolio-system-spec-supplement.md) | **求职总 Spec**：双源 changeDynamics、W1、Action Library、Fail-Safe、Sprint 路线、编码前置清单、面试讲解稿 |
 | 08 | [双仓库通盘集成设计](./08-dual-repo-portfolio-integration-spec.md) | **episode-data-lab + bridge 一体架构**、LeRobot 契约、Real 三模式、HAL 映射、统一 Sprint |
+| 09 | [风险监控补全实现 Spec](./09-risk-monitoring-completion-spec.md) | **S5a–S5d 已实现**：五维风险、R2 降级、看门狗/CSV/阈值热更新 |
 
 ## 阅读顺序
 
@@ -36,6 +37,8 @@
 07 作品集系统 Spec 补充  ← 面试准备 / bridge 编码前总览
         ↓
 08 双仓库通盘集成        ← 与 robot-arm-episode-data-lab 联调 / 作品集一体讲解
+        ↓
+09 风险监控补全 Spec     ← 五维风险 / R2 降级 / NFR 补全编码前读
 ```
 
 ## 包结构对照
@@ -60,3 +63,4 @@ ros2-moveit-pybullet-bridge/
 | v0.3 | 2026-06-19 | M5 HOC 实现同步；iiwa 主线配图；样例实验报告 |
 | v0.4 | 2026-06-19 | 新增 07：作品集总 Spec（W1、Action Library、Fail-Safe、前置清单） |
 | v0.5 | 2026-06-19 | 新增 08：双仓库通盘集成（episode-data-lab + bridge） |
+| v0.7 | 2026-06-20 | 09 Spec P4 完成：看门狗 HOLD、CSV 导出、verify_risk_complete |

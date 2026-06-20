@@ -52,11 +52,12 @@ class TrajectoryExecutor:
     def has_active_trajectory(self) -> bool:
         return self._active is not None
 
-    def sample(self, now_sec: float) -> dict[str, float]:
+    def sample(self, now_sec: float, time_scale: float = 1.0) -> dict[str, float]:
         if self._active is None:
             return dict(self._hold_positions)
 
-        elapsed = now_sec - self._active.start_time_sec
+        scale = max(min(float(time_scale), 1.0), 0.05)
+        elapsed = (now_sec - self._active.start_time_sec) * scale
         points = self._active.points
         first_t = self._point_time_sec(points[0])
 

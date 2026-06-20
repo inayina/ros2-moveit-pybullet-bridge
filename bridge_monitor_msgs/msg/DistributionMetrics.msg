@@ -31,3 +31,12 @@ float64[] real_position_max_per_joint
 
 bool shift_detected
 string detection_method
+
+# Communication health (dist_monitor comm_health monitor)
+float64 comm_health_score
+
+# Dynamics anomaly + soft limit (dist_monitor P2)
+float64 dynamics_anomaly_score
+float64[] velocity_jump_per_joint
+float64 soft_limit_score
+bool soft_limit_triggered

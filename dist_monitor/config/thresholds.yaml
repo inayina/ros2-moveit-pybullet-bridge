@@ -17,3 +17,15 @@ dist_monitor:
     baseline_duration_sec: 30.0
     real_source: topic
     lerobot_dataset_path: ''
+    comm_health:
+      expected_sim_hz: 100.0
+      expected_real_hz: 100.0
+      ewma_alpha: 0.2
+      gap_multiplier: 2.0
+      latency_threshold_ms: 100.0
+      max_samples: 100
+    robot_profile: iiwa7
+    soft_limit_proximity_ratio: 0.95
+    dynamics_anomaly:
+      velocity_jump_threshold: 2.0
+      error_spike_sigma: 3.0

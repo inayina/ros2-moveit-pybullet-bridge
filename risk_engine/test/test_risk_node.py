@@ -23,6 +23,9 @@ class _MonitorFeed(Node):
             DistributionMetrics, '/monitor/distribution_metrics', 10)
         self.error_pub = self.create_publisher(
             JointState, '/monitor/tracking_error', qos_profile_sensor_data)
+        from std_msgs.msg import String
+        self.planning_pub = self.create_publisher(
+            String, '/manipulation/planning_result', 10)
 
     def publish_shifted_metrics(self) -> None:
         metrics = DistributionMetrics()
@@ -31,12 +34,21 @@ class _MonitorFeed(Node):
         metrics.mmd_statistic = 0.08
         metrics.mmd_p_value = 0.01
         metrics.shift_detected = True
+        metrics.comm_health_score = 0.85
+        metrics.dynamics_anomaly_score = 0.55
+        metrics.soft_limit_triggered = False
         self.metrics_pub.publish(metrics)
 
         err = JointState()
         err.header = metrics.header
         err.position = [0.12, 0.08]
         self.error_pub.publish(err)
+
+    def publish_planning_failure(self) -> None:
+        from std_msgs.msg import String
+        msg = String()
+        msg.data = '{"action":"pick","success":false,"message":"canceled"}'
+        self.planning_pub.publish(msg)
 
 
 @pytest.fixture(scope='module')
@@ -78,6 +90,8 @@ def test_risk_node_publishes_status(risk_node):
         time.sleep(0.05)
 
     feed.publish_shifted_metrics()
+    feed.publish_planning_failure()
+    feed.publish_planning_failure()
 
     deadline = time.time() + 3.0
     while time.time() < deadline and len(statuses) < 1:
@@ -89,3 +103,9 @@ def test_risk_node_publishes_status(risk_node):
     assert latest.composite_score > 0.0
     assert latest.primary_driver
     assert len(latest.attribution) == 5
+    comm_attr = next(a for a in latest.attribution if a.dimension == 'comm_health')
+    assert comm_attr.raw_score > 0.5
+    dyn_attr = next(a for a in latest.attribution if a.dimension == 'dynamics_anomaly')
+    assert dyn_attr.raw_score > 0.5
+    plan_attr = next(a for a in latest.attribution if a.dimension == 'planning_failure')
+    assert plan_attr.raw_score >= 1.0

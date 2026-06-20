@@ -139,3 +139,20 @@ def test_monitor_node_detects_shift(monitor_node):
     latest = metrics[-1]
     assert latest.sample_count_sim >= 10
     assert latest.mmd_statistic > 0.0 or latest.kl_divergence_mean > 0.0
+
+
+def test_monitor_node_threshold_hot_reload(monitor_node):
+    monitor, _publisher = monitor_node
+    result = monitor.set_parameters([
+        rclpy.parameter.Parameter('kl_threshold_mean', rclpy.Parameter.Type.DOUBLE, 0.99),
+        rclpy.parameter.Parameter('w1_threshold_mean', rclpy.Parameter.Type.DOUBLE, 0.50),
+        rclpy.parameter.Parameter('mmd_threshold', rclpy.Parameter.Type.DOUBLE, 0.20),
+    ])
+    assert all(r.successful for r in result)
+    assert monitor.get_parameter('kl_threshold_mean').value == pytest.approx(0.99)
+    assert monitor.get_parameter('w1_threshold_mean').value == pytest.approx(0.50)
+    assert monitor.get_parameter('mmd_threshold').value == pytest.approx(0.20)
+    cfg = monitor._metrics_config()
+    assert cfg.kl_threshold_mean == pytest.approx(0.99)
+    assert cfg.w1_threshold_mean == pytest.approx(0.50)
+    assert cfg.mmd_threshold == pytest.approx(0.20)

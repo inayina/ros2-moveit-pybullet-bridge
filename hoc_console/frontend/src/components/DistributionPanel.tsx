@@ -144,6 +144,28 @@ export function DistributionPanel() {
         <Statistic title="W1 mean" value={metrics?.wasserstein_mean ?? 0} precision={4} />
         <Statistic title="MMD" value={metrics?.mmd_statistic ?? 0} precision={4} />
         <Statistic title="p-value" value={metrics?.mmd_p_value ?? 0} precision={4} />
+        <Statistic
+          title="通信健康"
+          value={metrics?.comm_health_score ?? 0}
+          precision={3}
+          suffix="/ 1"
+        />
+        <Statistic
+          title="动力学异常"
+          value={metrics?.dynamics_anomaly_score ?? 0}
+          precision={3}
+          suffix="/ 1"
+        />
+        {metrics?.soft_limit_triggered ? (
+          <Tag color="error">软限位触发</Tag>
+        ) : (
+          <Statistic
+            title="软限位接近"
+            value={metrics?.soft_limit_score ?? 0}
+            precision={3}
+            suffix="/ 1"
+          />
+        )}
         <Badge
           status={metrics?.shift_detected ? 'warning' : 'success'}
           text={metrics?.shift_detected ? '偏移' : '正常'}

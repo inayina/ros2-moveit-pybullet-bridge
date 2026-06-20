@@ -28,6 +28,7 @@ interface DashboardState {
   sessionStart: number;
   experiment: ExperimentProgressPayload | null;
   cameraFrame: string | null;
+  systemState: string;
   setConnected: (connected: boolean) => void;
   ingestRisk: (payload: RiskStatusPayload) => void;
   ingestMetrics: (payload: DistributionMetricsPayload) => void;
@@ -38,6 +39,7 @@ interface DashboardState {
   resetR3Modal: () => void;
   ingestExperimentProgress: (payload: ExperimentProgressPayload) => void;
   setCameraFrame: (dataUrl: string | null) => void;
+  setSystemState: (state: string) => void;
 }
 
 function computeTrend(history: RiskHistoryPoint[]): TrendDirection {
@@ -68,12 +70,22 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   sessionStart: Date.now(),
   experiment: null,
   cameraFrame: null,
+  systemState: 'RUNNING',
 
   setConnected: (connected) => set({ connected }),
 
   ingestRisk: (payload) => {
     const t = Date.now() / 1000;
-    const point: RiskHistoryPoint = { t, level: payload.level, score: payload.composite_score };
+    const attribution: Record<string, number> = {};
+    for (const a of payload.attribution) {
+      attribution[a.dimension] = a.raw_score;
+    }
+    const point: RiskHistoryPoint = {
+      t,
+      level: payload.level,
+      score: payload.composite_score,
+      attribution,
+    };
     const riskHistory = [...get().riskHistory, point].filter((p) => p.t >= t - HISTORY_SECONDS);
     const trend = computeTrend(riskHistory);
     const updates: Partial<DashboardState> = {
@@ -95,6 +107,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       kl_mean: payload.kl_divergence_mean,
       w1_mean: payload.wasserstein_mean,
       mmd_stat: payload.mmd_statistic,
+      comm_health_score: payload.comm_health_score ?? 0,
     };
     const metricsHistory = [...get().metricsHistory, point].filter(
       (p) => p.t >= t - HISTORY_SECONDS,
@@ -127,4 +140,6 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ experiment: payload, lastMessageAt: Date.now() }),
 
   setCameraFrame: (cameraFrame) => set({ cameraFrame }),
+
+  setSystemState: (systemState) => set({ systemState }),
 }));

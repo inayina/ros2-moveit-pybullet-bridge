@@ -37,6 +37,7 @@ def _launch_setup(context, *args, **kwargs):
         'align_tolerance_sec': 0.05,
         'real_source': real_source,
         'lerobot_dataset_path': lerobot_path,
+        'robot_profile': cfg['robot_profile'],
     }
 
     iiwa_home = list(IIWA_HOME)

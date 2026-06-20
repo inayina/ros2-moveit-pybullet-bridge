@@ -61,3 +61,14 @@ def test_empty_trajectory_ignored():
     msg.points = []
     executor.set_trajectory(msg, start_time_sec=0.0)
     assert executor.sample(0.0) == {'j1': 0.3}
+
+
+def test_degraded_time_scale_halves_progress():
+    executor = TrajectoryExecutor()
+    executor.set_hold_positions(['j1', 'j2'], [0.0, 0.0])
+    executor.set_trajectory(_make_trajectory(), start_time_sec=0.0)
+    normal = executor.sample(2.0, time_scale=1.0)
+    degraded = executor.sample(2.0, time_scale=0.5)
+    assert normal['j1'] == 0.5
+    assert degraded['j1'] == 0.0
+    assert degraded == {'j1': 0.0, 'j2': 0.0}
