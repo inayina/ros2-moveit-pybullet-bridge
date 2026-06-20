@@ -3,10 +3,35 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _frontend_candidates(subdir: str) -> list[Path]:
+    env = os.environ.get('HOC_FRONTEND_DIR', '').strip()
+    roots: list[Path] = []
+    if env:
+        roots.append(Path(env).expanduser())
+    roots.extend([
+        Path(__file__).resolve().parents[1] / 'frontend',
+        Path.cwd() / 'frontend',
+    ])
+    return [root / subdir if subdir else root for root in roots]
+
+
+def resolve_frontend_source(explicit: str = '') -> Path | None:
+    """Locate hoc_console/frontend (Vite dev root with package.json)."""
+    if explicit:
+        path = Path(explicit).expanduser().resolve()
+        if (path / 'package.json').is_file():
+            return path
+    for path in _frontend_candidates(''):
+        if (path / 'package.json').is_file():
+            return path.resolve()
+    return None
 
 
 def resolve_frontend_dist(explicit: str = '') -> Path | None:
@@ -14,11 +39,7 @@ def resolve_frontend_dist(explicit: str = '') -> Path | None:
         path = Path(explicit).expanduser().resolve()
         if (path / 'index.html').is_file():
             return path
-    candidates = [
-        Path(__file__).resolve().parents[1] / 'frontend' / 'dist',
-        Path.cwd() / 'frontend' / 'dist',
-    ]
-    for path in candidates:
+    for path in _frontend_candidates('dist'):
         if (path / 'index.html').is_file():
             return path.resolve()
     return None

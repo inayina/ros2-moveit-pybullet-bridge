@@ -9,8 +9,11 @@ import type {
   TrackingErrorPayload,
   TrendDirection,
 } from '../types/messages';
+import { shouldThrottle } from '../utils/throttle';
 
 const HISTORY_SECONDS = 60;
+const METRICS_THROTTLE_MS = 300;
+const TRACKING_THROTTLE_MS = 300;
 
 interface DashboardState {
   connected: boolean;
@@ -101,6 +104,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   },
 
   ingestMetrics: (payload) => {
+    if (shouldThrottle('metrics', METRICS_THROTTLE_MS)) {
+      return;
+    }
     const t = Date.now() / 1000;
     const point: MetricsHistoryPoint = {
       t,
@@ -119,7 +125,12 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     });
   },
 
-  ingestTracking: (payload) => set({ tracking: payload, lastMessageAt: Date.now() }),
+  ingestTracking: (payload) => {
+    if (shouldThrottle('tracking', TRACKING_THROTTLE_MS)) {
+      return;
+    }
+    set({ tracking: payload, lastMessageAt: Date.now() });
+  },
 
   ingestAlert: (payload) =>
     set((state) => ({

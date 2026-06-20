@@ -1,8 +1,8 @@
-import ReactECharts from 'echarts-for-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { StableChart } from './StableChart';
 
-export function TrackingChart() {
+export const TrackingChart = memo(function TrackingChart() {
   const tracking = useDashboardStore((s) => s.tracking);
 
   const option = useMemo(() => {
@@ -10,6 +10,7 @@ export function TrackingChart() {
     const errors = tracking?.errors ?? [];
     return {
       backgroundColor: 'transparent',
+      animation: false,
       tooltip: { trigger: 'axis' },
       grid: { left: 48, right: 16, top: 24, bottom: 32 },
       xAxis: {
@@ -44,10 +45,10 @@ export function TrackingChart() {
   }, [tracking]);
 
   return (
-    <div className="panel">
+    <div className="panel panel--chart">
       <h3>关节跟踪误差</h3>
-      <ReactECharts option={option} style={{ height: 200 }} notMerge lazyUpdate />
+      <StableChart option={option} height={200} />
       <p className="panel-caption">RMSE: {rmse.toFixed(4)} rad</p>
     </div>
   );
-}
+});

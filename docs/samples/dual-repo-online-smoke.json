@@ -1,0 +1,30 @@
+{
+  "ok": true,
+  "capture_ok": true,
+  "metrics_seen": true,
+  "real_source": "lerobot",
+  "lerobot_export": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export",
+  "sim_npz": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/bridge-sim-trajectory.npz",
+  "online_metrics": {
+    "kl_divergence_mean": 0.0,
+    "wasserstein_mean": 0.0,
+    "mmd_statistic": 0.0,
+    "shift_detected": false,
+    "sample_count_sim": 169.0,
+    "sample_count_real": 0.0
+  },
+  "log_tail": [
+    "[bridge_node-1] [WARN] [1781940288.566694462] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940288.578120307] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
+    "[bridge_node-1] [WARN] [1781940288.639141487] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940288.643551960] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
+    "[bridge_node-1] [WARN] [1781940288.969449186] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940288.976064962] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
+    "[bridge_node-1] [WARN] [1781940289.062508237] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940289.071856632] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
+    "[bridge_node-1] [WARN] [1781940289.156017401] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940289.218302461] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed",
+    "[bridge_node-1] [WARN] [1781940289.242656727] [pybullet_bridge]: Degraded mode active — trajectory time scale 0.5",
+    "[bridge_node-1] [INFO] [1781940289.252013865] [pybullet_bridge]: Degraded mode cleared — normal trajectory speed"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "sample_count": 1600,
+  "kl_divergence_per_joint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "kl_divergence_mean": 0.0,
+  "wasserstein_per_joint": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "wasserstein_mean": 0.0,
+  "shift_detected_w1": false,
+  "mmd_statistic": 0.0,
+  "mmd_p_value": 1.0,
+  "shift_detected": false,
+  "detection_method": "none",
+  "n_dof": 7
+}

@@ -22,7 +22,9 @@ def _launch_setup(context, *args, **kwargs):
 
     sim_mode = LaunchConfiguration('sim_mode').perform(context)
     real_source = LaunchConfiguration('real_source').perform(context)
+    motion_source = LaunchConfiguration('motion_source').perform(context)
     lerobot_path = LaunchConfiguration('lerobot_dataset_path').perform(context)
+    episode_index = int(LaunchConfiguration('episode_index').perform(context))
 
     bridge_pkg = FindPackageShare('pybullet_bridge').perform(context)
     dist_pkg = FindPackageShare('dist_monitor').perform(context)
@@ -103,18 +105,29 @@ def _launch_setup(context, *args, **kwargs):
                 ),
             ],
         ),
-        TimerAction(
-            period=2.0,
-            actions=[
-                Node(
-                    package='pybullet_bridge',
-                    executable='iiwa_motion_demo',
-                    name='iiwa_motion_demo',
-                    output='screen',
-                ),
-            ],
-        ),
     ]
+    if motion_source != 'none':
+        motion_exec = 'iiwa_motion_demo' if motion_source == 'iiwa' else 'lerobot_replay_demo'
+        motion_params = []
+        if motion_source == 'lerobot':
+            motion_params = [{
+                'lerobot_dataset_path': lerobot_path,
+                'episode_index': episode_index,
+            }]
+        nodes.append(
+            TimerAction(
+                period=2.0,
+                actions=[
+                    Node(
+                        package='pybullet_bridge',
+                        executable=motion_exec,
+                        name=motion_exec,
+                        output='screen',
+                        parameters=motion_params,
+                    ),
+                ],
+            ),
+        )
     return nodes
 
 
@@ -128,7 +141,17 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'lerobot_dataset_path',
             default_value=DEFAULT_LEROBOT_DATASET,
-            description='LeRobot export used when real_source:=lerobot',
+            description='LeRobot export used when real_source:=lerobot or motion_source:=lerobot',
+        ),
+        DeclareLaunchArgument(
+            'motion_source',
+            default_value='iiwa',
+            description='iiwa (sinusoidal demo), lerobot (episode replay), or none',
+        ),
+        DeclareLaunchArgument(
+            'episode_index',
+            default_value='0',
+            description='LeRobot episode index when motion_source:=lerobot',
         ),
         OpaqueFunction(function=_launch_setup),
     ])

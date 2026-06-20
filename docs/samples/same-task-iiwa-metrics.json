@@ -1,0 +1,31 @@
+{
+  "sample_count": 115,
+  "kl_divergence_per_joint": [
+    0.4745695192470596,
+    0.3436315465876235,
+    0.4969122806161145,
+    0.47620996228257717,
+    0.4912196146113921,
+    0.4969122806161146,
+    0.4969122806161145
+  ],
+  "kl_divergence_mean": 0.4680524977967137,
+  "wasserstein_per_joint": [
+    8.116908949070538e-05,
+    0.0021464198847837524,
+    0.00306391594520181,
+    0.016794340329326123,
+    0.004189154728715056,
+    0.03013250396555328,
+    0.002770028115636587
+  ],
+  "wasserstein_mean": 0.008453933151243901,
+  "shift_detected_w1": false,
+  "mmd_statistic": 0.04955252829239454,
+  "mmd_p_value": 0.009900990099009901,
+  "shift_detected": true,
+  "detection_method": "kl",
+  "n_dof": 7,
+  "baseline_frac": 0.3,
+  "dual_npz": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/same-task-iiwa-dual.npz"
+}

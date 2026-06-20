@@ -1,0 +1,55 @@
+# 文档索引
+
+本目录包含设计规格、集成指南、实验报告与作品集导出材料。
+
+## 快速导航
+
+| 你想… | 从这里开始 |
+|--------|------------|
+| 快速掌握整个项目 | [PROJECT_LEARNING_GUIDE.md](./PROJECT_LEARNING_GUIDE.md) |
+| 安装与 Launch 参数 | [SETUP.md](./SETUP.md) |
+| 与 episode-data-lab 联调 | [INTEGRATION.md](./INTEGRATION.md) |
+| 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
+| 阅读系统架构 | [design/README.md](./design/README.md) |
+| 导出 PPT/PDF 说明书 | [portfolio/README.md](./portfolio/README.md) |
+| 查看 HTML 报告与 JSON 产物 | [samples/README.md](./samples/README.md) |
+| 查看图表资源 | [assets/README.md](./assets/README.md) |
+
+## 目录结构
+
+```
+docs/
+├── README.md              ← 本页（总索引）
+├── PROJECT_LEARNING_GUIDE.md 项目学习路线、模块地图、代码阅读顺序
+├── SETUP.md               安装、编译、Launch、阈值配置
+├── INTEGRATION.md         双仓库环境变量与联调步骤
+├── EXPERIMENTS.md         实验流水线、指标解读、报告对照
+├── PORTFOLIO_REMAINING.md 待办跟踪
+├── design/                01–09 技术设计 Spec
+├── portfolio/             系统设计说明书 + Marp 幻灯片
+├── samples/               HTML 报告、JSON 指标、NPZ 轨迹
+└── assets/                PNG/GIF/SVG 配图
+```
+
+## 实验报告一览
+
+| 报告 | 类型 | 说明 |
+|------|------|------|
+| [samples/dual-repo-experiment-report.html](./samples/dual-repo-experiment-report.html) | 跨仓库联调 | Sim（bridge）vs Real（LeRobot），含局限说明 |
+| [samples/same-task-calibration-report.html](./samples/same-task-calibration-report.html) | 同任务校准 | 双源同 JointTrajectory，KL/W1/MMD 可解释 |
+| [samples/dual-repo-integration-report.html](./samples/dual-repo-integration-report.html) | 验收摘要 | 指标表 + 嵌入图表 |
+| [samples/sample-experiment-report.html](./samples/sample-experiment-report.html) | HOC 样例 | 五维风险 + dashboard 截图 |
+
+## 一键脚本（`scripts/`）
+
+| 脚本 | 用途 |
+|------|------|
+| `run_dual_repo_integration.sh` | 双仓库联调：校验 → 负对照 → 跨源对比 → 报告 |
+| `run_same_task_calibration.sh` | 同任务校准：双源采集 → baseline 分割对比 → 报告 |
+| `regenerate_all_reports.py` | **对齐**：从 JSON/NPZ 重生成图 1–9 + 三份 HTML |
+| `capture_readme_assets.sh` | **P1-1**：README 真实配图（m3 / m2-iiwa-* / m5） |
+| `run_integration_demo.sh` | 本地冒烟 / 可选采集 |
+| `run_tests.sh` | 单元 + 节点 + 集成测试 |
+| `verify_portfolio.sh` | URDF + offline_compare + 15s demo |
+
+详见 [EXPERIMENTS.md](./EXPERIMENTS.md)。

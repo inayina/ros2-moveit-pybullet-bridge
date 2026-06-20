@@ -24,14 +24,14 @@ export const RiskBanner = memo(function RiskBanner() {
   const systemState = useDashboardStore((s) => s.systemState);
 
   const level = risk?.level ?? 0;
-  const blink = level >= 2;
+  const alertAccent = level >= 2;
 
   const TrendIcon =
     trend === 'up' ? ArrowUpOutlined : trend === 'down' ? ArrowDownOutlined : MinusOutlined;
 
   return (
     <div
-      className={`risk-banner ${blink ? 'risk-banner--blink' : ''}`}
+      className={`risk-banner ${alertAccent ? 'risk-banner--alert' : ''}`}
       style={{
         borderColor: RISK_COLORS[level] ?? RISK_COLORS[0],
         background: RISK_BG[level] ?? RISK_BG[0],

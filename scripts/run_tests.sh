@@ -24,6 +24,7 @@ fi
 
 PACKAGES=(dist_monitor risk_engine pybullet_bridge hoc_console manipulation_actions)
 LAUNCH_IGNORE=(--ignore=test/test_m1_launch.py --ignore=test/test_full_system_launch.py)
+LAUNCH_TEST_TIMEOUT_SEC="${LAUNCH_TEST_TIMEOUT_SEC:-120}"
 FAILED=0
 
 echo "==> Unit + node tests (${PYTHON})"
@@ -41,8 +42,8 @@ for pkg in "${PACKAGES[@]}"; do
 done
 
 echo "==> Launch integration tests (pybullet_bridge)"
-if (cd "${ROOT}/pybullet_bridge" && "${PYTHON}" -m pytest \
-    test/test_m1_launch.py test/test_full_system_launch.py -v); then
+if (cd "${ROOT}/pybullet_bridge" && timeout --kill-after=10s "${LAUNCH_TEST_TIMEOUT_SEC}s" \
+    "${PYTHON}" -m pytest test/test_m1_launch.py test/test_full_system_launch.py -v); then
   :
 else
   FAILED=1

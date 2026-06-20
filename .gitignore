@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.pytest_cache/
 .venv/
 dist/
 build/
@@ -16,6 +17,10 @@ log/
 # Frontend
 hoc_console/frontend/node_modules/
 hoc_console/frontend/dist/
+hoc_console/frontend/test-results/
+
+# Generated capture scratch space
+docs/samples/.capture_tmp/
 
 # IDE
 .idea/

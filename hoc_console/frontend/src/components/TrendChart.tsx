@@ -1,6 +1,6 @@
-import ReactECharts from 'echarts-for-react';
 import { memo, useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { StableChart } from './StableChart';
 
 export const TrendChart = memo(function TrendChart() {
   const history = useDashboardStore((s) => s.metricsHistory);
@@ -82,13 +82,7 @@ export const TrendChart = memo(function TrendChart() {
   return (
     <div className="panel panel--wide panel--chart">
       <h3>KL / W1 / MMD / 通信健康 时序趋势（最近 60 秒）</h3>
-      <ReactECharts
-        option={option}
-        style={{ height: 180, width: '100%' }}
-        opts={{ renderer: 'canvas' }}
-        notMerge
-        lazyUpdate
-      />
+      <StableChart option={option} height={180} />
     </div>
   );
 });

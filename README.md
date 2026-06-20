@@ -1,268 +1,351 @@
-# ROS2 + MoveIt2 + PyBullet Sim2Real Bridge
+# ros2-moveit-pybullet-bridge
+
+> **MoveIt 2 与 PyBullet 闭环仿真桥接，内置 Sim/Real 分布偏移监控与运维控制台。**
 
 [![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
-
-虚实映射与分布监控系统 — ROS 2 Jazzy 工作区。
-
-## 包结构
-
-| 包 | 说明 |
-|----|------|
-| `bridge_monitor_msgs` | 自定义消息/服务/Action（含 Pick/Place） |
-| `pybullet_bridge` | PyBullet 双源仿真桥接 |
-| `dist_monitor` | KL / W1 / MMD 分布偏移监控 |
-| `risk_engine` | 多维风险态势聚合（R3 取消 MoveIt） |
-| `manipulation_actions` | Pick/Place 高层 Action Server |
-| `hoc_console` | 人机运维控制台后端 |
-| `moveit_config` | MoveIt2 配置（2-DOF 占位 + KUKA iiwa7 作品集） |
-
-设计文档见 [`docs/design/`](docs/design/README.md)。
-
-## 与 episode-data-lab 联动
-
-跨仓库路径通过环境变量解析（见 `pybullet_bridge/integration_paths.py`）：
-
-```bash
-export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
-export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
-```
-
-未设置时按顺序尝试：`/data/episode-data-lab`（Docker 挂载）、`~/robot-sim-lab/robot-arm-episode-data-lab`、与 bridge 同级的 `robot-arm-episode-data-lab`。
-
-完整联调步骤、Docker 与 **`./scripts/run_integration_demo.sh`** 见 **[docs/INTEGRATION.md](docs/INTEGRATION.md)**。
-
-episode-data-lab 侧简要说明：[integration_with_bridge.md](https://github.com/inayina/robot-arm-episode-data-lab/blob/main/docs/reference/integration_with_bridge.md)
-
-## Docker（可选）
-
-```bash
-export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
-docker compose run --rm verify          # 冒烟：offline_compare + portfolio_demo
-docker compose run --rm portfolio-demo  # 交互式 iiwa7 演示（headless）
-```
-
-详见 [`docker/README.md`](docker/README.md)。
-
-## 快速开始
-
-```bash
-# 1. 环境
-source setup.sh
-
-# 2. 安装 Python 依赖
-pip install -r requirements.txt
-
-# 3. 编译（conda 用户请先执行下一行，确保消息包绑定 Python 3.12）
-# export PATH="/usr/bin:/bin:/opt/ros/jazzy/bin:$PATH" && unset CONDA_PREFIX
-cd ~/ros2_ws
-colcon build --packages-select bridge_monitor_msgs pybullet_bridge dist_monitor risk_engine hoc_console manipulation_actions moveit_config --symlink-install
-source install/setup.bash
-
-# 4. 启动完整系统（默认 KUKA iiwa7 作品集主线）
-ros2 launch pybullet_bridge full_system.launch.py
-
-# CI / M1 快速验证仍用 2-DOF
-ros2 launch pybullet_bridge m1_demo.launch.py robot:=planar_2dof
-
-# 求职作品集一键演示（iiwa + 双源 + 监控 + 运动）
-ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
-```
-
-## 测试
-
-三层测试覆盖：**单元测试**（纯算法）→ **节点测试**（rclpy 单节点）→ **集成测试**（launch_testing 启动完整 launch）。
-
-```bash
-# 一键运行全部测试（需先 colcon build + source install）
-./scripts/run_tests.sh
-
-# 仅单元 + 节点测试（较快）
-cd dist_monitor && python3 -m pytest test/ -v -m "not launch_test"
-
-# 仅 M1 / 全系统集成测试
-cd pybullet_bridge && python3 -m pytest test/ -v -m launch_test
-```
-
-| 层级 | 包 | 测试文件 | 验证内容 |
-|------|-----|---------|---------|
-| 单元 | 全部 Python 包 | `test/test_*.py` | KL/MMD、风险聚合、轨迹插值等 |
-| 节点 | 全部 Python 包 | `test/test_*_node.py` | 单节点话题发布/订阅 |
-| 节点 | `hoc_console` | `test/test_ws_hub.py` | WebSocket 广播、消息 JSON 化 |
-| 集成 | `pybullet_bridge` | `test/test_m1_launch.py` | M1 demo 关节运动 |
-| 集成 | `pybullet_bridge` | `test/test_full_system_launch.py` | bridge → monitor → risk 链路 |
-
-生成 README 里程碑配图与样例报告：
-
-```bash
-python3 scripts/generate_milestone_assets.py
-python3 scripts/generate_sample_report.py
-```
-
-## 里程碑
-
-| 里程碑 | 状态 | 说明 |
-|--------|------|------|
-| **M1** | ✅ | PyBullet 单实例 + 关节轨迹控制 + `/joint_states` 反馈 |
-| **M2** | ✅ | MoveIt2 规划闭环 — iiwa7 作品集主线 + UR5 教程可选 |
-| **M3** | ✅ | 双源域随机化 |
-| **M4** | ✅ | 分布监控标定（KL / W1 / MMD） |
-| **M5** | ✅ | HOC 前端 + 实验报告 + Pick/Place Action |
-
-## 机器人平台（方案 C）
-
-| Profile | 用途 | 启动 |
-|---------|------|------|
-| `planar_2dof` | CI、M1 冒烟 | `ros2 launch pybullet_bridge m1_demo.launch.py` |
-| `iiwa7` | **作品集主线**、episode-data-lab 联动 | `ros2 launch pybullet_bridge portfolio_demo.launch.py` |
-
-```bash
-# 作品集录屏（iiwa7 + 双源 + 监控 + 运动）
-ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
-
-# 与 episode-data-lab LeRobot 离线对比
-export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
-export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
-ros2 run dist_monitor offline_compare \
-  --real-dataset "$LEROBOT_EXPORT" \
-  --sim-dataset "$LEROBOT_EXPORT"
-
-./scripts/verify_portfolio.sh
-./scripts/verify_pick.sh
-python3 scripts/check_iiwa_joint_consistency.py
-python3 scripts/calibrate_monitor_thresholds.py --write   # 可选：重标定监控阈值
-```
-
-详设：[`docs/design/06-robot-platform-selection.md`](docs/design/06-robot-platform-selection.md)
-
-### M1 — PyBullet 桥接 + 关节轨迹
-
-![M1 joint sweep animation](docs/assets/m1-joint-sweep.gif)
-
-![M1 PyBullet render](docs/assets/m1-pybullet.png)
-
-- PyBullet 加载 2-DOF 平面臂，接收 `/bridge/command` 轨迹
-- 发布 `/bridge/sim/joint_states` 供监控与验证
-- 集成测试：`test_m1_launch.py` · 一键验证：`./scripts/verify_m1.sh`
-
-```bash
-cd ~/ros2_ws/src/ros2-moveit-pybullet-bridge
-./scripts/verify_m1.sh
-```
-
-看到 `[PASS] M1 验证通过` 即表示桥接与关节反馈正常。
-
-**手动三步验证**（需先 `source setup.sh`，且不要同时运行 M2）：
-
-```bash
-# 终端 1：启动 M1 全套（bridge + 3s 后自动发轨迹）
-ros2 launch pybullet_bridge m1_demo.launch.py
-
-# 终端 2：观察桥接输出的关节状态（勿用 /joint_states，避免与 M2 冲突）
-ros2 topic echo /bridge/sim/joint_states --spin-time 2
-```
-
-### M2 — MoveIt2 规划闭环
-
-**作品集主线（KUKA iiwa7）**
-
-![M2 iiwa MoveIt2 pipeline](docs/assets/m2-iiwa-pipeline.svg)
-
-**UR5 教程（可选）**
-
-![M2 UR5 MoveIt2 pipeline](docs/assets/m2-moveit-pipeline.svg)
-
-> 配图为架构示意。真实 RViz 录屏可保存为 `docs/assets/m2-iiwa-rviz.gif`。
-
-**作品集主线（KUKA iiwa7）** — 与 episode-data-lab / PyBullet 同构 URDF：
-
-```bash
-source ~/ros2_ws/install/setup.bash
-ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=DIRECT
-# 录屏用 GUI
-ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=GUI
-```
-
-RViz：**Planning Group** 选 **`manipulator`** → Interact 拖动末端 → **Plan** → **Execute**
-
-关节一致性检查：`python3 scripts/check_iiwa_joint_consistency.py`
-
-一键冒烟：`./scripts/verify_m2_iiwa.sh`
-
-**UR5 教程演示**（可选，需 `ur_description`）：
-
-```bash
-cd ~/ros2_ws/src
-git clone --depth 1 --branch jazzy https://github.com/UniversalRobots/Universal_Robots_ROS2_Description.git
-git clone --depth 1 --branch jazzy https://github.com/UniversalRobots/Universal_Robots_ROS2_Driver.git /tmp/ur_driver
-cp -r /tmp/ur_driver/ur_moveit_config .
-# 或: sudo apt install ros-jazzy-ur-description ros-jazzy-ur-moveit-config
-```
-
-```bash
-source setup.sh
-cd ~/ros2_ws && colcon build --packages-select ur_description ur_moveit_config pybullet_bridge moveit_config --symlink-install
-source install/setup.bash
-
-ros2 launch moveit_config m2_demo.launch.py sim_mode:=DIRECT ur_type:=ur5
-```
-
-**RViz 操作**：
-
-1. 左侧面板 **MotionPlanning**
-2. **Planning Group** 选 **`ur_manipulator`**（不是 manipulator）
-3. 工具栏 **Interact**，拖动末端 **tool0** 上的交互 marker
-4. **Plan** → **Execute**
-
-> M2 截图/GIF：iiwa 主线录屏保存到 `docs/assets/m2-iiwa-rviz.gif`；UR5 教程同理。
-
-### M3 — 双源域随机化
-
-![M3 dual-source sim vs real](docs/assets/m3-dual-source.gif)
-
-> 配图为合成示意（Sim vs Real 漂移曲线）；真实双源请用 `portfolio_demo.launch.py` 录屏替换。
-
-- Sim-Source：理想物理参数
-- Real-Source：噪声 + 域随机化（阻尼、摩擦、负载等）
-- 话题：`/bridge/sim/joint_states` vs `/bridge/real/joint_states`
-
-### M4 — 分布监控标定
-
-![M4 monitor metrics](docs/assets/m4-monitor-metrics.png)
-
-> 配图为 iiwa 7 关节合成指标（`generate_milestone_assets.py`）；在线数据请从 `/monitor/distribution_metrics` 导出替换。
-
-- KL / W1 / MMD 置换检验检测 Sim/Real 偏移
-- 发布 `/monitor/distribution_metrics` 与 `/monitor/tracking_error`
-- 节点测试：`dist_monitor/test/test_monitor_node.py`
-
-### M5 — HOC 人机运维控制台
-
-**架构**
-
-![M5 HOC console architecture](docs/assets/m5-hoc-console.svg)
-
-**Dashboard 线框（暗色主题，接近实机布局）**
-
-![M5 HOC dashboard wireframe](docs/assets/m5-hoc-dashboard.svg)
-
-**样例实验报告（HTML）**：[docs/samples/sample-experiment-report.html](docs/samples/sample-experiment-report.html)
-
-- React + ECharts 一屏态势感知：风险雷达、Sim/Real 分布对比、KL/MMD 时序
-- `hoc_server` WebSocket (8765) 推送 `/risk/status`、`/monitor/distribution_metrics`
-- 实验控制：场景运行、录制 rosbag、HTML 报告导出、域随机化 / 偏移注入
-- **开发**：`ros2 launch hoc_console hoc.launch.py` → http://localhost:5173
-- **生产**：`cd hoc_console/frontend && npm run build` → `ros2 launch hoc_console hoc_prod.launch.py` → http://localhost:8080
-- 3 分钟演示脚本：`./scripts/hoc_demo_3min.sh`
+![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
+![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-blue)
+![MoveIt 2](https://img.shields.io/badge/MoveIt-2-green)
+![PyBullet](https://img.shields.io/badge/PyBullet-physics-orange)
+![Python 3.12](https://img.shields.io/badge/Python-3.12-yellow)
 
 ---
 
-**常见问题**
+## 招聘作品集定位
 
-| 现象 | 处理 |
-|------|------|
-| `package 'pybullet_bridge' not found` | `cd ~/ros2_ws && colcon build ... && source install/setup.bash` |
-| `PyBullet init failed` | `pip install -r requirements.txt` 后重新 `source setup.sh` |
-| 测试 skip / PyBullet init failed | 先 `colcon build` 并 `source install/setup.bash` |
-| `UnsupportedTypeSupport` / Python 报错 | conda 用户编译前：`export PATH="/usr/bin:/bin:/opt/ros/jazzy/bin:$PATH" && unset CONDA_PREFIX` |
-| echo 显示 UR5 关节名 | 有 M2 残留进程，`pkill -f bridge_node` 后重试，或用 `m1_demo.launch.py` |
-| echo 无输出/卡住 | 改用 `/bridge/sim/joint_states`，或运行 `./scripts/verify_m1.sh` |
+这是一个面向 **机器人集成 / ROS 2 / 仿真验证 / 机器人平台工程** 岗位的端到端作品集项目。它展示的不只是单个 demo，而是从 MoveIt 2 规划、PyBullet 物理执行、Sim2Real 偏移监控、风险闭环到 Web 运维控制台和实验报告的完整工程链路。
+
+**我在项目中实现的核心能力：**
+
+| 能力维度 | 作品集证据 |
+|----------|------------|
+| ROS 2 系统集成 | 自定义 msg/srv/action，跨包 topic/service/action 契约，launch 组合与 `launch_testing` |
+| 运动规划闭环 | MoveIt 2 / RViz Plan & Execute 通过 `FollowJointTrajectory` 驱动 PyBullet |
+| 仿真与 Sim2Real | KUKA iiwa7 双源 PyBullet，domain randomization，LeRobot 跨仓库回放 |
+| 监控算法 | KL / W1 / MMD、滑动窗口、时间对齐、离线与在线对比 |
+| 风险与运维 | 五维风险聚合、急停/确认服务、React + ECharts HOC Dashboard |
+| 工程交付 | Docker、CI、三层测试、HTML 报告、真实截图与可复现实验脚本 |
+
+---
+
+## 解决的核心痛点
+
+- **规划与仿真脱节**：MoveIt 2 规划结果无法直接驱动物理仿真，Sim2Real 验证链路断裂。
+- **偏移不可观测**：Sim 与 Real 关节分布漂移缺乏量化指标，问题只能在实机暴露。
+- **运维缺乏统一视图**：风险态势、分布曲线、实验录制分散在 CLI，难以快速决策。
+
+---
+
+## 系统架构
+
+```mermaid
+flowchart TB
+    subgraph UI["交互层"]
+        RViz["RViz2<br/>Interact 拖拽末端"]
+        HOC["HOC 控制台<br/>React + ECharts<br/>ws://localhost:8765"]
+    end
+
+    subgraph Planning["规划层"]
+        MG["move_group<br/>IK + OMPL + 碰撞检测"]
+        JTC["joint_trajectory_controller<br/>FollowJointTrajectory"]
+    end
+
+    subgraph Bridge["桥接层 · pybullet_bridge"]
+        CMD["/bridge/command<br/>JointTrajectory"]
+        PB_SIM["Sim-Source<br/>PyBullet"]
+        PB_REAL["Real-Source<br/>PyBullet + 域随机化"]
+        JS["/joint_states"]
+        SIM_JS["/bridge/sim/joint_states"]
+        REAL_JS["/bridge/real/joint_states"]
+    end
+
+    subgraph Monitor["监控层"]
+        DM["dist_monitor<br/>KL / W1 / MMD"]
+        MET["/monitor/distribution_metrics"]
+        ERR["/monitor/tracking_error"]
+        RE["risk_engine"]
+        RISK["/risk/status · /risk/alerts"]
+    end
+
+    subgraph Ops["运维层 · hoc_console"]
+        HS["hoc_server<br/>WebSocket 桥接"]
+    end
+
+    RViz -->|"MoveGroup Action"| MG
+    MG --> JTC
+    JTC --> CMD
+    CMD --> PB_SIM
+    CMD --> PB_REAL
+    PB_SIM --> JS
+    PB_SIM --> SIM_JS
+    PB_REAL --> REAL_JS
+    JS -->|"PlanningSceneMonitor"| MG
+    JS --> RSP["robot_state_publisher → /tf"]
+
+    SIM_JS --> DM
+    REAL_JS --> DM
+    DM --> MET
+    DM --> ERR
+    MET --> RE
+    ERR --> RE
+    RE --> RISK
+    RISK --> HS
+    MET --> HS
+    ERR --> HS
+    HS <-->|"实时推送"| HOC
+
+    HOC -.->|"/bridge/set_randomization<br/>/bridge/inject_shift"| PB_SIM
+    HOC -.->|"/risk/acknowledge<br/>/hoc/export_experiment"| RE
+```
+
+**关键接口速查**
+
+| 类型 | 名称 | 说明 |
+|------|------|------|
+| Topic | `/bridge/command` | 轨迹指令入口（MoveIt → PyBullet） |
+| Topic | `/joint_states` | 仿真反馈（PyBullet → MoveIt / TF） |
+| Topic | `/bridge/sim/joint_states` · `/bridge/real/joint_states` | 双源关节状态 |
+| Topic | `/monitor/distribution_metrics` | KL / W1 / MMD 指标 |
+| Topic | `/risk/status` | 综合风险等级 |
+| Service | `/bridge/set_randomization` · `/bridge/inject_shift` | 域随机化 / 偏移注入 |
+| Service | `/monitor/reset_baseline` | 重置监控基线 |
+| Service | `/risk/acknowledge` · `/risk/force_e_stop` | 风险确认 / 急停 |
+| Action | `/move_action` | MoveIt MoveGroup |
+| Action | `/arm_controller/follow_joint_trajectory` | 轨迹执行 |
+| WebSocket | `ws://localhost:8765` | HOC 仪表盘实时数据 |
+
+完整接口规格：[docs/design/05-ros2-node-interface-and-dataflow-spec.md](docs/design/05-ros2-node-interface-and-dataflow-spec.md)
+
+---
+
+## 快速开始
+
+### 1. 准备依赖（二选一）
+
+**Docker（推荐）**
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+docker compose build
+docker compose run --rm verify
+```
+
+Docker 默认用于 headless 验证和演示；需要 PyBullet GUI / RViz 时建议使用源码编译流程，或自行配置 X11 转发。
+
+**源码编译**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+source /opt/ros/jazzy/setup.bash
+cd ~/ros2_ws && colcon build --symlink-install && source install/setup.bash
+cd ~/ros2_ws/src/ros2-moveit-pybullet-bridge && source setup.sh
+```
+
+### 2. 一键启动演示
+
+源码 / 本机 GUI：
+
+```bash
+ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI
+```
+
+启动后约 3 s 自动运行 iiwa7 运动 demo，同时拉起双源监控与风险引擎。
+
+Docker headless：
+
+```bash
+docker compose run --rm portfolio-demo
+```
+
+### 3. 启动 HOC 控制台（可选）
+
+前端开发模式需要 Node.js / npm；`hoc.launch.py` 会在 `hoc_console/frontend` 下自动执行 `npm install && npm run dev`。
+
+```bash
+# 开发模式（Vite 热更新）
+ros2 launch hoc_console hoc.launch.py
+# → http://localhost:5173
+
+# 生产模式
+cd hoc_console/frontend && npm run build
+ros2 launch hoc_console hoc_prod.launch.py
+# → http://localhost:8080
+```
+
+### 4. MoveIt + RViz 闭环（可选）
+
+```bash
+ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=GUI
+```
+
+RViz 中选择 **Planning Group → manipulator**，Interact 拖动末端 → **Plan** → **Execute**。
+
+### 5. 验证
+
+```bash
+./scripts/run_tests.sh
+```
+
+> 完整安装步骤、Launch 参数与阈值配置见 **[docs/SETUP.md](docs/SETUP.md)**。
+
+---
+
+## 面试演示路线
+
+如果只有 3–5 分钟展示项目，建议按这条路径讲：
+
+1. **端到端闭环**：运行 `portfolio_demo.launch.py`，展示 iiwa7 轨迹进入 PyBullet，Sim/Real 双源同时发布。
+2. **规划接入仿真**：打开 `m2_iiwa_demo.launch.py`，在 RViz 中 Plan & Execute，说明 MoveIt 输出如何经 `FollowJointTrajectory` 到 `/bridge/command`。
+3. **偏移监控与风险**：展示 HOC Dashboard，解释 KL / W1 / MMD 如何进入 `/risk/status`，以及急停、确认、报告导出如何闭环。
+4. **工程验证**：展示 `./scripts/run_tests.sh`、Docker verify、HTML 实验报告和真实 README 截图来源。
+
+详细学习路线见 [docs/PROJECT_LEARNING_GUIDE.md](docs/PROJECT_LEARNING_GUIDE.md)，完整系统设计材料见 [docs/portfolio/](docs/portfolio/README.md)。
+
+---
+
+## 功能亮点
+
+### 🔗 MoveIt 2 ⇄ PyBullet 双向桥接
+
+`/bridge/command` 接收 `JointTrajectory`，240 Hz 物理步进 + 100 Hz 状态发布；`/joint_states` 闭环反馈 MoveIt PlanningSceneMonitor，支持 KUKA iiwa7 与 2-DOF 占位臂。
+
+### 📊 KL / MMD / W1 分布偏移监控
+
+`dist_monitor` 对齐 Sim / Real 双源关节流，在线计算 KL 散度、Wasserstein-1 与 MMD 置换检验，发布 `/monitor/distribution_metrics` 与 `/monitor/tracking_error`。
+
+### 🖥️ React + ECharts 运维控制台
+
+HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`hoc_server` 经 WebSocket（`:8765`）实时推送，支持 rosbag 录制、HTML 报告导出与域随机化控制。
+
+### ✅ 三层自动化测试
+
+单元测试（纯算法）→ 节点测试（rclpy 单节点）→ 集成测试（`launch_testing` 全链路），CI 于 `ros:jazzy-ros-base` 容器内自动执行。
+
+---
+
+## 截图展示
+
+> 配图由 `./scripts/capture_readme_assets.sh` 从**真实运行数据**生成（dual-source NPZ + 实验指标 / 可选 HOC 浏览器截图）。
+> README 仅保留最能证明工程能力的 4 张图；完整实验图表集中在 [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) 与 [docs/assets/](docs/assets/README.md)。
+
+### HOC 运维控制台
+
+![HOC 风险雷达与分布对比](docs/assets/m5-hoc-dashboard.png)
+
+**证明点**：具备机器人运行态势可视化、风险闭环和实验运维能力。HOC 将 `/risk/status`、`/monitor/distribution_metrics`、`/monitor/tracking_error` 聚合到一屏，并支持域随机化、急停、录制与报告导出。
+
+### RViz + PyBullet 联动
+
+![iiwa7 实时仿真与关节曲线](docs/assets/m2-iiwa-rviz.gif)
+
+**证明点**：MoveIt 2 规划不是停留在 RViz，而是通过 `FollowJointTrajectory` / `/bridge/command` 驱动 PyBullet 物理执行，并把 `/joint_states` 回灌给 MoveIt / TF。
+
+### 双源监控与一键演示
+
+![Dual-Source Sim vs Real](docs/assets/m3-dual-source.gif)
+
+**证明点**：同一条轨迹下，Sim-Source 与 domain-randomized Real-Source 的关节分布差异可以被采集、对齐并量化，为 KL / W1 / MMD 监控提供真实输入。
+
+![KUKA iiwa7 PyBullet 演示](docs/assets/m2-iiwa-pybullet.gif)
+
+**证明点**：`portfolio_demo.launch.py` 可一键复现 KUKA iiwa7 双源仿真、监控和风险引擎，适合作品集演示与自动化验证。
+
+重新捕获 README 展示图：`./scripts/capture_readme_assets.sh`。更多实验配图：[docs/assets/](docs/assets/README.md)
+
+> README 引用的图片、报告与示例数据均存放在 `docs/assets/` 与 `docs/samples/`；更新截图或报告时需一并提交这些产物，避免 GitHub 页面断图或断链。
+
+---
+
+## 实验与报告
+
+与 [robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab) 联调后，可一键生成 HTML 实验报告：
+
+| 实验 | 命令 | 报告 |
+|------|------|------|
+| 双仓库联调（连通性 + 跨源 MMD） | `./scripts/run_dual_repo_integration.sh` | [dual-repo-experiment-report.html](docs/samples/dual-repo-experiment-report.html) |
+| 同任务校准（双源同命令，KL/W1 可解释） | `./scripts/run_same_task_calibration.sh` | [same-task-calibration-report.html](docs/samples/same-task-calibration-report.html) |
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
+./scripts/run_dual_repo_integration.sh
+./scripts/run_same_task_calibration.sh
+```
+
+实验设计、指标解读与图表对照：[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) · 产物索引：[docs/samples/](docs/samples/README.md)
+
+---
+
+## 环境变量与配置
+
+| 变量 / 参数 | 默认值 | 说明 |
+|-------------|--------|------|
+| `EPISODE_DATA_LAB_ROOT` | 自动解析 | episode-data-lab 仓库根（LeRobot 联动） |
+| `LEROBOT_EXPORT` | `$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export` | Real 源数据集路径 |
+| `websocket_port`（HOC） | `8765` | WebSocket 推送端口，对应 `hoc_config.yaml` |
+| `real_source`（launch） | `topic` | Real 源：`topic`（双 PyBullet）或 `lerobot` |
+| `motion_source`（launch） | `iiwa` | 演示轨迹：`iiwa` / `lerobot`（episode 回放）/ `none` |
+| `/bridge/sim/joint_states` | — | Sim 源话题（监控输入） |
+| `/bridge/real/joint_states` | — | Real 源话题（监控输入） |
+| `HOC_FRONTEND_DIR` | 自动解析 | HOC 生产模式前端静态目录 |
+
+其余阈值、标定、机器人 Profile 等配置见 **[docs/SETUP.md](docs/SETUP.md)** 与 `dist_monitor/config/`、`pybullet_bridge/config/`。
+
+---
+
+## 测试与 CI
+
+```bash
+# 全量测试（单元 + 节点 + 集成）
+./scripts/run_tests.sh
+
+# 仅单元 / 节点（较快）
+cd dist_monitor && python3 -m pytest test/ -v -m "not launch_test"
+
+# 仅集成测试
+cd pybullet_bridge && python3 -m pytest test/ -v -m launch_test
+```
+
+| 层级 | 包 | 验证内容 |
+|------|-----|---------|
+| 单元 | 全部 Python 包 | KL/MMD 算法、风险聚合、轨迹插值 |
+| 节点 | 全部 Python 包 | 话题发布/订阅、WebSocket 广播 |
+| 集成 | `pybullet_bridge` | M1 demo、bridge → monitor → risk 全链路 |
+
+[![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
+
+---
+
+## 目录结构
+
+```
+ros2-moveit-pybullet-bridge/
+├── bridge_monitor_msgs/   # 自定义消息、服务与 Action 定义
+├── pybullet_bridge/       # PyBullet 双源仿真桥接核心
+├── dist_monitor/          # KL / W1 / MMD 分布偏移监控
+├── risk_engine/           # 多维风险态势聚合与急停联动
+├── manipulation_actions/  # Pick/Place 高层 Action Server
+├── hoc_console/           # HOC 运维控制台（ROS 后端 + React 前端）
+├── moveit_config/         # MoveIt 2 配置（iiwa7 主线 + UR5 可选）
+├── docs/                  # 设计文档、集成指南、实验报告与资源
+├── docker/                # Docker 镜像与 compose 配置
+└── scripts/               # 验证、测试与演示脚本
+```
+
+---
+
+## 引用与致谢
+
+- [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/) · [MoveIt 2](https://moveit.ai/) · [PyBullet](https://pybullet.org/)
+- 跨仓库数据侧：[robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab)（LeRobot 导出与离线采集）
+- 设计文档：[docs/design/](docs/design/README.md)
+
+---
+
+## License
+
+本项目采用 [Apache License 2.0](LICENSE) 开源，与各 ROS 2 包的 `package.xml` 声明一致。
+
+Copyright © 2026 [inayina](https://github.com/inayina)

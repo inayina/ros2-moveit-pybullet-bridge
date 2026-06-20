@@ -61,6 +61,7 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const pingRef = useRef<number | null>(null);
+  const disconnectRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
   const setConnected = useDashboardStore((s) => s.setConnected);
@@ -155,6 +156,10 @@ export function useWebSocket() {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (disconnectRef.current) {
+        clearTimeout(disconnectRef.current);
+        disconnectRef.current = null;
+      }
       retryRef.current = 0;
       setConnected(true);
       ws.send(
@@ -180,10 +185,15 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      setConnected(false);
       if (pingRef.current) {
         clearInterval(pingRef.current);
         pingRef.current = null;
+      }
+      if (!disconnectRef.current) {
+        disconnectRef.current = window.setTimeout(() => {
+          disconnectRef.current = null;
+          setConnected(false);
+        }, 1500);
       }
       if (!mountedRef.current) return;
       const delay = BACKOFF_MS[Math.min(retryRef.current, BACKOFF_MS.length - 1)];
@@ -200,6 +210,7 @@ export function useWebSocket() {
     return () => {
       mountedRef.current = false;
       if (pingRef.current) clearInterval(pingRef.current);
+      if (disconnectRef.current) clearTimeout(disconnectRef.current);
       wsRef.current?.close();
     };
   }, [connect]);

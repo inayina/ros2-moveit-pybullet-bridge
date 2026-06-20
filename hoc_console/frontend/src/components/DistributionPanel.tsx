@@ -1,7 +1,7 @@
 import { Badge, Space, Statistic, Tag } from 'antd';
-import ReactECharts from 'echarts-for-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
+import { StableChart } from './StableChart';
 
 function buildBoxplotSeries(
   joints: string[],
@@ -19,7 +19,7 @@ function buildBoxplotSeries(
   return data;
 }
 
-export function DistributionPanel() {
+export const DistributionPanel = memo(function DistributionPanel() {
   const metrics = useDashboardStore((s) => s.metrics);
 
   const boxplotOption = useMemo(() => {
@@ -53,6 +53,7 @@ export function DistributionPanel() {
 
     return {
       backgroundColor: 'transparent',
+      animation: false,
       tooltip: { trigger: 'item' },
       legend: {
         data: ['Sim 位置', 'Real 位置'],
@@ -101,6 +102,7 @@ export function DistributionPanel() {
     const w1 = metrics?.wasserstein_per_joint ?? joints.map(() => 0);
     return {
       backgroundColor: 'transparent',
+      animation: false,
       tooltip: { trigger: 'axis' },
       legend: {
         data: ['KL', 'W1'],
@@ -128,7 +130,7 @@ export function DistributionPanel() {
   }, [metrics]);
 
   return (
-    <div className="panel">
+    <div className="panel panel--distribution">
       <Space style={{ width: '100%', justifyContent: 'space-between' }}>
         <h3>Sim / Real 分布对比</h3>
         {metrics?.shift_detected ? (
@@ -137,9 +139,11 @@ export function DistributionPanel() {
           <Tag color="success">未检出偏移</Tag>
         )}
       </Space>
-      <ReactECharts option={boxplotOption} style={{ height: 220 }} notMerge lazyUpdate />
-      <ReactECharts option={barOption} style={{ height: 100 }} notMerge lazyUpdate />
-      <Space size="large" wrap>
+      <div className="distribution-charts">
+        <StableChart option={boxplotOption} height={220} className="chart-boxplot" />
+        <StableChart option={barOption} height={120} className="chart-bars" />
+      </div>
+      <Space size="large" wrap className="distribution-stats">
         <Statistic title="KL mean" value={metrics?.kl_divergence_mean ?? 0} precision={4} />
         <Statistic title="W1 mean" value={metrics?.wasserstein_mean ?? 0} precision={4} />
         <Statistic title="MMD" value={metrics?.mmd_statistic ?? 0} precision={4} />
@@ -173,4 +177,4 @@ export function DistributionPanel() {
       </Space>
     </div>
   );
-}
+});

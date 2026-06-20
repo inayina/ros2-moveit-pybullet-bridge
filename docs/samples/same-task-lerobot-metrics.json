@@ -1,0 +1,31 @@
+{
+  "sample_count": 525,
+  "kl_divergence_per_joint": [
+    0.15597600138183787,
+    0.07614890975651671,
+    0.14325554995408155,
+    0.17338877558545243,
+    0.5308917958898378,
+    0.12266880459281942,
+    0.3587058469959513
+  ],
+  "kl_divergence_mean": 0.22300509773664245,
+  "wasserstein_per_joint": [
+    2.1770850555791084e-06,
+    0.0006004024672916683,
+    1.957034805753421e-07,
+    0.0036016144982495097,
+    1.3618165534248985e-06,
+    0.0030016382729876035,
+    2.5204463186976144e-06
+  ],
+  "wasserstein_mean": 0.0010299871842767226,
+  "shift_detected_w1": false,
+  "mmd_statistic": 0.16226633536223312,
+  "mmd_p_value": 0.009900990099009901,
+  "shift_detected": true,
+  "detection_method": "kl+mmd",
+  "n_dof": 7,
+  "baseline_frac": 0.3,
+  "dual_npz": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/same-task-lerobot-dual.npz"
+}

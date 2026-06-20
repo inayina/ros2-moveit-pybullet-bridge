@@ -1,0 +1,16 @@
+{
+  "charts": [
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/dual-repo-integration-overview.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/dual-repo-cross-source-overlay.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/dual-repo-cross-source-metrics.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/dual-repo-lerobot-trajectory.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/dual-repo-offline-self-metrics.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-iiwa-overlay.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-iiwa-metrics.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-lerobot-overlay.png",
+    "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/assets/same-task-lerobot-metrics.png"
+  ],
+  "dual_repo_cross_source": "KL mean=0.0000  W1 mean=0.0000  MMD=0.2723 (p=0.010)  n=177  shift=True (mmd)",
+  "same_task_iiwa": "KL mean=0.4681  W1 mean=0.0085  MMD=0.0496 (p=0.010)  n=115  shift=True (kl)",
+  "same_task_lerobot": "KL mean=0.2230  W1 mean=0.0010  MMD=0.1623 (p=0.010)  n=525  shift=True (kl+mmd)"
+}

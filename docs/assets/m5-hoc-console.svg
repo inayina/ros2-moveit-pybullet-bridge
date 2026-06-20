@@ -21,6 +21,6 @@
   <text x="765" y="140" text-anchor="middle" fill="#2471a3" font-size="12">KL / MMD charts</text>
   <rect x="530" y="175" width="310" height="45" rx="6" fill="#f4f6f7"/>
   <text x="685" y="203" text-anchor="middle" fill="#566573" font-size="11">Export experiment · Acknowledge risk · E-Stop</text>
-  <text x="450" y="290" text-anchor="middle" font-size="12" fill="#7f8c8d">Architecture diagram — see m5-hoc-dashboard.svg for UI wireframe</text>
+  <text x="450" y="290" text-anchor="middle" font-size="12" fill="#7f8c8d">Architecture diagram — see m5-hoc-dashboard.png for UI preview</text>
 
 </svg>

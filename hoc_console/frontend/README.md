@@ -31,7 +31,27 @@ ros2 launch hoc_console hoc.launch.py
    ss -tlnp | grep 8765
    ```
 
-2. **缺少 Python 依赖** — 日志出现 `websockets not installed`  
+2. **只启动了 HOC，未启动仿真/监控** — 实验能点开始，但雷达图/时序曲线无数据  
+   需要同时运行 `portfolio_demo`（或一键脚本）：
+   ```bash
+   ./scripts/start_hoc_experiment.sh
+   ```
+   或分两个终端：
+   ```bash
+   ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=DIRECT
+   ros2 launch hoc_console hoc.launch.py
+   ```
+
+3. **端口被旧进程占用** — 日志出现 `Cannot bind WebSocket port 8765` 或 `Port 5173 is already in use`  
+   ```bash
+   pkill -f "/hoc_console/hoc_server"
+   pkill -f "vite --host"
+   ss -tlnp | grep -E ':5173|:8765'
+   ```
+
+4. **监控仍在预热** — 分布面板显示「样本不足」，需等待 `dist_monitor` 收集约 50 个对齐样本（约 30–60 秒）后 KL/W1/MMD 才会非零
+
+5. **缺少 Python 依赖** — 日志出现 `websockets not installed`  
    ```bash
    python3 -m pip install websockets aiohttp --break-system-packages
    ```

@@ -1,0 +1,105 @@
+{
+  "ok": true,
+  "dataset": "dataset/v1",
+  "lerobot_export_exists": true,
+  "lerobot_meta": {
+    "codebase_version": "v2.1",
+    "robot_type": "kuka_iiwa",
+    "total_episodes": 20,
+    "total_frames": 1600,
+    "total_tasks": 1,
+    "total_videos": 20,
+    "total_chunks": 1,
+    "chunks_size": 1000,
+    "fps": 10.0,
+    "splits": {
+      "train": "0:20"
+    },
+    "data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
+    "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4",
+    "features": {
+      "observation.state": {
+        "dtype": "float32",
+        "shape": [
+          7
+        ],
+        "names": [
+          "lbr_iiwa_joint_1",
+          "lbr_iiwa_joint_2",
+          "lbr_iiwa_joint_3",
+          "lbr_iiwa_joint_4",
+          "lbr_iiwa_joint_5",
+          "lbr_iiwa_joint_6",
+          "lbr_iiwa_joint_7"
+        ]
+      },
+      "action": {
+        "dtype": "float32",
+        "shape": [
+          7
+        ],
+        "names": [
+          "lbr_iiwa_joint_1",
+          "lbr_iiwa_joint_2",
+          "lbr_iiwa_joint_3",
+          "lbr_iiwa_joint_4",
+          "lbr_iiwa_joint_5",
+          "lbr_iiwa_joint_6",
+          "lbr_iiwa_joint_7"
+        ]
+      },
+      "observation.ee_pose": {
+        "dtype": "float32",
+        "shape": [
+          7
+        ],
+        "names": [
+          "x",
+          "y",
+          "z",
+          "qx",
+          "qy",
+          "qz",
+          "qw"
+        ]
+      },
+      "observation.object_pose": {
+        "dtype": "float32",
+        "shape": [
+          7
+        ],
+        "names": [
+          "x",
+          "y",
+          "z",
+          "qx",
+          "qy",
+          "qz",
+          "qw"
+        ]
+      },
+      "observation.images.main": {
+        "dtype": "video",
+        "shape": [
+          480,
+          640,
+          3
+        ],
+        "names": [
+          "height",
+          "width",
+          "channel"
+        ],
+        "info": {
+          "video.height": 480,
+          "video.width": 640,
+          "video.codec": "h264",
+          "video.pix_fmt": "yuv420p",
+          "video.fps": 10.0,
+          "video.channels": 3,
+          "video.is_depth_map": false
+        }
+      }
+    }
+  }
+}

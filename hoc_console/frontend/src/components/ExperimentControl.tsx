@@ -1,5 +1,5 @@
 import { DownloadOutlined, ExperimentOutlined, PauseCircleOutlined, PlayCircleOutlined, UploadOutlined, VerticalAlignBottomOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import { Button, InputNumber, Progress, Select, Slider, Space, Tag, message } from 'antd';
+import { Button, InputNumber, Progress, Select, Slider, Space, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 
@@ -63,7 +63,7 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
     <div className="panel panel--wide experiment-control">
       <h3>实验控制</h3>
       <div className={`experiment-progress-slot ${experiment ? '' : 'experiment-progress-slot--empty'}`}>
-        {experiment && (
+        {experiment ? (
           <>
             <Space wrap style={{ marginBottom: 8 }}>
               <Tag color="blue">{experiment.scenario_id}</Tag>
@@ -72,6 +72,10 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
             </Space>
             <Progress percent={Math.round(experiment.progress * 100)} size="small" showInfo={false} />
           </>
+        ) : (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            实验进度将显示在此处
+          </Typography.Text>
         )}
       </div>
       <Space wrap size="middle" align="center">

@@ -93,8 +93,9 @@ def test_manipulation_pick_action_server_accepts_goal(manipulation_stack):
     handle = send_future.result()
     assert handle is not None and handle.accepted
 
-    cancel_future = handle.cancel_goal_async()
-    deadline = time.time() + 5.0
-    while time.time() < deadline and not cancel_future.done():
+    result_future = handle.get_result_async()
+    deadline = time.time() + 12.0
+    while time.time() < deadline and not result_future.done():
         time.sleep(0.05)
-    assert cancel_future.done()
+    assert result_future.done(), 'Pick result timed out'
+    client.destroy()

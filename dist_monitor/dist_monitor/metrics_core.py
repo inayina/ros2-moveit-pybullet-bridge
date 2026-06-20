@@ -43,6 +43,7 @@ class MetricsConfig:
     w1_grid_points: int = 256
     align_tolerance_sec: float = 0.02
     min_samples: int = 50
+    baseline_frac: float = 0.0
 
 
 def compute_distribution_metrics(
@@ -73,6 +74,12 @@ def compute_distribution_metrics(
     sim_pos = aligned_sim[:, :n_dof]
     real_pos = aligned_real[:, :n_dof]
     errors = sim_pos - real_pos
+
+    if baseline_errors is None and cfg.baseline_frac > 0:
+        split = max(int(n * cfg.baseline_frac), cfg.min_samples // 3)
+        split = min(split, max(n // 2, 1))
+        if split >= 1 and split < n:
+            baseline_errors = errors[:split]
 
     baseline = baseline_errors if baseline_errors is not None and len(baseline_errors) > 0 else errors
 

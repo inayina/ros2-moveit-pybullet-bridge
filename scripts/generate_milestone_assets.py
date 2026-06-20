@@ -263,7 +263,7 @@ def generate_m5_svg() -> None:
   <text x="765" y="140" text-anchor="middle" fill="#2471a3" font-size="12">KL / MMD charts</text>
   <rect x="530" y="175" width="310" height="45" rx="6" fill="#f4f6f7"/>
   <text x="685" y="203" text-anchor="middle" fill="#566573" font-size="11">Export experiment · Acknowledge risk · E-Stop</text>
-  <text x="450" y="290" text-anchor="middle" font-size="12" fill="#7f8c8d">Architecture diagram — see m5-hoc-dashboard.svg for UI wireframe</text>
+  <text x="450" y="290" text-anchor="middle" font-size="12" fill="#7f8c8d">Architecture diagram — see m5-hoc-dashboard.png for UI preview</text>
 '''
     _write_svg(ASSETS / 'm5-hoc-console.svg', body, height=330)
 
@@ -287,9 +287,245 @@ def generate_m5_dashboard_svg() -> None:
   <rect x="20" y="318" width="860" height="90" rx="10" fill="#141414" stroke="#303030"/>
   <text x="40" y="342" fill="#d9d9d9" font-size="13">KL / MMD 时序（60s）</text>
   <polyline points="40,390 200,370 360,350 520,330 680,340 840,320" fill="none" stroke="#69b1ff" stroke-width="2"/>
-  <text x="450" y="430" text-anchor="middle" fill="#8c8c8c" font-size="11">Replace with real screenshot: record browser at http://localhost:5173 after hoc.launch.py</text>
+  <text x="450" y="430" text-anchor="middle" fill="#8c8c8c" font-size="11">See m5-hoc-dashboard.png for rendered preview (generate_milestone_assets.py)</text>
 '''
     _write_svg(ASSETS / 'm5-hoc-dashboard.svg', body, width=900, height=450)
+
+
+IIWA_HOME = (0.0, 0.785398, 0.0, -1.570796, 0.0, 1.570796, 0.0)
+
+
+def _iiwa_urdf_path() -> Path | None:
+    bundled = ROOT / 'pybullet_bridge' / 'urdf' / 'kuka_iiwa' / 'model.urdf'
+    if bundled.is_file():
+        return bundled
+    try:
+        import pybullet_data
+
+        fallback = Path(pybullet_data.getDataPath()) / 'kuka_iiwa' / 'model.urdf'
+        if fallback.is_file():
+            return fallback
+    except ImportError:
+        pass
+    return None
+
+
+def _render_pybullet_frame(
+    client: int,
+    robot: int,
+    joint_positions: tuple[float, ...],
+    *,
+    width: int = 640,
+    height: int = 480,
+) -> np.ndarray:
+    import pybullet as p
+
+    for idx, angle in enumerate(joint_positions):
+        p.resetJointState(robot, idx, angle, physicsClientId=client)
+    view = p.computeViewMatrixFromYawPitchRoll(
+        cameraTargetPosition=[0.0, 0.0, 0.55],
+        distance=1.85,
+        yaw=48,
+        pitch=-22,
+        roll=0,
+        upAxisIndex=2,
+    )
+    proj = p.computeProjectionMatrixFOV(fov=55, aspect=width / height, nearVal=0.1, farVal=4.0)
+    _, _, rgba, _, _ = p.getCameraImage(
+        width,
+        height,
+        view,
+        proj,
+        renderer=p.ER_TINY_RENDERER,
+        physicsClientId=client,
+    )
+    return np.reshape(rgba, (height, width, 4))[:, :, :3].astype(np.uint8)
+
+
+def generate_iiwa7_pybullet_png() -> None:
+    try:
+        import pybullet as p
+        import pybullet_data
+    except ImportError:
+        print('skip iiwa7-pybullet.png (pybullet not installed)')
+        return
+
+    urdf = _iiwa_urdf_path()
+    if urdf is None:
+        print('skip iiwa7-pybullet.png (URDF missing)')
+        return
+
+    client = p.connect(p.DIRECT)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.resetSimulation(physicsClientId=client)
+    p.setGravity(0, 0, -9.81, physicsClientId=client)
+    robot = p.loadURDF(str(urdf), useFixedBase=True, physicsClientId=client)
+    img = _render_pybullet_frame(client, robot, IIWA_HOME)
+    out = ASSETS / 'm2-iiwa-pybullet.png'
+    plt.imsave(out, img)
+    p.disconnect(client)
+    print(f'wrote {out}')
+
+
+def generate_iiwa7_motion_gif() -> None:
+    try:
+        import pybullet as p
+        import pybullet_data
+    except ImportError:
+        print('skip m2-iiwa-pybullet.gif (pybullet not installed)')
+        return
+
+    urdf = _iiwa_urdf_path()
+    if urdf is None:
+        print('skip m2-iiwa-pybullet.gif (URDF missing)')
+        return
+
+    frames = 24
+    client = p.connect(p.DIRECT)
+    p.setAdditionalSearchPath(pybullet_data.getDataPath())
+    p.resetSimulation(physicsClientId=client)
+    p.setGravity(0, 0, -9.81, physicsClientId=client)
+    robot = p.loadURDF(str(urdf), useFixedBase=True, physicsClientId=client)
+
+    images = []
+    for i in range(frames):
+        phase = 2.0 * math.pi * i / frames
+        joints = list(IIWA_HOME)
+        joints[1] += 0.35 * math.sin(phase)
+        joints[3] += 0.25 * math.cos(phase)
+        joints[5] += 0.2 * math.sin(phase * 1.5)
+        img = _render_pybullet_frame(client, robot, tuple(joints), width=480, height=360)
+        images.append(img)
+
+    p.disconnect(client)
+
+    import matplotlib.animation as animation
+    from matplotlib.image import AxesImage
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.8))
+    fig.patch.set_facecolor('#1a1a1a')
+    ax.set_facecolor('#1a1a1a')
+    ax.axis('off')
+    ax.set_title('KUKA iiwa7 — PyBullet portfolio profile', color='#e8e8e8', fontsize=11)
+    im: AxesImage = ax.imshow(images[0])
+
+    def _update(i: int):
+        im.set_array(images[i])
+        return [im]
+
+    anim = animation.FuncAnimation(fig, _update, frames=frames, interval=100, blit=True)
+    out = ASSETS / 'm2-iiwa-pybullet.gif'
+    anim.save(out, writer='pillow', dpi=100)
+    plt.close(fig)
+    print(f'wrote {out}')
+
+
+def generate_m5_dashboard_png() -> None:
+    """Dark-theme HOC dashboard preview (matplotlib; replace with browser screenshot when available)."""
+    dims = ['dist_shift', 'tracking', 'dynamics', 'comm', 'planning']
+    dim_labels = ['Distribution', 'Tracking', 'Dynamics', 'Comm', 'Planning']
+    scores = np.array([0.72, 0.35, 0.28, 0.15, 0.08])
+    angles = np.linspace(0, 2 * np.pi, len(dims), endpoint=False)
+    radar = np.concatenate([scores, scores[:1]])
+    ang_closed = np.concatenate([angles, angles[:1]])
+
+    fig = plt.figure(figsize=(12, 7), facecolor='#0a0a0a')
+    gs = fig.add_gridspec(2, 3, height_ratios=[0.12, 1], hspace=0.28, wspace=0.25)
+
+    banner = fig.add_subplot(gs[0, :])
+    banner.set_facecolor('#2b1d11')
+    banner.set_xlim(0, 1)
+    banner.set_ylim(0, 1)
+    banner.axis('off')
+    banner.text(
+        0.02, 0.5,
+        'R2 WARNING  ·  score 0.58 ↑  ·  driver: distribution_shift  ·  degraded 50%',
+        color='#faad14', fontsize=12, va='center', fontweight='bold',
+    )
+
+    ax_radar = fig.add_subplot(gs[1, 0], polar=True, facecolor='#141414')
+    ax_radar.set_theta_offset(np.pi / 2)
+    ax_radar.set_theta_direction(-1)
+    ax_radar.plot(ang_closed, radar, color='#69b1ff', linewidth=2)
+    ax_radar.fill(ang_closed, radar, color='#69b1ff', alpha=0.25)
+    ax_radar.set_xticks(angles)
+    ax_radar.set_xticklabels(dim_labels, color='#d9d9d9', fontsize=9)
+    ax_radar.set_ylim(0, 1)
+    ax_radar.set_yticklabels([])
+    ax_radar.grid(color='#434343', alpha=0.5)
+    ax_radar.set_title('5D Risk Radar', color='#d9d9d9', pad=12)
+
+    ax_kl = fig.add_subplot(gs[1, 1], facecolor='#141414')
+    t = np.linspace(0, 60, 120)
+    kl = 0.08 + 0.004 * t + 0.02 * np.sin(t / 5)
+    mmd = 0.02 + 0.0015 * t
+    comm = 0.05 + 0.003 * np.maximum(0, t - 35)
+    ax_kl.plot(t, kl, color='#69b1ff', label='KL mean', lw=1.8)
+    ax_kl.plot(t, mmd, color='#95de64', label='MMD', lw=1.5)
+    ax_kl.plot(t, comm, color='#ffc069', label='comm_health', lw=1.5)
+    ax_kl.axhline(0.15, color='#ff7875', ls='--', lw=1, alpha=0.8)
+    ax_kl.set_xlabel('time (s)', color='#8c8c8c')
+    ax_kl.set_ylabel('metric', color='#8c8c8c')
+    ax_kl.set_title('KL / MMD / Comm Health', color='#d9d9d9')
+    ax_kl.legend(facecolor='#141414', edgecolor='#434343', labelcolor='#d9d9d9', fontsize=8)
+    ax_kl.tick_params(colors='#8c8c8c')
+    ax_kl.grid(True, alpha=0.2)
+
+    ax_bar = fig.add_subplot(gs[1, 2], facecolor='#141414')
+    joints = [f'J{i}' for i in range(1, 8)]
+    sim = np.array([0.12, 0.18, 0.25, 0.20, 0.14, 0.16, 0.13])
+    real = sim + np.array([0.04, 0.06, 0.11, 0.08, 0.05, 0.06, 0.05])
+    x = np.arange(len(joints))
+    w = 0.35
+    ax_bar.bar(x - w / 2, sim, w, label='Sim', color='#69b1ff')
+    ax_bar.bar(x + w / 2, real, w, label='Real', color='#95de64')
+    ax_bar.set_xticks(x)
+    ax_bar.set_xticklabels(joints, color='#8c8c8c')
+    ax_bar.set_title('Sim / Real Window Stats', color='#d9d9d9')
+    ax_bar.legend(facecolor='#141414', edgecolor='#434343', labelcolor='#d9d9d9', fontsize=8)
+    ax_bar.tick_params(colors='#8c8c8c')
+    ax_bar.grid(True, axis='y', alpha=0.2)
+
+    fig.suptitle('M5: HOC Dashboard Preview', color='#e8e8e8', fontsize=14, fontweight='bold', y=0.98)
+    out = ASSETS / 'm5-hoc-dashboard.png'
+    fig.savefig(out, dpi=120, facecolor=fig.get_facecolor(), bbox_inches='tight')
+    plt.close(fig)
+    print(f'wrote {out}')
+
+
+def generate_portfolio_overview_png() -> None:
+    """Single-page portfolio stack diagram for README / slides."""
+    fig, ax = plt.subplots(figsize=(10, 5.5), facecolor='#f8f9fb')
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 5.5)
+    ax.axis('off')
+    ax.set_title('Portfolio Stack — iiwa7 Sim2Real Monitor', fontsize=14, fontweight='bold', pad=12)
+
+    layers = [
+        ('HOC Console', 'React + WebSocket', '#16a085', 4.6),
+        ('Risk Engine', 'R0–R3 · 5D · Fail-Safe', '#c0392b', 3.7),
+        ('dist_monitor', 'KL · W1 · MMD', '#8e44ad', 2.8),
+        ('PyBullet Bridge', 'Dual-Source · iiwa7', '#27ae60', 1.9),
+        ('MoveIt2 / Actions', 'Plan · Pick/Place', '#2980b9', 1.0),
+    ]
+    for title, subtitle, color, y in layers:
+        rect = patches.FancyBboxPatch(
+            (1.2, y - 0.32), 7.6, 0.64, boxstyle='round,pad=0.02,rounding_size=0.08',
+            facecolor=color, edgecolor='white', alpha=0.92,
+        )
+        ax.add_patch(rect)
+        ax.text(5.0, y + 0.06, title, ha='center', va='center', color='white', fontsize=12, fontweight='bold')
+        ax.text(5.0, y - 0.12, subtitle, ha='center', va='center', color='white', fontsize=9, alpha=0.9)
+        if y > 1.0:
+            ax.annotate('', xy=(5.0, y - 0.38), xytext=(5.0, y - 0.55),
+                        arrowprops=dict(arrowstyle='->', color='#95a5a6', lw=1.5))
+
+    ax.text(5.0, 0.35, 'ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI',
+            ha='center', fontsize=10, color='#555')
+    out = ASSETS / 'portfolio-overview.png'
+    fig.savefig(out, dpi=120, bbox_inches='tight')
+    plt.close(fig)
+    print(f'wrote {out}')
 
 
 def main() -> None:
@@ -297,10 +533,14 @@ def main() -> None:
     generate_m1_pybullet_png()
     generate_m2_svg()
     generate_m2_iiwa_svg()
+    generate_iiwa7_pybullet_png()
+    generate_iiwa7_motion_gif()
     generate_m3_gif()
     generate_m4_png()
     generate_m5_svg()
     generate_m5_dashboard_svg()
+    generate_m5_dashboard_png()
+    generate_portfolio_overview_png()
     print(f'done — assets in {ASSETS}')
 
 

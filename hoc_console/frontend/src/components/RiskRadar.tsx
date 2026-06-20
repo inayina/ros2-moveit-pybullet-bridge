@@ -1,7 +1,7 @@
-import ReactECharts from 'echarts-for-react';
 import { memo, useMemo } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 import { DIMENSION_LABELS } from '../types/messages';
+import { StableChart } from './StableChart';
 
 const AXES = [
   'distribution_shift',
@@ -72,13 +72,7 @@ export const RiskRadar = memo(function RiskRadar() {
   return (
     <div className="panel panel--chart">
       <h3>五维风险雷达</h3>
-      <ReactECharts
-        option={option}
-        style={{ height: 280, width: '100%' }}
-        opts={{ renderer: 'canvas' }}
-        notMerge
-        lazyUpdate
-      />
+      <StableChart option={option} height={260} />
       <p className="panel-caption">
         主因: {risk?.primary_driver ?? '—'} · {risk?.recommendation ?? '系统运行正常'}
       </p>
