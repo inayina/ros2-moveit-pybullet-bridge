@@ -1,0 +1,17 @@
+{
+  "completed_episodes": 3,
+  "cpu_peak_percent": 0.0,
+  "episodes": 3,
+  "fault_injection": false,
+  "health_alarm_detected_within_1s": true,
+  "health_alarm_latency_ms": null,
+  "health_events": 6,
+  "max_latency_ms": 444.4,
+  "mean_latency_ms": 11.021,
+  "replay_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+  "rss_peak_mb": 2.066,
+  "seed": 0,
+  "std_latency_ms": 51.481,
+  "strategy": "replay",
+  "timeseries_rows": 739
+}

@@ -62,7 +62,7 @@ python3 scripts/regenerate_all_reports.py
 | `reliability-nfr-rosbags/` | HOC 录制的可靠性复验 rosbag2，含 `metadata.yaml` 与 `.mcap` |
 | [safety-nfr-metrics.json](./safety-nfr-metrics.json) | `NFR-S01..05` 复验输出：急停速度归零、软限位 R2、watchdog HOLD、R2 降速、ack 恢复 |
 | [maintainability-nfr-metrics.json](./maintainability-nfr-metrics.json) | `NFR-M/REP` 复验输出：YAML/launch/package 结构、动态配置、coverage、确定性脚本产物 |
-| `maintainability-coverage/` | coverage JSON/XML 报告；当前核心包测试 130 passed，coverage=72.2% |
+| `maintainability-coverage/` | coverage JSON/XML 报告；当前核心包测试 142 passed，coverage=73.2% |
 
 ```bash
 ./scripts/verify_bridge_comm.sh
@@ -94,6 +94,23 @@ export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 ```
 
 图表：`docs/assets/same-task-*.png`
+
+---
+
+## 实验 C · Policy Runner 系统验证产物
+
+| 文件 | 说明 |
+|------|------|
+| [validation_report.html](./system-validation/validation_report.html) | Replay + SineWave 汇总 HTML 报告 |
+| [validation_summary.json](./system-validation/validation_summary.json) | 汇总指标（mean/max latency、health alarm、RSS） |
+| [replay/benchmark_summary.json](./system-validation/replay/benchmark_summary.json) | ReplayPolicy benchmark 摘要 |
+| [sine_wave/benchmark_summary.json](./system-validation/sine_wave/benchmark_summary.json) | SineWavePolicy benchmark 摘要 |
+| `system-validation/ros_logs/` | benchmark 调试日志（**已 gitignore，不提交**） |
+
+```bash
+./scripts/run_system_validation.sh
+python3 scripts/check_policy_runner_benchmark.py docs/samples/system-validation/sine_wave/benchmark_summary.json
+```
 
 ---
 

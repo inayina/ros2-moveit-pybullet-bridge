@@ -38,6 +38,7 @@ setup(
             'joint_sweep_demo = pybullet_bridge.joint_sweep_demo:main',
             'iiwa_motion_demo = pybullet_bridge.iiwa_motion_demo:main',
             'lerobot_replay_demo = pybullet_bridge.lerobot_replay_demo:main',
+            'policy_runner = pybullet_bridge.learning.policy_runner:main',
             'trajectory_controller_node = pybullet_bridge.trajectory_controller_node:main',
         ],
     },

@@ -11,16 +11,24 @@ build/
 install/
 log/
 .ros_log/
+.ros-log/
 *.bag
 *.db3
+
+# Benchmark / validation debug logs (keep HTML/JSON summaries in repo)
+docs/samples/system-validation/ros_logs/
 
 # Frontend
 hoc_console/frontend/node_modules/
 hoc_console/frontend/dist/
 hoc_console/frontend/test-results/
 
-# Generated capture scratch space
+# Generated capture / video scratch space
 docs/samples/.capture_tmp/
+docs/samples/**/concat.txt
+
+# Coverage raw database (commit coverage.json / coverage.xml only)
+**/.coverage
 
 # IDE
 .idea/

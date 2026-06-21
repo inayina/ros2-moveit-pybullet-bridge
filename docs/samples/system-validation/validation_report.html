@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Policy Runner System Validation</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #141414; color: #e8e8e8; margin: 24px; }
+    h1, h2 { color: #69b1ff; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #434343; padding: 8px; text-align: left; }
+    th { background: #1f1f1f; }
+    .pass { color: #95de64; font-weight: bold; }
+    .fail { color: #ff7875; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Policy Runner System Validation</h1>
+  <p>Generated: 2026-06-21T17:40:39</p>
+  <p>Output: <code>/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation</code></p>
+  <p>Overall: <span class="pass">PASS</span></p>
+
+  <h2>Benchmark Comparison</h2>
+  <table>
+    <tr>
+      <th>Strategy</th><th>Episodes</th><th>Mean latency (ms)</th><th>Max latency (ms)</th>
+      <th>CPU peak (%)</th><th>RSS peak (MB)</th><th>Rows</th>
+    </tr>
+    <tr>
+      <td>replay</td>
+      <td>3</td>
+      <td>11.021</td>
+      <td>444.400</td>
+      <td>0.000</td>
+      <td>2.066</td>
+      <td>739</td>
+    </tr>
+    <tr>
+      <td>sine_wave</td>
+      <td>3</td>
+      <td>4.785</td>
+      <td>25.465</td>
+      <td>0.000</td>
+      <td>2.066</td>
+      <td>766</td>
+    </tr>
+  </table>
+
+  <h2>Dataset</h2>
+  <pre>{
+  "episode_data_lab_root": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab",
+  "lerobot_export": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export",
+  "replay_fixture": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+  "episode_data_lab_present": true,
+  "lerobot_export_present": true
+}</pre>
+
+  <h2>Full Summary JSON</h2>
+  <pre>{
+  "generated_at": "2026-06-21T17:40:39",
+  "pass": true,
+  "replay": {
+    "completed_episodes": 3,
+    "cpu_peak_percent": 0.0,
+    "episodes": 3,
+    "fault_injection": false,
+    "health_alarm_detected_within_1s": true,
+    "health_alarm_latency_ms": null,
+    "health_events": 6,
+    "max_latency_ms": 444.4,
+    "mean_latency_ms": 11.021,
+    "replay_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+    "rss_peak_mb": 2.066,
+    "seed": 0,
+    "std_latency_ms": 51.481,
+    "strategy": "replay",
+    "timeseries_rows": 739
+  },
+  "sine_wave": {
+    "completed_episodes": 3,
+    "cpu_peak_percent": 0.0,
+    "episodes": 3,
+    "fault_injection": false,
+    "health_alarm_detected_within_1s": true,
+    "health_alarm_latency_ms": null,
+    "health_events": 7,
+    "max_latency_ms": 25.465,
+    "mean_latency_ms": 4.785,
+    "replay_path": "",
+    "rss_peak_mb": 2.066,
+    "seed": 0,
+    "std_latency_ms": 5.168,
+    "strategy": "sine_wave",
+    "timeseries_rows": 766
+  },
+  "dataset": {
+    "episode_data_lab_root": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab",
+    "lerobot_export": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export",
+    "replay_fixture": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+    "episode_data_lab_present": true,
+    "lerobot_export_present": true
+  },
+  "artifacts": {
+    "replay_dir": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation/replay",
+    "sine_wave_dir": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation/sine_wave"
+  }
+}</pre>
+</body>
+</html>

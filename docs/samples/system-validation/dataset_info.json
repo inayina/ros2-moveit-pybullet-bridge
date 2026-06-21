@@ -1,0 +1,7 @@
+{
+  "episode_data_lab_root": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab",
+  "lerobot_export": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/dataset/v1/lerobot_export",
+  "replay_fixture": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+  "episode_data_lab_present": true,
+  "lerobot_export_present": true
+}

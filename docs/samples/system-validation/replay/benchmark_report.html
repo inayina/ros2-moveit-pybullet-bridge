@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Policy Runner Benchmark — replay</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #141414; color: #e8e8e8; margin: 24px; }
+    h1, h2 { color: #69b1ff; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #434343; padding: 8px; text-align: left; }
+    th { background: #1f1f1f; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric-card { background: #1f1f1f; padding: 16px; border-radius: 8px; }
+    .metric-value { font-size: 22px; font-weight: bold; color: #95de64; }
+  </style>
+</head>
+<body>
+  <h1>Policy Runner System Benchmark</h1>
+  <p>Output directory: <code>/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation/replay</code></p>
+  <div class="metric-grid">
+    <div class="metric-card"><div>Mean latency</div><div class="metric-value">11.021 ms</div></div>
+    <div class="metric-card"><div>Max latency</div><div class="metric-value">444.400 ms</div></div>
+    <div class="metric-card"><div>CPU peak</div><div class="metric-value">0.0%</div></div>
+    <div class="metric-card"><div>RSS peak</div><div class="metric-value">2.1 MB</div></div>
+  </div>
+  <h2>Summary</h2>
+  <pre>{
+  "strategy": "replay",
+  "episodes": 3,
+  "completed_episodes": 3,
+  "max_latency_ms": 444.4,
+  "mean_latency_ms": 11.021,
+  "std_latency_ms": 51.481,
+  "cpu_peak_percent": 0.0,
+  "rss_peak_mb": 2.066,
+  "health_alarm_detected_within_1s": true,
+  "health_alarm_latency_ms": null,
+  "seed": 0,
+  "fault_injection": false,
+  "replay_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
+  "timeseries_rows": 739,
+  "health_events": 6
+}</pre>
+  <h2>Artifacts</h2>
+  <ul>
+    <li>benchmark_timeseries.csv</li>
+    <li>benchmark_summary.json</li>
+    <li>system_health_events.csv</li>
+  </ul>
+</body>
+</html>
