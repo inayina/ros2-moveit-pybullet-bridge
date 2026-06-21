@@ -122,7 +122,7 @@
 | NFR-M01 | YAML 配置，支持动态调参 | 已满足 | `./scripts/verify_maintainability_nfr.sh` 已生成 `docs/samples/maintainability-nfr-metrics.json`：18 个 YAML 配置解析通过；FR-MON 阈值热更新与 HOC `set_randomization` 均有复验证据 |
 | NFR-M02 | 一键 launch 完整系统 | 已满足 | 同一复验确认 `hoc_console/launch/hoc_experiment.launch.py` 同时 include `portfolio_demo.launch.py` 与 `hoc.launch.py`；14 个 launch 文件均可 `py_compile` |
 | NFR-M03 | ROS2 标准包结构，`colcon build` 可编译 | 已满足 | 同一复验确认 7 个 ROS 包均有 `package.xml` + build file，且 `ros2 pkg prefix` 均可解析到 install 前缀 |
-| NFR-M04 | 单元测试覆盖率 > 70% | 已满足 | 同一复验运行核心包 coverage：130 passed，coverage=72.2%，产出 `docs/samples/maintainability-coverage/coverage.json` 与 `coverage.xml` |
+| NFR-M04 | 单元测试覆盖率 > 70% | 已满足 | 同一复验运行核心包 coverage：142 passed，coverage=73.2%，产出 `docs/samples/maintainability-coverage/coverage.json` 与 `coverage.xml` |
 | NFR-REP-01 | 随机过程可配置 seed | 已满足 | 同一复验确认 seed/randomization 配置链路存在；HOC `set_randomization` 成功，样例产物含固定 seed 输出 |
 | NFR-REP-02 | 实验配置与结果关联存储 | 已满足 | 同一复验确认可靠性 rosbag `metadata.yaml` 存在，HOC/report/rosbag metadata 与配置结果产物可关联 |
 | NFR-REP-03 | 标准 Demo 脚本输出确定性基准 | 已满足 | 同一复验确认 9 个 verify 脚本存在、可执行且 `bash -n` 通过；8 个 JSON 样例指标产物已落盘 |

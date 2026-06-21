@@ -4,7 +4,7 @@
 
 ## 总体结论
 
-当前仓库已经具备面试 Demo 主线：MoveIt 2 / PyBullet 闭环、双源分布监控、五维风险闭环、HOC 控制台、报告导出与脚本化复验。主要剩余工作不是核心链路不可用，而是公开展示材料的补齐：CI 最新绿勾、完整 Demo 视频外链、2 小时长稳等长期证据。
+当前仓库已经具备面试 Demo 主线：MoveIt 2 / PyBullet 闭环、双源分布监控、五维风险闭环、HOC 控制台、Policy Runner 系统验证、报告导出与脚本化复验。主要剩余工作不是核心链路不可用，而是公开展示材料的补齐：CI 最新绿勾、完整 Demo 视频外链、2 小时长稳等长期证据。
 
 ## 功能需求证据
 
@@ -15,6 +15,7 @@
 | 分布监控 | 已满足 | `monitor-metrics.json`：10 Hz 输出，5 s 滑窗，MMD p-value = 0.019608，3/3 偏移注入检出 |
 | 风险管理 | 已满足 | `risk-management-metrics.json`：R0-R3 转换均 < 500 ms，R3 后 bridge 进入 E_STOP，速度归零延迟 0.796 ms |
 | HOC 控制台 | 已满足 | `hoc-console-metrics.json`：三路 WebSocket stream 5 Hz，最大延迟 70.712 ms，控制命令、参数调节、JSON/CSV 导出均通过 |
+| Policy Runner | 已满足 | `system-validation/validation_summary.json`：Replay / SineWave benchmark PASS；SineWave mean latency 4.785 ms；`/system_health` 报警在 1 s 内检出 |
 
 ## 非功能需求证据
 
@@ -23,7 +24,7 @@
 | 性能 | 已满足 | `performance-nfr-metrics.json`：控制回路 P95 = 14.571 ms，monitor 10 Hz，HOC 5 Hz，双源物理步进 min = 239.507 Hz/source，RTF min = 0.998 |
 | 可靠性 | 部分满足 | `reliability-nfr-metrics.json`：覆盖 watchdog HOLD、reset 恢复、短时 smoke/RSS、HOC 独立 rosbag；2 小时 soak 与跨进程 supervisor 属于 Phase-2+ |
 | 安全 | 已满足 | `safety-nfr-metrics.json`：R3 急停速度归零、软限位 R2、watchdog HOLD、R2 降速、ack 恢复均通过 |
-| 可维护性 | 已满足 | `maintainability-nfr-metrics.json`：YAML/launch/package 结构检查通过，核心包测试 130 passed，coverage = 72.2% |
+| 可维护性 | 已满足 | `maintainability-nfr-metrics.json`：YAML/launch/package 结构检查通过，核心包测试 142 passed，coverage = 73.2% |
 | 可复现性 | 已满足 | 9 个 `scripts/verify_*.sh` 可执行且有样例产物；HOC 导出 JSON/CSV，rosbag metadata 与配置结果可关联 |
 
 ## 联调仓库证据
@@ -51,5 +52,5 @@
 
 - 确认 GitHub Actions 最新提交为绿勾。
 - 给 Demo 视频准备公开链接，README 中只保留短入口。
-- 若公开仓库，清理 `.ros-log/`、`.coverage`、`.capture_tmp/` 和大体积 `.mcap` 原始包。
+- 若公开仓库，清理 `.ros-log/`、`.ros_log/`、`docs/samples/system-validation/ros_logs/`、`.coverage`、`.capture_tmp/` 和大体积 `.mcap` 原始包。
 - 保留 `docs/samples/README.md` 作为原始证据索引，避免在作品集主页面堆满 JSON 文件。

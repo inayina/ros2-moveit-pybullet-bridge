@@ -39,3 +39,7 @@ docker compose run --rm portfolio-demo
 ## GUI
 
 Headless 验证默认 `sim_mode:=DIRECT`。需要 RViz / PyBullet GUI 时请在宿主机按 README 启动，或自行配置 X11 转发。
+
+## 构建上下文
+
+根目录 `.dockerignore` 排除文档、前端依赖与本机 colcon 产物，避免把 ~1 GB 无关文件打进 build context；仅保留 ROS 包源码与 `scripts/` 验证脚本。

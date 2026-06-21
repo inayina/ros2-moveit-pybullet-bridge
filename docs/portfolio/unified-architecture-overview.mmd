@@ -1,0 +1,68 @@
+flowchart TB
+  subgraph L0["L0 · 展示层"]
+    DF["Dashboard Frontend<br/>纯 HTML/JS"]
+    HOC["HOC 控制台<br/>React + ECharts"]
+    RViz["RViz2 / MoveIt"]
+  end
+
+  subgraph L1["L1 · 聚合 / 桥接层"]
+    DAPI["robot-ops-dashboard<br/>FastAPI · WS /ws/status · MQTT cache"]
+    HS["hoc_server<br/>ROS ↔ WebSocket :8765"]
+  end
+
+  subgraph L2["L2 · 集成协议"]
+    HTTP["HTTP REST"]
+    WS["WebSocket"]
+    MQTT["MQTT"]
+    ROS["ROS 2 DDS"]
+  end
+
+  subgraph AMR["AMR 子系统 · amr_warehouse_navigation"]
+    WMS["Mock WMS API"]
+    NAV["Nav2 + Gazebo Harmonic"]
+    WMS --> NAV
+  end
+
+  subgraph EDGE["边缘 / 孪生子系统 · ros2-robot-digital-twin"]
+    MCU["STM32 + MPU6050"]
+    ESP["ESP32-S3 micro-ROS"]
+    MB["Motor / Encoder bench"]
+    MCU --> ESP
+    ESP --> MB
+  end
+
+  subgraph DATA["数据子系统 · robot-arm-episode-data-lab"]
+    FSM["任务 FSM · pick-lift"]
+    LR["LeRobot v2.1 export"]
+    FSM --> LR
+  end
+
+  subgraph BRIDGE["操作臂 / Sim2Real · ros2-moveit-pybullet-bridge"]
+    MG["MoveIt 2 move_group"]
+    PB["pybullet_bridge<br/>Sim / Real 双源 PyBullet"]
+    DM["dist_monitor · KL/W1/MMD"]
+    RE["risk_engine · R0–R3"]
+    PR["PolicyRunner · BasePolicy"]
+    MG --> PB
+    PB --> DM --> RE
+    PR --> PB
+  end
+
+  DF <-->|"REST + WS"| DAPI
+  HOC <-->|"WS"| HS
+  RViz --> MG
+
+  DAPI <-->|"任务 proxy"| HTTP
+  HTTP <--> WMS
+  DAPI <-->|"状态 / 命令"| MQTT
+  MQTT <--> ESP
+  HS <-->|"topic / service"| ROS
+  ROS <--> PB
+  ROS <--> ESP
+  ROS <--> NAV
+
+  LR -->|"real_source:=lerobot"| PB
+  RE -->|"R3 e_stop"| PB
+  RE --> HS
+  DM --> HS
+  DAPI -.->|"Evaluation JSON"| DF

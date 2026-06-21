@@ -3,8 +3,8 @@ marp: true
 theme: default
 paginate: true
 size: 16:9
-header: 'ros2-moveit-pybullet-bridge'
-footer: '系统设计说明书 v1.0 · 2026-06-20 · 集成交付版'
+header: '机器人系统集成与验证平台'
+footer: '系统设计说明书 v1.1 · 2026-06-21 · 五仓集成交付版'
 style: |
   section { font-size: 28px; }
   h1 { color: #1a365d; }
@@ -18,12 +18,12 @@ style: |
 
 # ros2-moveit-pybullet-bridge
 
-## 机械臂 Sim2Real 闭环仿真与分布监控
+## 机械臂 Sim2Real 闭环 · 五仓统一作品集
 ### 系统设计说明书 · 集成交付版
 
-**ROS 2 Jazzy · MoveIt 2 · PyBullet · HOC 运维控制台**
+**ROS 2 Jazzy · MoveIt 2 · PyBullet · FastAPI · MQTT · HOC**
 
-inayina · v1.0 · 2026-06-20
+inayina · v1.1 · 2026-06-21
 
 ---
 
@@ -31,15 +31,15 @@ inayina · v1.0 · 2026-06-20
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| **v1.1** | 2026-06-21 | 五仓统一作品集 + robot-ops-dashboard 章节 |
 | **v1.0** | 2026-06-20 | 交付视角说明书初版 |
 | v0.7 | 2026-06-20 | 五维风险 / R2 降级补全 |
-| v0.1 | 2026-06-19 | 架构 / 接口 / 算法初稿 |
 
 **交付定位**
 
-> 可脚本化验收的 Sim2Real 预集成环境：核心 launch、CI 配置、verify 脚本、HOC 可审计报告
+> 可脚本化验收的机器人**系统集成与验证**平台：Dashboard 聚合 + Bridge 深度验证 + 数据采集
 
-**仓库** github.com/inayina/ros2-moveit-pybullet-bridge · **License** Apache-2.0
+**仓库** github.com/inayina/robot-ops-dashboard（主入口）· ros2-moveit-pybullet-bridge · 见 §1.2
 
 ---
 
@@ -68,29 +68,142 @@ inayina · v1.0 · 2026-06-20
 
 ---
 
-## 双仓库作品集架构
+## 五仓统一作品集架构
 
 ```
-robot-arm-episode-data-lab
-  PyBullet 采集 → 任务 FSM / HAL → LeRobot v2.1 export
-                                      │
-                                      ▼
-ros2-moveit-pybullet-bridge
-  MoveIt 2 → pybullet_bridge → Sim / Real Proxy
-                                      │
-                                      ▼
-  dist_monitor (KL/W1/MMD) → risk_engine (R0-R3)
-                                      │
-                                      ▼
-  HOC 控制台 → HTML / JSON / CSV / rosbag 验收证据
+robot-ops-dashboard          ← 主展示入口（FastAPI + WS + MQTT）
+  ├─ amr_warehouse_navigation    Nav2 + Gazebo + Mock WMS
+  └─ ros2-robot-digital-twin     micro-ROS + MQTT + Motor bench
+
+robot-arm-episode-data-lab   ← 离线采集 → LeRobot export
+          │
+          ▼
+ros2-moveit-pybullet-bridge  ← MoveIt + PyBullet + 监控 + 风险 + HOC
 ```
 
 | 仓库 | 职责 |
 |------|------|
-| `robot-arm-episode-data-lab` | episode 采集、任务数据、LeRobot 导出 |
-| `ros2-moveit-pybullet-bridge` | ROS 2 联调、MoveIt 闭环、监控、风险、HOC |
+| `robot-ops-dashboard` | AMR 任务 / 遥测聚合 / 评测展示层 |
+| `amr_warehouse_navigation` | Nav2 任务执行与 WMS 回写 |
+| `ros2-robot-digital-twin` | 边缘 IMU / motor bench |
+| `robot-arm-episode-data-lab` | episode 采集、LeRobot 导出 |
+| `ros2-moveit-pybullet-bridge` | 操作臂 Sim2Real 深度验证 |
 
-**边界**：LeRobot 回放是外部数据接入证据，不等同于真机接入。
+**So What**：Dashboard 证明**多子系统聚合**；Bridge 证明**量化验证闭环**
+
+---
+
+<!-- _class: lead -->
+
+# 1.2 robot-ops-dashboard
+### 运维聚合子系统
+
+---
+
+## Dashboard 定位
+
+**Robot Data Link & Evaluation Dashboard**
+
+| 项 | 说明 |
+|----|------|
+| 角色 | 上层运维 / 数据链路 / 评测**驾驶舱** |
+| 技术 | FastAPI · WebSocket `/ws/status` · MQTT cache |
+| 前端 | 纯 HTML / CSS / JavaScript |
+| 边界 | **不是** Nav2 控制台 · **不是** 底盘高频控制器 |
+
+**主入口** github.com/inayina/robot-ops-dashboard
+
+**验收** 2026-06-14 demo readiness：health / tasks / WS / WMS proxy / motor STOP 探针 PASS
+
+---
+
+<!-- _class: lead -->
+
+# 1.3 Dashboard 数据链（1/2）
+### AMR · 遥测
+
+---
+
+## 两条只读 / 一条受限命令链
+
+**① AMR / WMS 任务链**
+
+```
+Dashboard → HTTP → Mock WMS API → Nav2 → Gazebo → 状态回写
+```
+
+**② IMU / Robot State（只读）**
+
+```
+STM32 → ESP32 micro-ROS → ROS 2 → MQTT → Dashboard /ws/status
+```
+
+| 关键词 | 证据 |
+|--------|------|
+| HTTP 集成 | `POST /api/wms/tasks` proxy |
+| MQTT 镜像 | `robot/imu` · `robot/state` |
+| 实时推送 | WebSocket 5 Hz 级快照 |
+
+Dashboard **不**直接 import ROS 2 / Nav2 代码
+
+---
+
+<!-- _class: lead -->
+
+# 1.3 Dashboard 数据链（2/2）
+### Motor bench · Evaluation
+
+---
+
+## Motor bench + 评测展示层
+
+**③ Motor / Encoder（受限命令）**
+
+```
+POST /api/robot/motor/cmd → MQTT robot/motor/cmd
+  → ESP32 bench → encoder → MQTT status → Dashboard
+```
+
+- 低频 · 显式 · 安全限幅 · 非完整控制平面
+
+**④ Evaluation 展示层（只读）**
+
+- `GET /api/evaluation/*` → mock / baseline / **reserved**
+- 展示 run_id · task_success_rate · failure_cases · telemetry_freshness
+- **不宣称** VLA / RL / world model 已训练
+
+**协议对照**：REST + WS + MQTT（Bridge 侧为 ROS 2 + HOC WS）
+
+详：`robot-ops-dashboard/docs/api_contract.md`
+
+---
+
+<!-- _class: lead -->
+
+# 1.4 操作臂验证子系统
+### 本仓库职责摘要
+
+---
+
+## ros2-moveit-pybullet-bridge 数据流
+
+```
+MoveIt 2 → /bridge/command → PyBullet Sim / Real Proxy
+    → dist_monitor (KL/W1/MMD) → risk_engine (R0-R3)
+    → HOC (ws:8765) → HTML / JSON / CSV 报告
+
+LeRobot export ──real_source:=lerobot──► Real Proxy
+PolicyRunner (Replay/SineWave) ──► /bridge/command
+```
+
+| 模块 | 交付价值 |
+|------|----------|
+| 双源 PyBullet | 无真机构造 Ground Truth 偏移 |
+| dist_monitor | 10 Hz · 5s 滑窗 · inject 检出 |
+| risk_engine | R3 E-stop + acknowledge 互锁 |
+| Policy Runner | 插件 benchmark · `/system_health` |
+
+**边界**：LeRobot 回放 ≠ 真机；relay ≠ 完整 ros2_control
 
 ---
 
@@ -358,7 +471,8 @@ L1 单元（KL/MMD/插值）
 | M1–M5 核心 | ✅ ~98% 可 Demo |
 | S5 五维风险 | 本机复验通过 |
 | M6 展示材料 | ~95%，待 5–8 分钟公开视频链接 |
-| 双仓库联动 | ~95%，本机样例通过，HAL / 真机属 Phase-2+ |
+| 五仓 Dashboard 联动 | demo readiness PASS（2026-06-14） |
+| 双仓库 LeRobot | ~95%，本机样例通过，HAL / 真机属 Phase-2+ |
 
 **已知限制**（写入验收说明）
 
@@ -430,10 +544,14 @@ enable_dual_source: true
 
 # 谢谢
 
-**ros2-moveit-pybullet-bridge**
+**机器人系统集成与验证平台 · 五仓作品集**
 
-github.com/inayina/ros2-moveit-pybullet-bridge
+| 入口 | 链接 |
+|------|------|
+| Dashboard 主展示 | github.com/inayina/robot-ops-dashboard |
+| 操作臂 Sim2Real | github.com/inayina/ros2-moveit-pybullet-bridge |
+| 数据采集 | github.com/inayina/robot-arm-episode-data-lab |
 
-设计详设 · `docs/design/` · 导出说明 · `docs/portfolio/README.md`
+作品集 · `docs/portfolio/` · 统一计划 · `MASTER_PORTFOLIO_PLAN.md`
 
 **Apache-2.0** · inayina · 2026

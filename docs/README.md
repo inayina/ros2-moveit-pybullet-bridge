@@ -12,6 +12,7 @@
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
 | 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |
 | 阅读系统架构 | [design/README.md](./design/README.md) |
+| 查看系统工程架构 / ICD / FMEA | [ARCHITECTURE.md](./ARCHITECTURE.md) · [ICD.md](./ICD.md) · [FMEA.md](./FMEA.md) |
 | 整理作品集材料 | [portfolio/README.md](./portfolio/README.md) |
 | 录制或讲解 Demo | [portfolio/DEMO_SCRIPT.md](./portfolio/DEMO_SCRIPT.md) |
 | 查看验收摘要 | [portfolio/ACCEPTANCE_SUMMARY.md](./portfolio/ACCEPTANCE_SUMMARY.md) |
@@ -30,7 +31,10 @@ docs/
 ├── EXPERIMENTS.md         实验流水线、指标解读、报告对照
 ├── ACCEPTANCE_GAP.md      验收标准差距台账
 ├── PORTFOLIO_REMAINING.md 待办跟踪
-├── design/                01–09 技术设计 Spec
+├── ARCHITECTURE.md         逻辑架构、物理部署、QoS 策略
+├── ICD.md                  ROS 2 Topic / Service 接口控制文件
+├── FMEA.md                 失效模式与影响分析
+├── design/                01–10 技术设计 Spec
 ├── portfolio/             作品集入口、Demo 脚本、验收摘要、代码导览、简历描述、系统设计说明书 + Marp 幻灯片
 ├── samples/               HTML 报告、JSON 指标、NPZ 轨迹
 └── assets/                PNG/GIF/SVG 配图
@@ -65,6 +69,8 @@ docs/
 | `verify_reliability_nfr.sh` | `NFR-R01..04`：watchdog HOLD、reset 恢复、短时 smoke/RSS、HOC 独立 rosbag |
 | `verify_safety_nfr.sh` | `NFR-S01..05`：急停速度归零、软限位 R2、watchdog HOLD、R2 降速、ack 恢复 |
 | `verify_maintainability_nfr.sh` | `NFR-M/REP`：YAML/launch/package 结构、动态配置、coverage、确定性脚本产物 |
+| `benchmark_system.py` | PolicyRunner 延迟、CPU/RSS、故障注入与系统健康报警 benchmark |
+| `run_system_validation.sh` | ReplayPolicy + SineWavePolicy headless 一键系统验证 |
 | `verify_portfolio.sh` | URDF + offline_compare + 15s demo |
 
 详见 [EXPERIMENTS.md](./EXPERIMENTS.md)。

@@ -1,7 +1,7 @@
 # 作品集剩余工作清单
 
 **项目**：ros2-moveit-pybullet-bridge（+ robot-arm-episode-data-lab 联动）  
-**更新**：2026-06-20  
+**更新**：2026-06-21  
 **用途**：面试 Demo 与作品集交付的待办跟踪；按优先级推进，避免与「可选扩展」混淆。
 
 ---
@@ -13,10 +13,11 @@
 | **M1–M5 核心功能** | ~98% | 桥接、MoveIt、双源、监控、HOC、Pick/Place 已落地 |
 | **S5 风险补全（09 Spec）** | ~98% | 五维风险、R2 降速、看门狗、CSV、verify 脚本已落地；2026-06-20 本机复验通过 |
 | **M6 作品集打磨** | ~95% | pick-and-lift 抓取 GIF、真实 HOC 浏览器截图、双仓报告与样例报告已入库；RViz 仅作可选本地演示证据，待 Demo 视频与公开 CI 证据 |
+| **Phase-1.5 Policy Runner** | ✅ 已完成 | D0–D5：策略抽象、PolicyRunner、benchmark、一键验证；见 `docs/design/10-policy-runner-system-engineering-spec.md` |
 | **双仓库一体叙事** | ~95% | episode-data-lab 数据集、LeRobot export、bridge online/offline 联调与同任务校准已通过；HAL 属 Phase-2 |
 | **Phase-2+ 扩展** | ~15% | 真机、独立虚拟相机、NavigateToPose 等 — **刻意预留，非面试必做** |
 
-> **结论**：系统已能 Live Demo；核心与双仓联调已本机验收。剩余工作主要是 **展示材料 + 排练 + 公开 CI/Docker 证据**，不是补核心代码。
+> **结论**：系统已能 Live Demo；核心与双仓联调已本机验收。若目标是面试交付，优先补展示材料、排练和公开 CI/Docker 证据；若目标是继续开发，Phase-2+ 真机与 HAL 迁移可排在展示材料之后。
 
 ---
 
@@ -26,6 +27,7 @@
 |------|------|----------|
 | **P0** | 不做则面试 Demo 有风险 | 推送后 1–2 天 |
 | **P1** | 提升作品集专业度（README / GitHub 第一印象） | 面试前 1 周内 |
+| **P1.5** | 下一轮系统工程增强开发 | 1–2 周 |
 | **P2** | 加分项，有时间再做 | 可选 |
 | **P3** | 设计文档中的未来扩展，不必为求职阻塞 | 长期 |
 
@@ -35,8 +37,8 @@
 
 ### 3.1 确认 CI 通过
 
-- [ ] Push 后打开 [Actions](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions)，确认最新提交的 **build-and-test** 全绿  
-- [ ] 若仍失败：查看失败步骤日志；`ci.yml` 已改为 `"${GITHUB_WORKSPACE}"`，常见剩余问题是依赖或 launch 测试超时
+- [x] GitHub Actions 上次运行成功，**build-and-test** 全绿  
+- [ ] 若后续提交 CI 失败：查看失败步骤日志；`ci.yml` 已改为 `"${GITHUB_WORKSPACE}"`，常见剩余问题是依赖或 launch 测试超时
 - [x] 本机已复现：`./scripts/run_tests.sh` 通过（单元 + 节点 + launch 集成）
 
 **本地复现 CI：**
@@ -170,17 +172,52 @@ ros2 launch hoc_console hoc_prod.launch.py   # http://localhost:8080
 
 ---
 
-## 6. P2 · 双仓库联动（episode-data-lab）
+## 6. P1.5 · Policy Runner 系统工程增强
+
+目标：在不训练 AI 模型、不接真机的前提下，把现有仿真平台升级为可插拔策略运行与可复现系统 benchmark 平台。
+
+完整规格见 [`docs/design/10-policy-runner-system-engineering-spec.md`](design/10-policy-runner-system-engineering-spec.md)。
+
+### 6.1 开发阶段
+
+| 阶段 | 任务 | 交付物 | 状态 |
+|------|------|--------|------|
+| D0 | 规划与文档 | 10 Spec、ARCHITECTURE、ICD、FMEA、README 入口 | ✅ 已完成 |
+| D1 | 策略抽象层 | `BasePolicy`、`ReplayPolicy`、`SineWavePolicy`、单元测试 | ✅ 已完成 |
+| D2 | 最小 PolicyRunner | 订阅 `/bridge/sim/joint_states`，发布 `/bridge/command` | ✅ 已完成 |
+| D3 | 健康与故障注入 | lifecycle/state machine、`/system_health`、metrics 日志、sleep 注入 | ✅ 已完成 |
+| D4 | Benchmark | `scripts/benchmark_system.py`、CSV/JSON/HTML 输出 | ✅ 已完成 |
+| D5 | 一键验证 | `scripts/run_system_validation.sh`、汇总报告、CI 友好退出码 | ✅ 已完成 |
+
+### 6.2 推荐开工顺序
+
+1. 先做 D1，保证策略接口和基线策略完全脱离 ROS，可快速测试。
+2. 再做 D2，让 `SineWavePolicy` 能通过 `PolicyRunner` 驱动现有 PyBullet bridge。
+3. D3 加 `/system_health` 和故障注入，用它证明可靠性工程能力。
+4. D4/D5 最后做，因为 benchmark 依赖前面节点稳定。
+
+### 6.3 当前不做
+
+| 项 | 原因 |
+|----|------|
+| PyTorch 训练 / RL pipeline | 本阶段证明系统工程能力，不证明模型训练能力 |
+| 真机 `real_source:=ros2` | 属于 Phase-2+，需要硬件和 HAL 迁移 |
+| 完整 `ros2_control` 硬件接口 | 当前 MoveIt relay 已满足演示闭环，完整控制栈后续做 |
+| 2 小时 soak / supervisor | 可由 benchmark 铺垫，但完整长稳仍属于 Phase-2+ 硬化 |
+
+---
+
+## 7. P2 · 双仓库联动（episode-data-lab）
 
 与 [`docs/design/08-dual-repo-portfolio-integration-spec.md`](design/08-dual-repo-portfolio-integration-spec.md) §10 对齐。
 
-### 5.1 episode-data-lab 侧
+### 7.1 episode-data-lab 侧
 
 - [x] `dataset/v1/lerobot_export` 已导出且 `validate_dataset.py` 通过（20 episodes，20/20 success）  
 - [x] Episode 使用 `robot=kuka_iiwa`、7-DOF、LeRobot `observation.state` / `action` 关节名对齐 `lbr_iiwa_joint_1..7`  
 - [x] LeRobot meta 含任务、episode、video、state/action schema；原始 episode metadata 仍由 episode-data-lab 侧维护
 
-### 5.2 bridge 侧
+### 7.2 bridge 侧
 
 - [x] `export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab`  
 - [x] `./scripts/run_dual_repo_integration.sh` PASS，生成 `dual-repo-integration-report.html` / `dual-repo-experiment-report.html`  
@@ -192,14 +229,14 @@ export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
 ros2 launch pybullet_bridge portfolio_demo.launch.py real_source:=lerobot
 ```
 
-### 5.3 一体讲解
+### 7.3 一体讲解
 
 - [ ] 熟练 [08 §11 面试一体讲解稿](design/08-dual-repo-portfolio-integration-spec.md#11-面试一体讲解稿3-分钟)（offline 采集 + online 监控两条腿）
 - [ ] 可选：把最新双仓报告截图/链接放入 README 或演示视频脚本
 
 ---
 
-## 7. Phase-2+ 可选扩展（收尾取舍）
+## 8. Phase-2+ 可选扩展（收尾取舍）
 
 来自设计文档、**已实现占位或未实现**的项：
 

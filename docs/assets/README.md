@@ -42,3 +42,10 @@ python3 scripts/capture_pick_lift_asset.py
 1. 打开 `docs/samples/dual-repo-experiment-report.html`（图 1–5 + 6–9）
 2. 打开 `docs/samples/same-task-calibration-report.html`（图 6–9 详解）
 3. README 配图优先使用真实 NPZ 指标图、HOC 浏览器截图与 pick-and-lift episode；动画素材保留为可选补充
+
+## 五仓统一架构（作品集主图）
+
+- Mermaid 源：`docs/portfolio/unified-architecture-overview.mmd`
+- 说明文档：`docs/portfolio/UNIFIED_ARCHITECTURE.md`
+- 可选 PNG：`unified-architecture-overview.png`（`mmdc -i ../portfolio/unified-architecture-overview.mmd -o unified-architecture-overview.png`）
+- 已嵌入：根目录 `README.md` 与 `robot-ops-dashboard` README

@@ -3,6 +3,7 @@
 > **MoveIt 2 与 PyBullet 闭环仿真桥接，内置 Sim/Real 分布偏移监控与运维控制台。**
 
 [![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
+![Docker](https://img.shields.io/badge/Docker-✓%20verified-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 ![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-blue)
 ![MoveIt 2](https://img.shields.io/badge/MoveIt-2-green)
@@ -30,6 +31,7 @@
 
 | 范围 | 当前状态 | 说明 |
 |------|----------|------|
+| Docker 一键验证 | **已通过** | `docker compose build` + `docker compose run --rm verify`（需挂载 `EPISODE_DATA_LAB_ROOT`）；headless 演示见 `portfolio-demo` |
 | 核心 Demo 链路 | 本机 smoke 已通过 | `portfolio_demo.launch.py` 拉起 iiwa7 双源 PyBullet、监控、风险引擎与运动 demo |
 | HOC 控制台 | 有单独入口和组合入口 | 单独运行 `hoc.launch.py` / `hoc_prod.launch.py`，或用 `hoc_experiment.launch.py` 组合 portfolio demo + HOC |
 | MoveIt 闭环 | 可演示 | `m2_iiwa_demo.launch.py` 通过 `FollowJointTrajectory` relay 驱动 PyBullet |
@@ -37,6 +39,73 @@
 | 展示材料 M6 | 打磨中 | README 已有 pick-and-lift 抓取 GIF、HOC 浏览器截图与双仓报告；RViz 录屏作为可选本地演示证据，仍建议补完整 Demo 视频 |
 
 **本版本交付边界**：仿真预集成 + 分布监控 + 风险闭环 + HOC 运维控制台。真机 `real_source:=ros2`、完整 `ros2_control` 硬件接口、episode-data-lab `Ros2Robot` HAL、`/clock` + `use_sim_time` 全链路属于 Phase-2+，不作为当前面试 Demo 的阻塞项。
+
+### 关联仓库 · 统一作品集
+
+本仓库是 **机器人系统集成与验证平台** 的操作臂 / Sim2Real **深度验证**子系统。运维聚合与 AMR / MQTT 遥测见主展示入口 [robot-ops-dashboard](https://github.com/inayina/robot-ops-dashboard)；五仓投递计划见 [docs/portfolio/MASTER_PORTFOLIO_PLAN.md](docs/portfolio/MASTER_PORTFOLIO_PLAN.md)。
+
+| 仓库 | 角色 |
+|------|------|
+| [**robot-ops-dashboard**](https://github.com/inayina/robot-ops-dashboard) | **主展示入口**：FastAPI + WebSocket + MQTT，AMR 任务 / 遥测 / 评测层 |
+| [amr_warehouse_navigation](https://github.com/inayina/amr_warehouse_navigation) | Nav2 + Gazebo + Mock WMS |
+| [ros2-robot-digital-twin](https://github.com/inayina/ros2-robot-digital-twin) | micro-ROS + MQTT + 电机 bench |
+| **ros2-moveit-pybullet-bridge**（本仓库） | MoveIt + PyBullet + 监控 + 风险 + HOC + Policy Runner |
+| [robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab) | Episode 采集 + LeRobot 导出 |
+
+### 五仓统一架构
+
+完整说明与三条链细节图见 [docs/portfolio/UNIFIED_ARCHITECTURE.md](docs/portfolio/UNIFIED_ARCHITECTURE.md)。
+
+```mermaid
+flowchart TB
+  subgraph L0["L0 · 展示层"]
+    DF["Dashboard Frontend"]
+    HOC["HOC 控制台"]
+    RViz["RViz2 / MoveIt"]
+  end
+
+  subgraph L1["L1 · 聚合 / 桥接层"]
+    DAPI["robot-ops-dashboard<br/>FastAPI · WS · MQTT cache"]
+    HS["hoc_server · WS :8765"]
+  end
+
+  subgraph L2["L2 · 集成协议"]
+    HTTP["HTTP REST"]
+    MQTT["MQTT"]
+    ROS["ROS 2 DDS"]
+  end
+
+  subgraph AMR["AMR · amr_warehouse_navigation"]
+    WMS["Mock WMS"] --> NAV["Nav2 + Gazebo"]
+  end
+
+  subgraph EDGE["边缘 · ros2-robot-digital-twin"]
+    ESP["ESP32 micro-ROS"] --> MB["Motor bench"]
+  end
+
+  subgraph DATA["数据 · robot-arm-episode-data-lab"]
+    LR["LeRobot export"]
+  end
+
+  subgraph BRIDGE["本仓库 · Sim2Real 验证"]
+    MG["MoveIt 2"] --> PB["pybullet_bridge 双源"]
+    PB --> DM["dist_monitor"] --> RE["risk_engine"]
+    PR["PolicyRunner"] --> PB
+  end
+
+  DF <--> DAPI
+  HOC <--> HS
+  RViz --> MG
+  DAPI <-- HTTP --> WMS
+  DAPI <-- MQTT --> ESP
+  HS <-- ROS --> PB
+  ROS <-- ESP
+  ROS <-- NAV
+  LR --> PB
+  RE --> PB
+  RE --> HS
+  DM --> HS
+```
 
 ---
 
@@ -142,7 +211,7 @@ docker compose build
 docker compose run --rm verify
 ```
 
-Docker 默认用于 headless 验证和演示；需要 PyBullet GUI / RViz 时建议使用源码编译流程，或自行配置 X11 转发。
+Docker 默认用于 headless 验证和演示；需要 PyBullet GUI / RViz 时建议使用源码编译流程，或自行配置 X11 转发。`.dockerignore` 已排除 `docs/`、前端 `node_modules` 与本机构建产物，加快 `docker compose build`。
 
 **源码编译**
 
@@ -240,7 +309,7 @@ HOC 一屏展示风险雷达、Sim/Real 分布对比与 KL/MMD 时序曲线；`h
 单元测试（纯算法）→ 节点测试（rclpy 单节点）→ 集成测试（`launch_testing` 全链路），CI 于 `ros:jazzy-ros-base` 容器内自动执行。
 
 > 发布或面试前建议复跑 `./scripts/run_tests.sh`、`./scripts/verify_portfolio.sh`、`./scripts/verify_risk_complete.sh`，并以 GitHub Actions 最新绿勾作为最终验收记录。
-> 最近复验（2026-06-20）：`./scripts/run_tests.sh`、`./scripts/verify_portfolio.sh`、`./scripts/verify_risk_complete.sh`、`python3 scripts/check_iiwa_joint_consistency.py` 均通过；`docker compose run --rm verify` 在挂载 episode-data-lab 后通过。
+> 最近复验（2026-06-21）：`./scripts/run_tests.sh`、`./scripts/verify_portfolio.sh`、`./scripts/verify_risk_complete.sh`、`python3 scripts/check_iiwa_joint_consistency.py` 均通过；`docker compose build` + `docker compose run --rm verify` 在挂载 episode-data-lab 后通过（URDF 检查、LeRobot offline compare、portfolio_demo headless smoke）。
 
 ---
 
@@ -301,6 +370,28 @@ export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 实验设计、指标解读与图表对照：[docs/EXPERIMENTS.md](docs/EXPERIMENTS.md) · 产物索引：[docs/samples/](docs/samples/README.md)
 
 最近本机双仓复验：episode-data-lab `validate_dataset.py` 通过（20 episodes，20/20 success）；online `real_source:=lerobot` smoke 样本 `sim=421` / `real=421`；same-task LeRobot replay 样本 `sim=1543` / `real=1542`。
+
+---
+
+## 系统性能
+
+Policy Runner 系统工程增强的实现规格见 [docs/design/10-policy-runner-system-engineering-spec.md](docs/design/10-policy-runner-system-engineering-spec.md)，配套架构、接口和失效分析见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)、[docs/ICD.md](docs/ICD.md)、[docs/FMEA.md](docs/FMEA.md)。
+
+一键生成 benchmark 与汇总报告：
+
+```bash
+./scripts/run_system_validation.sh
+# 产物：docs/samples/system-validation/validation_report.html
+```
+
+最新本机验证摘要见 [`docs/samples/system-validation/validation_summary.json`](docs/samples/system-validation/validation_summary.json)（由脚本生成，勿手写数值）：
+
+| 策略 | mean latency | max latency | std latency | RSS peak |
+|------|-------------|-------------|-------------|----------|
+| `sine_wave` | 4.785 ms | 25.465 ms | 5.168 ms | 2.07 MB |
+| `replay` | 11.021 ms | 444.4 ms | 51.481 ms | 2.07 MB |
+
+调试日志写入 `docs/samples/system-validation/ros_logs/`（已加入 `.gitignore`，不提交 GitHub）。
 
 ---
 
@@ -365,8 +456,9 @@ ros2-moveit-pybullet-bridge/
 ## 引用与致谢
 
 - [ROS 2 Jazzy](https://docs.ros.org/en/jazzy/) · [MoveIt 2](https://moveit.ai/) · [PyBullet](https://pybullet.org/)
+- 统一作品集主入口：[robot-ops-dashboard](https://github.com/inayina/robot-ops-dashboard)（AMR / MQTT / 运维 Dashboard）
 - 跨仓库数据侧：[robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab)（LeRobot 导出与离线采集）
-- 设计文档：[docs/design/](docs/design/README.md)
+- 设计文档：[docs/design/](docs/design/README.md) · 作品集：[docs/portfolio/](docs/portfolio/README.md)
 
 ---
 

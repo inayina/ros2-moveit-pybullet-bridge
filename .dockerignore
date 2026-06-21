@@ -1,0 +1,40 @@
+# Git & CI (not needed inside runtime image)
+.git/
+.github/
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Python local env & caches
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+**/.coverage
+dist/
+
+# Host ROS workspace artifacts (image builds its own /ws/install)
+install/
+log/
+build/
+.ros_log/
+.ros-log/
+*.bag
+*.db3
+
+# HOC frontend (Docker runs hoc_server only; no npm/Vite in container)
+hoc_console/frontend/
+
+# Portfolio docs, reports, and generated samples (not used by verify/demo)
+docs/
+
+# Large media scratch (belt-and-suspenders if docs/ layout changes)
+*.mp4
+*.gif
+
+# Package tests (verify uses launch smoke, not pytest in container)
+**/test/
