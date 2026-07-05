@@ -184,8 +184,9 @@ class DistMonitorNode(Node):
         if not path:
             self.get_logger().error('lerobot_dataset_path is required when real_source=lerobot')
             return
+        profile = str(self.get_parameter('robot_profile').value)
         try:
-            self._lerobot_traj = load_lerobot_dataset(path)
+            self._lerobot_traj = load_lerobot_dataset(path, robot=profile)
             self._lerobot_origin = None
             self._joint_names = list(self._lerobot_traj.joint_names)
             self.get_logger().info(
@@ -195,8 +196,9 @@ class DistMonitorNode(Node):
             self.get_logger().error(f'Failed to load LeRobot dataset: {exc}')
 
     def _on_sim(self, msg: JointState) -> None:
+        profile = str(self.get_parameter('robot_profile').value)
         if msg.name:
-            self._joint_names = normalize_joint_names(list(msg.name))
+            self._joint_names = normalize_joint_names(list(msg.name), robot=profile)
         t = _stamp_to_sec(msg.header.stamp)
         self._comm_health.record('/bridge/sim/joint_states', time.monotonic())
         self._sim_window.push(t, _extract_full_state(msg, self._joint_names or None))

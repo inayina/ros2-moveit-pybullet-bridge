@@ -32,6 +32,13 @@ def test_iiwa_profile_paths():
     assert cfg['end_effector_link'] == 'lbr_iiwa_link_7'
 
 
+def test_panda_profile_paths():
+    cfg = resolve_profile_config('panda')
+    assert os.path.isfile(cfg['urdf_path'])
+    assert len(cfg['home_positions']) == 7
+    assert cfg['end_effector_link'] == 'panda_link7'
+
+
 def test_unknown_profile_raises():
     with pytest.raises(ValueError):
         get_profile('unknown_robot')
@@ -46,6 +53,21 @@ def test_iiwa_pybullet_load():
     import pybullet as p
 
     urdf = resolve_urdf_path('iiwa7')
+    client = p.connect(p.DIRECT)
+    robot = p.loadURDF(urdf, useFixedBase=True)
+    assert p.getNumJoints(robot) >= 7
+    p.disconnect()
+
+
+@pytest.mark.skipif(
+    not os.path.isfile(resolve_urdf_path('panda')),
+    reason='franka_panda URDF not installed',
+)
+def test_panda_pybullet_load():
+    pytest.importorskip('pybullet')
+    import pybullet as p
+
+    urdf = resolve_urdf_path('panda')
     client = p.connect(p.DIRECT)
     robot = p.loadURDF(urdf, useFixedBase=True)
     assert p.getNumJoints(robot) >= 7

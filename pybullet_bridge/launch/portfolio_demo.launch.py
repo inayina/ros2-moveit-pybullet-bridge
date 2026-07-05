@@ -18,7 +18,7 @@ DEFAULT_LEROBOT_DATASET = default_lerobot_export_path()
 
 
 def _launch_setup(context, *args, **kwargs):
-    from pybullet_bridge.robot_profiles import IIWA_HOME, IIWA_JOINTS, resolve_profile_config
+    from pybullet_bridge.robot_profiles import resolve_profile_config
 
     sim_mode = LaunchConfiguration('sim_mode').perform(context)
     real_source = LaunchConfiguration('real_source').perform(context)
@@ -26,12 +26,13 @@ def _launch_setup(context, *args, **kwargs):
     lerobot_path = LaunchConfiguration('lerobot_dataset_path').perform(context)
     episode_index = int(LaunchConfiguration('episode_index').perform(context))
     enable_camera = LaunchConfiguration('enable_camera').perform(context) == 'true'
+    robot_profile = LaunchConfiguration('robot_profile').perform(context)
 
     bridge_pkg = FindPackageShare('pybullet_bridge').perform(context)
     dist_pkg = FindPackageShare('dist_monitor').perform(context)
     risk_pkg = FindPackageShare('risk_engine').perform(context)
 
-    cfg = resolve_profile_config('iiwa7')
+    cfg = resolve_profile_config(robot_profile)
     urdf_path = cfg['urdf_path']
     bridge_yaml = os.path.join(bridge_pkg, 'config', 'bridge_config.yaml')
     thresholds_yaml = os.path.join(dist_pkg, 'config', 'thresholds.yaml')
@@ -43,8 +44,8 @@ def _launch_setup(context, *args, **kwargs):
         'robot_profile': cfg['robot_profile'],
     }
 
-    iiwa_home = list(IIWA_HOME)
-    iiwa_joints = list(IIWA_JOINTS)
+    home_positions = cfg['home_positions']
+    joint_names = cfg['joint_names']
 
     nodes = [
         Node(
@@ -101,8 +102,8 @@ def _launch_setup(context, *args, **kwargs):
                     output='screen',
                     parameters=[{
                         'use_moveit': False,
-                        'joint_names': iiwa_joints,
-                        'home_positions': iiwa_home,
+                        'joint_names': joint_names,
+                        'home_positions': home_positions,
                     }],
                 ),
             ],
@@ -111,7 +112,12 @@ def _launch_setup(context, *args, **kwargs):
     if motion_source != 'none':
         motion_exec = 'iiwa_motion_demo' if motion_source == 'iiwa' else 'lerobot_replay_demo'
         motion_params = []
-        if motion_source == 'lerobot':
+        if motion_source == 'iiwa':
+            motion_params = [{
+                'joint_names': joint_names,
+                'home_positions': home_positions,
+            }]
+        elif motion_source == 'lerobot':
             motion_params = [{
                 'lerobot_dataset_path': lerobot_path,
                 'episode_index': episode_index,

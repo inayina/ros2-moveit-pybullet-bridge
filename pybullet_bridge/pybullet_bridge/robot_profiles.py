@@ -15,6 +15,7 @@ class RobotProfile:
     home_positions: tuple[float, ...]
     end_effector_link: str
     role: str
+    joint_names: tuple[str, ...]
 
 
 IIWA_HOME = (0.0, 0.785398, 0.0, -1.570796, 0.0, 1.570796, 0.0)
@@ -36,6 +37,7 @@ ROBOT_PROFILES: dict[str, RobotProfile] = {
         home_positions=(0.8, -0.6),
         end_effector_link='tool0',
         role='CI / M1 smoke tests',
+        joint_names=('joint1', 'joint2'),
     ),
     'iiwa7': RobotProfile(
         name='iiwa7',
@@ -43,6 +45,23 @@ ROBOT_PROFILES: dict[str, RobotProfile] = {
         home_positions=IIWA_HOME,
         end_effector_link='lbr_iiwa_link_7',
         role='Portfolio / episode-data-lab / M4 calibration',
+        joint_names=IIWA_JOINTS,
+    ),
+    'panda': RobotProfile(
+        name='panda',
+        urdf_relpath=os.path.join('franka_panda', 'panda.urdf'),
+        home_positions=(0.0, -0.785398, 0.0, -2.356194, 0.0, 1.570796, 0.785398),
+        end_effector_link='panda_link7',
+        role='Portfolio / episode-data-lab / Panda validation',
+        joint_names=(
+            'panda_joint1',
+            'panda_joint2',
+            'panda_joint3',
+            'panda_joint4',
+            'panda_joint5',
+            'panda_joint6',
+            'panda_joint7',
+        ),
     ),
 }
 
@@ -84,6 +103,16 @@ def resolve_urdf_path(profile_name: str) -> str:
         except ImportError:
             pass
 
+    if profile.name == 'panda':
+        try:
+            import pybullet_data
+
+            fallback = os.path.join(pybullet_data.getDataPath(), 'franka_panda', 'panda.urdf')
+            if os.path.isfile(fallback):
+                return fallback
+        except ImportError:
+            pass
+
     raise FileNotFoundError(
         f'URDF for profile {profile_name!r} not found at {bundled}',
     )
@@ -98,6 +127,9 @@ def resolve_urdf_robot_description(profile_name: str, *, for_moveit: bool = Fals
     if for_moveit and get_profile(profile_name).name == 'iiwa7':
         prefix = 'package://pybullet_bridge/urdf/kuka_iiwa/'
         text = text.replace('filename="meshes/', f'filename="{prefix}meshes/')
+    elif for_moveit and get_profile(profile_name).name == 'panda':
+        prefix = 'package://pybullet_bridge/urdf/franka_panda/'
+        text = text.replace('package://meshes/', f'{prefix}meshes/')
     return text
 
 
@@ -109,4 +141,5 @@ def resolve_profile_config(profile_name: str) -> dict:
         'urdf_path': resolve_urdf_path(profile.name),
         'home_positions': list(profile.home_positions),
         'end_effector_link': profile.end_effector_link,
+        'joint_names': list(profile.joint_names),
     }

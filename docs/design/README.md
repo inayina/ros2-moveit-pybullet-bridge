@@ -21,6 +21,7 @@
 | 08 | [双仓库通盘集成设计](./08-dual-repo-portfolio-integration-spec.md) | **episode-data-lab + bridge 一体架构**、LeRobot 契约、Real 三模式、HAL 映射、统一 Sprint |
 | 09 | [风险监控补全实现 Spec](./09-risk-monitoring-completion-spec.md) | **S5a–S5d 已实现**：五维风险、R2 降级、看门狗/CSV/阈值热更新 |
 | 10 | [Policy Runner 系统工程增强 Spec](./10-policy-runner-system-engineering-spec.md) | **已实现**：策略抽象、PolicyRunner、benchmark、故障注入、ARCHITECTURE/ICD/FMEA 与一键验证 |
+| 11 | [Franka Panda 机械臂对齐架构决策记录 (ADR)](./11-franka-panda-alignment-adr.md) | **架构决策**：对齐 Panda 主线设计决策、Legacy Fallback 设计、参数化泛型重构、容器 DEMO 入口与性能评估 |
 | — | [验收标准差距台账](../ACCEPTANCE_GAP.md) | **验收对照**：逐条记录 FR/NFR 当前状态、证据缺口、范围调整与 Phase-2+ |
 | — | [作品集剩余工作清单](../PORTFOLIO_REMAINING.md) | **待办跟踪**：M6 打磨、面试 Demo、双仓库验收（非设计 Spec） |
 | — | [实验与报告指南](../EXPERIMENTS.md) | **实验流水线**：双仓库联调 + 同任务校准、指标解读 |
@@ -79,3 +80,4 @@ ros2-moveit-pybullet-bridge/
 | v0.8 | 2026-06-20 | 新增验收标准差距台账入口 |
 | v0.9 | 2026-06-21 | 新增 10：Policy Runner 系统工程增强 Spec |
 | v1.0 | 2026-06-21 | 10 Spec D0–D5 落地：PolicyRunner、benchmark、system-validation 报告 |
+| v1.1 | 2026-07-05 | 新增 11：Franka Panda 机械臂对齐架构决策记录 (ADR) |

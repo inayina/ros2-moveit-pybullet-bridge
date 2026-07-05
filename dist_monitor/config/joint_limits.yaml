@@ -11,3 +11,12 @@ iiwa7:
 planar_2dof:
   joint1: {lower: -3.14159, upper: 3.14159}
   joint2: {lower: -3.14159, upper: 3.14159}
+
+panda:
+  panda_joint1: {lower: -2.9671, upper: 2.9671}
+  panda_joint2: {lower: -1.8326, upper: 1.8326}
+  panda_joint3: {lower: -2.9671, upper: 2.9671}
+  panda_joint4: {lower: -3.1416, upper: 0.0}
+  panda_joint5: {lower: -2.9671, upper: 2.9671}
+  panda_joint6: {lower: -0.0873, upper: 3.8223}
+  panda_joint7: {lower: -2.9671, upper: 2.9671}

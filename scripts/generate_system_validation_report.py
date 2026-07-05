@@ -20,6 +20,21 @@ def _load_summary(path: Path) -> dict[str, Any]:
 def _render_html(summary: dict[str, Any], output_dir: Path) -> str:
     replay = summary.get('replay', {})
     sine = summary.get('sine_wave', {})
+    panda = summary.get('panda_jsonl_replay', {})
+    
+    panda_row = ""
+    if panda:
+        panda_row = f"""
+    <tr>
+      <td>panda_jsonl_replay</td>
+      <td>{panda.get('completed_episodes', 0)}</td>
+      <td>{panda.get('mean_latency_ms', 0):.3f}</td>
+      <td>{panda.get('max_latency_ms', 0):.3f}</td>
+      <td>{panda.get('cpu_peak_percent', 0):.3f}</td>
+      <td>{panda.get('rss_peak_mb', 0):.3f}</td>
+      <td>{panda.get('timeseries_rows', 0)}</td>
+    </tr>"""
+
     return f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -40,7 +55,7 @@ def _render_html(summary: dict[str, Any], output_dir: Path) -> str:
   <p>Generated: {summary.get('generated_at', '')}</p>
   <p>Output: <code>{output_dir}</code></p>
   <p>Overall: <span class="{'pass' if summary.get('pass') else 'fail'}">{'PASS' if summary.get('pass') else 'FAIL'}</span></p>
-
+ 
   <h2>Benchmark Comparison</h2>
   <table>
     <tr>
@@ -64,7 +79,7 @@ def _render_html(summary: dict[str, Any], output_dir: Path) -> str:
       <td>{sine.get('cpu_peak_percent', 0):.3f}</td>
       <td>{sine.get('rss_peak_mb', 0):.3f}</td>
       <td>{sine.get('timeseries_rows', 0)}</td>
-    </tr>
+    </tr>{panda_row}
   </table>
 
   <h2>Dataset</h2>
@@ -81,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--replay-summary', type=Path, required=True)
     parser.add_argument('--sine-summary', type=Path, required=True)
+    parser.add_argument('--panda-summary', type=Path, default=None)
     parser.add_argument('--dataset-info', type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -89,6 +105,10 @@ def main(argv: list[str] | None = None) -> int:
 
     replay = _load_summary(args.replay_summary)
     sine = _load_summary(args.sine_summary)
+    panda: dict[str, Any] = {}
+    if args.panda_summary and args.panda_summary.is_file():
+        panda = _load_summary(args.panda_summary)
+
     dataset: dict[str, Any] = {}
     if args.dataset_info and args.dataset_info.is_file():
         dataset = json.loads(args.dataset_info.read_text(encoding='utf-8'))
@@ -96,8 +116,10 @@ def main(argv: list[str] | None = None) -> int:
     passes = (
         replay.get('completed_episodes') == replay.get('episodes')
         and sine.get('completed_episodes') == sine.get('episodes')
+        and (not panda or panda.get('completed_episodes') == panda.get('episodes'))
         and replay.get('timeseries_rows', 0) > 0
         and sine.get('timeseries_rows', 0) > 0
+        and (not panda or panda.get('timeseries_rows', 0) > 0)
     )
 
     summary = {
@@ -105,12 +127,15 @@ def main(argv: list[str] | None = None) -> int:
         'pass': passes,
         'replay': replay,
         'sine_wave': sine,
+        'panda_jsonl_replay': panda,
         'dataset': dataset,
         'artifacts': {
             'replay_dir': str(output_dir / 'replay'),
             'sine_wave_dir': str(output_dir / 'sine_wave'),
         },
     }
+    if panda:
+        summary['artifacts']['panda_jsonl_replay_dir'] = str(output_dir / 'panda_jsonl_replay')
 
     summary_path = output_dir / 'validation_summary.json'
     summary_path.write_text(

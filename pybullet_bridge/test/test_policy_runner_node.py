@@ -1,5 +1,6 @@
 """Node tests for PolicyRunner command path, health, and fault injection."""
 
+import json
 import os
 import time
 
@@ -97,6 +98,33 @@ def _init_rclpy(log_dir, extra_args: list[str] | None = None) -> None:
     rclpy.init(args=args)
 
 
+def _write_panda_handoff_bundle(path) -> None:
+    path.mkdir()
+    (path / 'handoff_manifest.json').write_text(
+        json.dumps({'handoff_format': 'panda_bridge_handoff_v0'}),
+        encoding='utf-8',
+    )
+    (path / 'replay_check.json').write_text(
+        json.dumps({'status': 'PASS'}),
+        encoding='utf-8',
+    )
+    row = {
+        'timestamp': 0.033,
+        'episode_index': 0,
+        'frame_index': 1,
+        'task': 'pick_lift',
+        'robot': 'panda',
+        'schema_id': 'panda_ee_delta_gripper_v0',
+        'release_id': 'panda_demo_delta_v0',
+        'action_type': 'ee_delta_gripper',
+        'action': [0.001, 0.0, -0.002, 0.0, 0.0, 0.01, 0.0],
+    }
+    (path / 'predicted_actions.jsonl').write_text(
+        json.dumps(row) + '\n',
+        encoding='utf-8',
+    )
+
+
 def test_policy_runner_publishes_joint_trajectory_from_joint_state(tmp_path):
     _init_rclpy(tmp_path / 'ros-log')
     runner = PolicyRunner()
@@ -119,6 +147,45 @@ def test_policy_runner_publishes_joint_trajectory_from_joint_state(tmp_path):
         assert len(command.points) == 1
         assert command.points[0].positions == pytest.approx([0.2, -0.1])
         assert command.points[0].time_from_start.nanosec == 50_000_000
+    finally:
+        executor.shutdown()
+        observer.destroy_node()
+        publisher.destroy_node()
+        runner.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+def test_policy_runner_panda_jsonl_replay_hold_publishes_joint_trajectory(tmp_path):
+    bundle = tmp_path / 'bridge_handoff'
+    _write_panda_handoff_bundle(bundle)
+    _init_rclpy(
+        tmp_path / 'ros-log',
+        [
+            '-p', 'strategy_type:=panda_jsonl_replay',
+            '-p', f'panda_handoff_path:={bundle}',
+            '-p', 'panda_command_mode:=hold',
+        ],
+    )
+    runner = PolicyRunner()
+    publisher = _JointStatePublisher()
+    observer = _CommandObserver()
+    executor = SingleThreadedExecutor()
+    executor.add_node(runner)
+    executor.add_node(publisher)
+    executor.add_node(observer)
+
+    try:
+        deadline = time.time() + 3.0
+        while time.time() < deadline and not observer.commands:
+            publisher.publish_state()
+            executor.spin_once(timeout_sec=0.05)
+
+        assert observer.commands, 'expected Panda PolicyRunner to publish /bridge/command'
+        command = observer.commands[-1]
+        assert command.joint_names == ['joint1', 'joint2']
+        assert len(command.points) == 1
+        assert command.points[0].positions == pytest.approx([0.2, -0.1])
     finally:
         executor.shutdown()
         observer.destroy_node()

@@ -190,15 +190,17 @@ def _launch_stack(
     *,
     strategy: str,
     replay_path: str,
+    panda_handoff_path: str = '',
     seed: int,
     fault_injection: bool,
     inference_freq: int,
 ) -> tuple[subprocess.Popen, subprocess.Popen]:
+    robot_profile = 'panda' if strategy == 'panda_jsonl_replay' else 'planar_2dof'
     launch = subprocess.Popen(
         [
             'ros2', 'launch', 'pybullet_bridge', 'test_monitoring.launch.py',
             'sim_mode:=DIRECT',
-            'robot:=planar_2dof',
+            f'robot:={robot_profile}',
         ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -214,6 +216,11 @@ def _launch_stack(
     ]
     if strategy == 'replay':
         runner_args.extend(['-p', f'replay_path:={replay_path}'])
+    elif strategy == 'panda_jsonl_replay':
+        runner_args.extend([
+            '-p', f'panda_handoff_path:={panda_handoff_path}',
+            '-p', 'panda_command_mode:=mock_ik',
+        ])
     if fault_injection:
         runner_args.extend([
             '-p', 'fault_injection_enabled:=true',
@@ -376,6 +383,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
         launch_proc, runner_proc = _launch_stack(
             strategy=args.strategy,
             replay_path=replay_path,
+            panda_handoff_path=args.panda_handoff_path,
             seed=args.seed,
             fault_injection=args.fault_injection,
             inference_freq=args.inference_freq,
@@ -458,11 +466,12 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Benchmark PolicyRunner system metrics.')
-    parser.add_argument('--strategy', choices=['replay', 'sine_wave'], default='replay')
+    parser.add_argument('--strategy', choices=['replay', 'sine_wave', 'panda_jsonl_replay'], default='replay')
     parser.add_argument('--episodes', type=int, default=100)
     parser.add_argument('--duration-sec', type=float, default=10.0)
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--replay-path', default='')
+    parser.add_argument('--panda-handoff-path', default='')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--fault-injection', action='store_true')
     parser.add_argument('--process-name', default='policy_runner')

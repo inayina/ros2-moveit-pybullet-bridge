@@ -101,18 +101,19 @@ def _infer_state_keys(features: dict) -> tuple[str | None, str | None]:
     return position_key, velocity_key
 
 
-def _joint_names_from_features(features: dict, position_key: str | None, dim: int) -> list[str]:
+def _joint_names_from_features(features: dict, position_key: str | None, dim: int, robot: str = 'kuka_iiwa') -> list[str]:
     if position_key and position_key in features:
         feat = features[position_key]
         raw_names = feat.get('names')
         if raw_names:
-            return normalize_joint_names([str(name) for name in raw_names])
-    return normalize_joint_names([f'joint_{index}' for index in range(dim)])
+            return normalize_joint_names([str(name) for name in raw_names], robot=robot)
+    return normalize_joint_names([f'joint_{index}' for index in range(dim)], robot=robot)
 
 
 def load_lerobot_dataset(
     dataset_path: str | Path,
     episode_indices: list[int] | None = None,
+    robot: str = 'kuka_iiwa',
 ) -> LeRobotTrajectory:
     """Load positions/velocities from a LeRobot v2-style dataset directory."""
     root = Path(dataset_path)
@@ -135,7 +136,7 @@ def load_lerobot_dataset(
             shape = features[position_key].get('shape', [])
             if shape:
                 joint_names = _joint_names_from_features(
-                    features, position_key, int(shape[0]),
+                    features, position_key, int(shape[0]), robot=robot,
                 )
 
     parquet_files = _discover_parquet_files(root)
@@ -229,6 +230,7 @@ def load_lerobot_dataset(
     if not joint_names:
         joint_names = normalize_joint_names(
             [f'joint_{index}' for index in range(positions.shape[1])],
+            robot=robot,
         )
 
     return LeRobotTrajectory(

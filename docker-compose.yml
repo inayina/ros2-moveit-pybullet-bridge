@@ -35,3 +35,15 @@ services:
       - portfolio_demo.launch.py
       - sim_mode:=DIRECT
       - real_source:=lerobot
+
+  portfolio-panda-demo:
+    extends:
+      service: bridge
+    command:
+      - ros2
+      - launch
+      - pybullet_bridge
+      - portfolio_demo.launch.py
+      - sim_mode:=DIRECT
+      - robot_profile:=panda
+      - real_source:=lerobot

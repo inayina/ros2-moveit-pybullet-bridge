@@ -20,6 +20,7 @@ def generate_launch_description():
         launch_arguments={
             'sim_mode': LaunchConfiguration('sim_mode'),
             'real_source': LaunchConfiguration('real_source'),
+            'robot_profile': LaunchConfiguration('robot_profile'),
         }.items(),
     )
 
@@ -36,6 +37,7 @@ def generate_launch_description():
             description='DIRECT: embedded camera in HOC; GUI: also open PyBullet window',
         ),
         DeclareLaunchArgument('real_source', default_value='topic'),
+        DeclareLaunchArgument('robot_profile', default_value='iiwa7'),
         portfolio,
         hoc,
         LogInfo(msg='Local experiment: http://localhost:5173 (camera + metrics in HOC)'),

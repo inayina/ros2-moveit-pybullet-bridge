@@ -22,6 +22,7 @@
 | 5 | [简历描述](./RESUME_SUMMARY.md) | 如何把本仓库和采集仓库合并写进简历 |
 | 6 | [系统设计说明书](./SYSTEM_DESIGN_SPEC.md) | 架构、接口、算法与交付取舍 |
 | 7 | [系统设计幻灯片](./system-design-slides.md) | 导出 PDF/PPTX 用于投递或现场讲解 |
+| 8 | [实机部署与安全规范](./SIM2REAL_DEPLOYMENT_GUIDE.md) | 仿真过渡至真机的核心痛点、优化方向与致命硬安全规范 |
 
 ## 作品集亮点
 

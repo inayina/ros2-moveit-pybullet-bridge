@@ -41,6 +41,32 @@ print("generated replay fixture:", "${REPLAY_FIXTURE}")
 PY
 fi
 
+PANDA_HANDOFF_FIXTURE="/tmp/panda_handoff_test/train/bridge_handoff"
+python3 - <<PY
+import json
+from pathlib import Path
+bundle = Path("${PANDA_HANDOFF_FIXTURE}")
+if not bundle.is_dir():
+    bundle.mkdir(parents=True, exist_ok=True)
+    (bundle / 'handoff_manifest.json').write_text(json.dumps({'handoff_format': 'panda_bridge_handoff_v0'}))
+    (bundle / 'replay_check.json').write_text(json.dumps({'status': 'PASS'}))
+    with (bundle / 'predicted_actions.jsonl').open('w') as f:
+        for idx in range(15):
+            row = {
+                'timestamp': 0.033 * idx,
+                'episode_index': 0,
+                'frame_index': idx,
+                'task': 'pick_lift',
+                'robot': 'panda',
+                'schema_id': 'panda_ee_delta_gripper_v0',
+                'release_id': 'panda_demo_delta_v0',
+                'action_type': 'ee_delta_gripper',
+                'action': [0.001, 0.0, -0.002, 0.0, 0.0, 0.01, 0.0]
+            }
+            f.write(json.dumps(row) + '\n')
+    print("generated mock panda handoff bundle:", "${PANDA_HANDOFF_FIXTURE}")
+PY
+
 DATASET_INFO="${OUTPUT_DIR}/dataset_info.json"
 python3 - <<PY
 import json
@@ -49,6 +75,7 @@ payload = {
     "episode_data_lab_root": "${EPISODE_DATA_LAB_ROOT:-}",
     "lerobot_export": "${LEROBOT_EXPORT:-}",
     "replay_fixture": "${REPLAY_FIXTURE}",
+    "panda_handoff_fixture": "${PANDA_HANDOFF_FIXTURE}",
     "episode_data_lab_present": bool("${EPISODE_DATA_LAB_ROOT:-}" and Path("${EPISODE_DATA_LAB_ROOT:-}").is_dir()),
     "lerobot_export_present": bool("${LEROBOT_EXPORT:-}" and Path("${LEROBOT_EXPORT:-}").is_dir()),
 }
@@ -70,7 +97,7 @@ if ! python3 -c "import psutil" 2>/dev/null; then
     || python3 -m pip install psutil --user -q
 fi
 
-mkdir -p "${OUTPUT_DIR}/replay" "${OUTPUT_DIR}/sine_wave" "${OUTPUT_DIR}/ros_logs"
+mkdir -p "${OUTPUT_DIR}/replay" "${OUTPUT_DIR}/sine_wave" "${OUTPUT_DIR}/panda_jsonl_replay" "${OUTPUT_DIR}/ros_logs"
 export ROS_LOG_DIR="${OUTPUT_DIR}/ros_logs"
 
 cleanup_ros
@@ -98,15 +125,29 @@ python3 "${SCRIPT_DIR}/benchmark_system.py" \
   --launch-stack \
   | tee "${OUTPUT_DIR}/ros_logs/sine_wave_benchmark.log"
 
+section "4b/5 Benchmark PandaJsonlReplayPolicy"
+python3 "${SCRIPT_DIR}/benchmark_system.py" \
+  --strategy panda_jsonl_replay \
+  --episodes "${EPISODES}" \
+  --duration-sec "${DURATION_SEC}" \
+  --output-dir "${OUTPUT_DIR}/panda_jsonl_replay" \
+  --panda-handoff-path "${PANDA_HANDOFF_FIXTURE}" \
+  --seed "${SEED}" \
+  --inference-freq "${INFERENCE_FREQ}" \
+  --launch-stack \
+  | tee "${OUTPUT_DIR}/ros_logs/panda_jsonl_benchmark.log"
+
 section "5/5 Generate validation report"
 python3 "${SCRIPT_DIR}/generate_system_validation_report.py" \
   --output-dir "${OUTPUT_DIR}" \
   --replay-summary "${OUTPUT_DIR}/replay/benchmark_summary.json" \
   --sine-summary "${OUTPUT_DIR}/sine_wave/benchmark_summary.json" \
+  --panda-summary "${OUTPUT_DIR}/panda_jsonl_replay/benchmark_summary.json" \
   --dataset-info "${DATASET_INFO}"
 
 python3 "${SCRIPT_DIR}/check_policy_runner_benchmark.py" "${OUTPUT_DIR}/replay/benchmark_summary.json"
 python3 "${SCRIPT_DIR}/check_policy_runner_benchmark.py" "${OUTPUT_DIR}/sine_wave/benchmark_summary.json"
+python3 "${SCRIPT_DIR}/check_policy_runner_benchmark.py" "${OUTPUT_DIR}/panda_jsonl_replay/benchmark_summary.json"
 
 ELAPSED="$(( $(date +%s) - START_TS ))"
 section "Done in ${ELAPSED}s"

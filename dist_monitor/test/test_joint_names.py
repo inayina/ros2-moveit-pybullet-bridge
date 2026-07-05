@@ -32,3 +32,21 @@ def test_normalize_gripper_legacy():
     legacy = [f'joint_{index}' for index in range(9)]
     expected = list(IIWA_ARM_JOINTS) + list(GRIPPER_JOINTS)
     assert normalize_joint_names(legacy) == expected
+
+
+def test_normalize_panda_legacy():
+    from dist_monitor.joint_names import PANDA_ARM_JOINTS
+    legacy = [f'joint_{index}' for index in range(7)]
+    assert normalize_joint_names(legacy, robot='panda') == list(PANDA_ARM_JOINTS)
+
+
+def test_normalize_panda_gripper_legacy():
+    from dist_monitor.joint_names import PANDA_ARM_JOINTS, PANDA_GRIPPER_JOINTS
+    legacy = [f'joint_{index}' for index in range(9)]
+    expected = list(PANDA_ARM_JOINTS) + list(PANDA_GRIPPER_JOINTS)
+    assert normalize_joint_names(legacy, robot='panda') == expected
+
+
+def test_normalize_panda_canonical_is_idempotent():
+    from dist_monitor.joint_names import PANDA_ARM_JOINTS
+    assert normalize_joint_names(list(PANDA_ARM_JOINTS), robot='panda') == list(PANDA_ARM_JOINTS)

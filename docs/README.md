@@ -10,6 +10,8 @@
 | 安装与 Launch 参数 | [SETUP.md](./SETUP.md) |
 | 与 episode-data-lab 联调 | [INTEGRATION.md](./INTEGRATION.md) |
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
+| 查看 iiwa7 与 Panda 对齐路线 | [PANDA_ALIGNMENT_ROADMAP.md](./PANDA_ALIGNMENT_ROADMAP.md) |
+| 接入 Panda JSONL replay | [PANDA_JSONL_REPLAY_ROADMAP.md](./PANDA_JSONL_REPLAY_ROADMAP.md) |
 | 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |
 | 阅读系统架构 | [design/README.md](./design/README.md) |
 | 查看系统工程架构 / ICD / FMEA | [ARCHITECTURE.md](./ARCHITECTURE.md) · [ICD.md](./ICD.md) · [FMEA.md](./FMEA.md) |
@@ -29,6 +31,8 @@ docs/
 ├── SETUP.md               安装、编译、Launch、阈值配置
 ├── INTEGRATION.md         双仓库环境变量与联调步骤
 ├── EXPERIMENTS.md         实验流水线、指标解读、报告对照
+├── PANDA_ALIGNMENT_ROADMAP.md iiwa7 legacy backend 与 Panda schema 对齐路线
+├── PANDA_JSONL_REPLAY_ROADMAP.md Panda JSONL replay 与 bridge handoff 接入路线
 ├── ACCEPTANCE_GAP.md      验收标准差距台账
 ├── PORTFOLIO_REMAINING.md 待办跟踪
 ├── ARCHITECTURE.md         逻辑架构、物理部署、QoS 策略

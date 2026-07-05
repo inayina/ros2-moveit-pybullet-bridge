@@ -18,6 +18,7 @@ class IiwaMotionDemo(Node):
     def __init__(self) -> None:
         super().__init__('iiwa_motion_demo')
         self.declare_parameter('joint_names', IIWA_JOINTS)
+        self.declare_parameter('home_positions', list(IIWA_HOME))
         self.declare_parameter('amplitude', 0.25)
         self.declare_parameter('duration_sec', 6.0)
         self.declare_parameter('publish_delay_sec', 1.0)
@@ -37,7 +38,7 @@ class IiwaMotionDemo(Node):
         amplitude = float(self.get_parameter('amplitude').value)
         duration = float(self.get_parameter('duration_sec').value)
         steps = 50
-        home = IIWA_HOME[:len(joint_names)]
+        home = list(self.get_parameter('home_positions').value)[:len(joint_names)]
 
         msg = JointTrajectory()
         msg.joint_names = joint_names

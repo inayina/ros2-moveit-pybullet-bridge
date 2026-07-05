@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"/>
-  <title>Policy Runner Benchmark — replay</title>
+  <title>Policy Runner Benchmark — panda_jsonl_replay</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #141414; color: #e8e8e8; margin: 24px; }
     h1, h2 { color: #69b1ff; }
@@ -16,30 +16,30 @@
 </head>
 <body>
   <h1>Policy Runner System Benchmark</h1>
-  <p>Output directory: <code>/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation/replay</code></p>
+  <p>Output directory: <code>/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation/panda_jsonl_replay</code></p>
   <div class="metric-grid">
-    <div class="metric-card"><div>Mean latency</div><div class="metric-value">2.224 ms</div></div>
-    <div class="metric-card"><div>Max latency</div><div class="metric-value">325.806 ms</div></div>
+    <div class="metric-card"><div>Mean latency</div><div class="metric-value">0.000 ms</div></div>
+    <div class="metric-card"><div>Max latency</div><div class="metric-value">0.000 ms</div></div>
     <div class="metric-card"><div>CPU peak</div><div class="metric-value">0.0%</div></div>
     <div class="metric-card"><div>RSS peak</div><div class="metric-value">29.3 MB</div></div>
   </div>
   <h2>Summary</h2>
   <pre>{
-  "strategy": "replay",
+  "strategy": "panda_jsonl_replay",
   "episodes": 10,
   "completed_episodes": 10,
-  "max_latency_ms": 325.806,
-  "mean_latency_ms": 2.224,
-  "std_latency_ms": 13.98,
+  "max_latency_ms": 0.0,
+  "mean_latency_ms": 0.0,
+  "std_latency_ms": 0.0,
   "cpu_peak_percent": 0.0,
-  "rss_peak_mb": 29.297,
+  "rss_peak_mb": 29.27,
   "health_alarm_detected_within_1s": true,
   "health_alarm_latency_ms": null,
   "seed": 0,
   "fault_injection": false,
-  "replay_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
-  "timeseries_rows": 3751,
-  "health_events": 29
+  "replay_path": "",
+  "timeseries_rows": 3019,
+  "health_events": 595
 }</pre>
   <h2>Artifacts</h2>
   <ul>

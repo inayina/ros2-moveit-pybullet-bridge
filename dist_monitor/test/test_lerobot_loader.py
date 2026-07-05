@@ -73,3 +73,12 @@ def test_lerobot_lookup_nearest(tmp_path):
     pos = traj.lookup_nearest_position(0.05, tolerance_sec=0.02)
     assert pos is not None
     assert pos.shape == (2,)
+
+
+def test_load_lerobot_dataset_normalizes_legacy_panda_names(tmp_path):
+    from dist_monitor.joint_names import PANDA_ARM_JOINTS
+    legacy = [f'joint_{index}' for index in range(7)]
+    _write_minimal_lerobot_dataset(tmp_path, n=10, joint_names=legacy)
+    traj = load_lerobot_dataset(tmp_path, robot='panda')
+    assert traj.joint_names == list(PANDA_ARM_JOINTS)
+    assert traj.positions.shape == (10, 7)

@@ -17,6 +17,11 @@ from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 from pybullet_bridge.learning.base_policy import BasePolicy
+from pybullet_bridge.learning.jsonl_action_replay_policy import JsonlActionReplayPolicy
+from pybullet_bridge.learning.panda_action_adapter import (
+    PandaActionAdapter,
+    PandaActionAdapterConfig,
+)
 from pybullet_bridge.learning.replay_policy import ReplayPolicy
 from pybullet_bridge.learning.sine_wave_policy import SineWavePolicy
 
@@ -33,6 +38,7 @@ class PolicyRunner(Node):
         self._latest_obs: Optional[Dict[str, np.ndarray]] = None
         self._latest_metrics: Optional[DistributionMetrics] = None
         self._policy: Optional[BasePolicy] = None
+        self._panda_adapter: Optional[PandaActionAdapter] = None
         self._rng: Optional[np.random.Generator] = None
         self._active = False
         self._reason = 'inactive'
@@ -52,6 +58,10 @@ class PolicyRunner(Node):
     def _declare_parameters(self) -> None:
         self.declare_parameter('strategy_type', 'replay')
         self.declare_parameter('replay_path', '')
+        self.declare_parameter('panda_handoff_path', '')
+        self.declare_parameter('panda_schema_id', 'panda_ee_delta_gripper_v0')
+        self.declare_parameter('panda_action_type', 'ee_delta_gripper')
+        self.declare_parameter('panda_command_mode', 'hold')
         self.declare_parameter('policy_inference_freq', 0)
         self.declare_parameter('joint_names', [])
         self.declare_parameter('command_topic', '/bridge/command')
@@ -79,6 +89,7 @@ class PolicyRunner(Node):
     def on_configure(self) -> bool:
         self._strategy_type = str(self.get_parameter('strategy_type').value)
         self._joint_names = list(self.get_parameter('joint_names').value)
+        self._panda_adapter = None
         self._policy = self._build_policy()
         self._rng = np.random.default_rng(int(self.get_parameter('seed').value))
 
@@ -164,6 +175,26 @@ class PolicyRunner(Node):
                 kwargs['inference_freq'] = requested_freq
             return ReplayPolicy(replay_path, **kwargs)
 
+        if strategy == 'panda_jsonl_replay':
+            handoff_path = str(self.get_parameter('panda_handoff_path').value)
+            if not handoff_path:
+                raise ValueError(
+                    'panda_handoff_path is required when strategy_type is '
+                    'panda_jsonl_replay'
+                )
+            inference_freq = requested_freq if requested_freq > 0 else 50
+            self._panda_adapter = PandaActionAdapter(
+                PandaActionAdapterConfig(
+                    command_mode=str(self.get_parameter('panda_command_mode').value),
+                )
+            )
+            return JsonlActionReplayPolicy(
+                handoff_path,
+                inference_freq=inference_freq,
+                expected_schema_id=str(self.get_parameter('panda_schema_id').value),
+                expected_action_type=str(self.get_parameter('panda_action_type').value),
+            )
+
         if strategy == 'sine_wave':
             inference_freq = requested_freq if requested_freq > 0 else 50
             return SineWavePolicy(
@@ -208,6 +239,12 @@ class PolicyRunner(Node):
         start = time.monotonic()
         try:
             action = np.asarray(self._policy.get_action(self._latest_obs), dtype=np.float64)
+            if self._panda_adapter is not None:
+                action = self._panda_adapter.to_joint_target(
+                    action,
+                    self._latest_obs,
+                    self._joint_names,
+                )
         except Exception as exc:  # noqa: BLE001 - policy errors become health diagnostics
             self._reason = 'exception'
             self.get_logger().error(f'Policy inference failed: {exc}')
@@ -298,6 +335,14 @@ class PolicyRunner(Node):
         status.message = self._reason
         status.values = [
             KeyValue(key='strategy_type', value=self._strategy_type),
+            KeyValue(
+                key='panda_command_mode',
+                value=(
+                    self._panda_adapter.command_mode
+                    if self._panda_adapter is not None
+                    else ''
+                ),
+            ),
             KeyValue(
                 key='inference_latency_ms',
                 value=f'{self._last_inference_latency_ms:.3f}',
