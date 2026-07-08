@@ -22,6 +22,8 @@
 | 09 | [风险监控补全实现 Spec](./09-risk-monitoring-completion-spec.md) | **S5a–S5d 已实现**：五维风险、R2 降级、看门狗/CSV/阈值热更新 |
 | 10 | [Policy Runner 系统工程增强 Spec](./10-policy-runner-system-engineering-spec.md) | **已实现**：策略抽象、PolicyRunner、benchmark、故障注入、ARCHITECTURE/ICD/FMEA 与一键验证 |
 | 11 | [Franka Panda 机械臂对齐架构决策记录 (ADR)](./11-franka-panda-alignment-adr.md) | **架构决策**：对齐 Panda 主线设计决策、Legacy Fallback 设计、参数化泛型重构、容器 DEMO 入口与性能评估 |
+| 12 | [Real-Machine Readiness 实施验证 Spec](./12-real-machine-readiness-spec.md) | **待实现**：将下游仓库定位为真机接入前实施验证环节，定义 readiness 文档、集成测试矩阵、抓取评估、安全验收、实施报告与最小评测脚本方案 |
+| 13 | [三仓集成与真机就绪度联合开发方案](./13-three-repo-integration-development-plan.md) | **后续方案**：对接上游 MuJoCo/中游 LeRobot，落地底层 PID、物理死区建模、多模态异步传感器融合与 HOC 多模型评测看板重构 |
 | — | [验收标准差距台账](../ACCEPTANCE_GAP.md) | **验收对照**：逐条记录 FR/NFR 当前状态、证据缺口、范围调整与 Phase-2+ |
 | — | [作品集剩余工作清单](../PORTFOLIO_REMAINING.md) | **待办跟踪**：M6 打磨、面试 Demo、双仓库验收（非设计 Spec） |
 | — | [实验与报告指南](../EXPERIMENTS.md) | **实验流水线**：双仓库联调 + 同任务校准、指标解读 |
@@ -52,6 +54,10 @@
 09 风险监控补全 Spec     ← 五维风险 / R2 降级 / NFR 补全编码前读
         ↓
 10 Policy Runner 增强    ← 策略抽象 / benchmark / 故障注入编码前读
+        ↓
+12 Real-Machine Readiness ← 真机接入前 readiness / integration test / safety acceptance 编码前读
+        ↓
+13 三仓集成与真机就绪度方案  ← 后续开发方案及三仓联调对照读
 ```
 
 ## 包结构对照
@@ -81,3 +87,5 @@ ros2-moveit-pybullet-bridge/
 | v0.9 | 2026-06-21 | 新增 10：Policy Runner 系统工程增强 Spec |
 | v1.0 | 2026-06-21 | 10 Spec D0–D5 落地：PolicyRunner、benchmark、system-validation 报告 |
 | v1.1 | 2026-07-05 | 新增 11：Franka Panda 机械臂对齐架构决策记录 (ADR) |
+| v1.2 | 2026-07-06 | 新增 12：Real-Machine Readiness 实施验证 Spec |
+| v1.3 | 2026-07-06 | 新增 13：三仓集成与真机就绪度联合开发方案 |

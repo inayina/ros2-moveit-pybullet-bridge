@@ -4,6 +4,7 @@ import json
 import os
 import time
 
+import numpy as np
 import pytest
 import rclpy
 from bridge_monitor_msgs.msg import DistributionMetrics
@@ -186,6 +187,47 @@ def test_policy_runner_panda_jsonl_replay_hold_publishes_joint_trajectory(tmp_pa
         assert command.joint_names == ['joint1', 'joint2']
         assert len(command.points) == 1
         assert command.points[0].positions == pytest.approx([0.2, -0.1])
+    finally:
+        executor.shutdown()
+        observer.destroy_node()
+        publisher.destroy_node()
+        runner.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+def test_policy_runner_panda_jsonl_replay_pybullet_ik_publishes_joint_trajectory(tmp_path):
+    bundle = tmp_path / 'bridge_handoff'
+    _write_panda_handoff_bundle(bundle)
+    _init_rclpy(
+        tmp_path / 'ros-log',
+        [
+            '-p', 'strategy_type:=panda_jsonl_replay',
+            '-p', f'panda_handoff_path:={bundle}',
+            '-p', 'panda_command_mode:=pybullet_ik',
+        ],
+    )
+    runner = PolicyRunner()
+    publisher = _JointStatePublisher()
+    observer = _CommandObserver()
+    executor = SingleThreadedExecutor()
+    executor.add_node(runner)
+    executor.add_node(publisher)
+    executor.add_node(observer)
+
+    try:
+        deadline = time.time() + 3.0
+        while time.time() < deadline and not observer.commands:
+            publisher.publish_state()
+            executor.spin_once(timeout_sec=0.05)
+
+        assert observer.commands, 'expected Panda PolicyRunner to publish /bridge/command'
+        command = observer.commands[-1]
+        assert command.joint_names == ['joint1', 'joint2']
+        assert len(command.points) == 1
+        assert len(command.points[0].positions) == 2
+        # Check that it executed IK and output targets are not identical to current joint state [0.2, -0.1]
+        assert not np.allclose(command.points[0].positions, [0.2, -0.1])
     finally:
         executor.shutdown()
         observer.destroy_node()

@@ -1,0 +1,47 @@
+# Runtime IO requirements requested by downstream bridge from middle/upstream.
+schema_version: runtime_io_requirements_v0
+request_id: runtime_io_YYYYMMDD_short_name
+created_at: YYYY-MM-DDTHH:MM:SSZ
+source_repo: ros2-moveit-pybullet-bridge
+target_repo: robot-arm-episode-data-lab
+
+handoff_requirements:
+  required_manifest_keys:
+    - handoff_format
+    - handoff_id
+    - release_id
+    - policy_id
+    - schema_id
+    - action_type
+    - action_dim
+    - observation_keys
+    - control_rate_hz
+    - frame_convention
+    - gripper_range_m
+  required_files:
+    - predicted_actions.jsonl
+    - dataset_manifest.json
+    - dataset_inspection_report.json
+    - replay_check.json
+    - handoff_manifest.json
+
+runtime_contract:
+  robot_profile: panda
+  command_topic: /bridge/command
+  command_type: trajectory_msgs/msg/JointTrajectory
+  input_action_type: ee_delta_gripper
+  input_action_dim: 7
+  input_action_units:
+    delta_xyz: meters
+    delta_rpy: radians
+    gripper: meters
+  quaternion_order: xyzw
+  joint_order_source: robot_profile
+  control_rate_hz: 50
+  action_clamp_policy: reject_or_clamp_with_report
+
+missing_or_ambiguous_fields:
+  - field: example_field
+    problem: Describe ambiguity.
+    required_by: policy_runner
+    requested_owner: robot-arm-episode-data-lab

@@ -1,4 +1,4 @@
-"""Portfolio demo: KUKA iiwa7 + dual-source + monitor + optional LeRobot Real replay."""
+"""Portfolio demo: Franka Panda + dual-source + monitor + optional LeRobot Real replay."""
 
 from __future__ import annotations
 
@@ -141,7 +141,7 @@ def _launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        declare_robot_launch_arg(default_profile='iiwa7'),
+        declare_robot_launch_arg(default_profile='panda'),
         DeclareLaunchArgument('sim_mode', default_value='GUI',
                               description='DIRECT for headless, GUI for portfolio recording'),
         DeclareLaunchArgument('real_source', default_value='topic',

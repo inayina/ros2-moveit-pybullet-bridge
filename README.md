@@ -395,7 +395,7 @@ export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 
 > Current bridge demos use KUKA iiwa7 as a legacy validation backend. The portfolio-wide manipulation schema is being standardized on Franka Panda through `robot-arm-episode-data-lab`. A future Panda backend will align PolicyRunner, LeRobot replay, and Sim/Real distribution monitoring under the same observation/action schema.
 >
-> 当前 bridge demo 使用 KUKA iiwa7 作为早期验证后端。作品集主线操作臂 schema 将通过 `robot-arm-episode-data-lab` 统一到 Franka Panda。后续 Panda backend 会让 PolicyRunner、LeRobot replay 与 Sim/Real 分布监控使用同一套 observation/action schema。迁移路线见 [docs/PANDA_ALIGNMENT_ROADMAP.md](docs/PANDA_ALIGNMENT_ROADMAP.md)。
+> 当前 bridge demo 使用 KUKA iiwa7 作为早期验证后端。作品集主线操作臂 schema 将通过 `robot-arm-episode-data-lab` 统一到 Franka Panda。后续 Panda backend 会让 PolicyRunner、LeRobot replay 与 Sim/Real 分布监控使用同一套 observation/action schema。迁移路线见 [docs/PANDA_ALIGNMENT_ROADMAP.md](docs/PANDA_ALIGNMENT_ROADMAP.md)，新周期开发时间线与里程碑细化见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ---
 

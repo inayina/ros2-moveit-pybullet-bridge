@@ -81,7 +81,7 @@ class DistMonitorNode(Node):
         self.declare_parameter('comm_health.gap_multiplier', 2.0)
         self.declare_parameter('comm_health.latency_threshold_ms', 100.0)
         self.declare_parameter('comm_health.max_samples', 100)
-        self.declare_parameter('robot_profile', 'iiwa7')
+        self.declare_parameter('robot_profile', 'panda')
         self.declare_parameter('joint_limits_path', '')
         self.declare_parameter('soft_limit_proximity_ratio', 0.95)
         self.declare_parameter('dynamics_anomaly.velocity_jump_threshold', 2.0)

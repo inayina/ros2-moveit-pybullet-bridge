@@ -15,7 +15,7 @@ from pybullet_bridge.robot_profiles import (
 
 def test_default_profiles():
     assert DEFAULT_CI_PROFILE == 'planar_2dof'
-    assert DEFAULT_PORTFOLIO_PROFILE == 'iiwa7'
+    assert DEFAULT_PORTFOLIO_PROFILE == 'panda'
 
 
 def test_planar_profile_paths():

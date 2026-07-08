@@ -219,7 +219,7 @@ def _launch_stack(
     elif strategy == 'panda_jsonl_replay':
         runner_args.extend([
             '-p', f'panda_handoff_path:={panda_handoff_path}',
-            '-p', 'panda_command_mode:=mock_ik',
+            '-p', 'panda_command_mode:=pybullet_ik',
         ])
     if fault_injection:
         runner_args.extend([

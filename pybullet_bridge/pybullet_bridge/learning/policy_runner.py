@@ -62,6 +62,15 @@ class PolicyRunner(Node):
         self.declare_parameter('panda_schema_id', 'panda_ee_delta_gripper_v0')
         self.declare_parameter('panda_action_type', 'ee_delta_gripper')
         self.declare_parameter('panda_command_mode', 'hold')
+        self.declare_parameter('panda_enable_deadband', False)
+        self.declare_parameter('panda_deadband_val', 0.0001)
+        self.declare_parameter('panda_deadband_feedforward', 0.0002)
+        self.declare_parameter('panda_enable_backlash', False)
+        self.declare_parameter('panda_backlash_val', 0.001)
+        self.declare_parameter('panda_enable_limits', False)
+        self.declare_parameter('panda_max_joint_velocity', 2.0)
+        self.declare_parameter('panda_max_joint_acceleration', 10.0)
+        self.declare_parameter('panda_control_loop_dt', 0.02)
         self.declare_parameter('policy_inference_freq', 0)
         self.declare_parameter('joint_names', [])
         self.declare_parameter('command_topic', '/bridge/command')
@@ -119,6 +128,8 @@ class PolicyRunner(Node):
             return False
 
         self._policy.reset()
+        if self._panda_adapter is not None:
+            self._panda_adapter.reset()
         self._active = True
         self._reason = 'ok'
         self._last_successful_action_mono = time.monotonic()
@@ -186,6 +197,15 @@ class PolicyRunner(Node):
             self._panda_adapter = PandaActionAdapter(
                 PandaActionAdapterConfig(
                     command_mode=str(self.get_parameter('panda_command_mode').value),
+                    enable_deadband=bool(self.get_parameter('panda_enable_deadband').value),
+                    deadband_val=float(self.get_parameter('panda_deadband_val').value),
+                    deadband_feedforward=float(self.get_parameter('panda_deadband_feedforward').value),
+                    enable_backlash=bool(self.get_parameter('panda_enable_backlash').value),
+                    backlash_val=float(self.get_parameter('panda_backlash_val').value),
+                    enable_limits=bool(self.get_parameter('panda_enable_limits').value),
+                    max_joint_velocity=float(self.get_parameter('panda_max_joint_velocity').value),
+                    max_joint_acceleration=float(self.get_parameter('panda_max_joint_acceleration').value),
+                    control_loop_dt=float(self.get_parameter('panda_control_loop_dt').value),
                 )
             )
             return JsonlActionReplayPolicy(

@@ -9,6 +9,7 @@
 | 快速掌握整个项目 | [PROJECT_LEARNING_GUIDE.md](./PROJECT_LEARNING_GUIDE.md) |
 | 安装与 Launch 参数 | [SETUP.md](./SETUP.md) |
 | 与 episode-data-lab 联调 | [INTEGRATION.md](./INTEGRATION.md) |
+| 查看三仓交接契约 / feedback loop | [INTER_REPO_CONTRACTS.md](./INTER_REPO_CONTRACTS.md) |
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
 | 查看 iiwa7 与 Panda 对齐路线 | [PANDA_ALIGNMENT_ROADMAP.md](./PANDA_ALIGNMENT_ROADMAP.md) |
 | 接入 Panda JSONL replay | [PANDA_JSONL_REPLAY_ROADMAP.md](./PANDA_JSONL_REPLAY_ROADMAP.md) |
@@ -30,6 +31,7 @@ docs/
 ├── PROJECT_LEARNING_GUIDE.md 项目学习路线、模块地图、代码阅读顺序
 ├── SETUP.md               安装、编译、Launch、阈值配置
 ├── INTEGRATION.md         双仓库环境变量与联调步骤
+├── INTER_REPO_CONTRACTS.md 三仓交接 gate、runtime IO、feedback loop
 ├── EXPERIMENTS.md         实验流水线、指标解读、报告对照
 ├── PANDA_ALIGNMENT_ROADMAP.md iiwa7 legacy backend 与 Panda schema 对齐路线
 ├── PANDA_JSONL_REPLAY_ROADMAP.md Panda JSONL replay 与 bridge handoff 接入路线
@@ -78,3 +80,10 @@ docs/
 | `verify_portfolio.sh` | URDF + offline_compare + 15s demo |
 
 详见 [EXPERIMENTS.md](./EXPERIMENTS.md)。
+
+## 三仓契约模板
+
+| 模板 | 用途 |
+|------|------|
+| [templates/downstream_replay_summary.yaml](./templates/downstream_replay_summary.yaml) | 下游 replay / deployment-readiness 小报告，回流给中游和上游 |
+| [templates/runtime_io_requirements.yaml](./templates/runtime_io_requirements.yaml) | 下游向中游请求 handoff manifest / runtime IO 字段时使用 |

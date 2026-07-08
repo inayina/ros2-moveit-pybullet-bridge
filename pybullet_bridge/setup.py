@@ -40,6 +40,7 @@ setup(
             'lerobot_replay_demo = pybullet_bridge.lerobot_replay_demo:main',
             'policy_runner = pybullet_bridge.learning.policy_runner:main',
             'trajectory_controller_node = pybullet_bridge.trajectory_controller_node:main',
+            'sensor_fusion_node = pybullet_bridge.sensor_fusion_node:main',
         ],
     },
 )

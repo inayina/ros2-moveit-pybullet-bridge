@@ -1,6 +1,6 @@
 # 与 robot-arm-episode-data-lab 集成指南
 
-两个**独立 Git 仓库**组成**同一作品集**，设计时必须通盘考虑。完整跨仓库架构、数据契约与 Sprint 见 **[docs/design/08-dual-repo-portfolio-integration-spec.md](design/08-dual-repo-portfolio-integration-spec.md)**。
+本页保留 legacy 双仓 iiwa/LeRobot 联调说明。当前 Panda 主线是三仓闭环：上游 `ros2-arm-teleoperation-suite` 采集 raw episodes，中游 `robot-arm-episode-data-lab` 完成数据清洗+训练+handoff，下游本仓做 MoveIt/PyBullet replay、部署验证和监控。三仓 gate、runtime IO 与 feedback loop 见 **[INTER_REPO_CONTRACTS.md](INTER_REPO_CONTRACTS.md)**；旧双仓架构背景见 **[docs/design/08-dual-repo-portfolio-integration-spec.md](design/08-dual-repo-portfolio-integration-spec.md)**。
 
 | 仓库 | 典型路径 | 职责 |
 |------|----------|------|

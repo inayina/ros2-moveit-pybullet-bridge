@@ -22,6 +22,7 @@ set(msg_files
   "msg/DomainRandomizationConfig.msg"
   "msg/ExperimentMetadata.msg"
   "msg/SimRealError.msg"
+  "msg/GraspStatus.msg"
 )
 
 set(srv_files

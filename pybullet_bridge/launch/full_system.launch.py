@@ -91,7 +91,7 @@ def _launch_setup(context, *args, **kwargs):
 
 def generate_launch_description():
     return LaunchDescription([
-        declare_robot_launch_arg(default_profile='iiwa7'),
+        declare_robot_launch_arg(default_profile='panda'),
         DeclareLaunchArgument('sim_mode', default_value='DIRECT'),
         DeclareLaunchArgument('enable_dual_source', default_value='true'),
         DeclareLaunchArgument('enable_hoc', default_value='true'),

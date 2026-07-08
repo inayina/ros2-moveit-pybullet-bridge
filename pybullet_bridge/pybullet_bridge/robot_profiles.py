@@ -66,7 +66,7 @@ ROBOT_PROFILES: dict[str, RobotProfile] = {
 }
 
 DEFAULT_CI_PROFILE = 'planar_2dof'
-DEFAULT_PORTFOLIO_PROFILE = 'iiwa7'
+DEFAULT_PORTFOLIO_PROFILE = 'panda'
 
 
 def list_profiles() -> list[str]:

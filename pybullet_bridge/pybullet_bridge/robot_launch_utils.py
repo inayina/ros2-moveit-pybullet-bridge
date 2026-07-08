@@ -12,7 +12,7 @@ def declare_robot_launch_arg(*, default_profile: str) -> DeclareLaunchArgument:
     return DeclareLaunchArgument(
         'robot',
         default_value=default_profile,
-        description='Robot profile: planar_2dof (CI) | iiwa7 (portfolio)',
+        description='Robot profile: planar_2dof (CI) | panda (portfolio) | iiwa7 (fallback)',
     )
 
 

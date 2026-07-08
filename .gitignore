@@ -18,6 +18,19 @@ log/
 # Benchmark / validation debug logs (keep HTML/JSON summaries in repo)
 docs/samples/system-validation/ros_logs/
 
+# Cross-repo bulk artifacts should not be committed to the downstream bridge
+checkpoints/
+runs/
+wandb/
+rollouts/
+replay_logs/
+handoff_bundles/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
 # Frontend
 hoc_console/frontend/node_modules/
 hoc_console/frontend/dist/

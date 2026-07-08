@@ -15,7 +15,7 @@
 </head>
 <body>
   <h1>Policy Runner System Validation</h1>
-  <p>Generated: 2026-07-05T14:41:40</p>
+  <p>Generated: 2026-07-06T20:49:54</p>
   <p>Output: <code>/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/samples/system-validation</code></p>
   <p>Overall: <span class="pass">PASS</span></p>
  
@@ -28,20 +28,20 @@
     <tr>
       <td>replay</td>
       <td>10</td>
-      <td>2.224</td>
-      <td>325.806</td>
+      <td>5.534</td>
+      <td>304.164</td>
       <td>0.000</td>
       <td>29.297</td>
-      <td>3751</td>
+      <td>3658</td>
     </tr>
     <tr>
       <td>sine_wave</td>
       <td>10</td>
-      <td>2.315</td>
-      <td>240.688</td>
+      <td>1.404</td>
+      <td>200.248</td>
       <td>0.000</td>
-      <td>29.086</td>
-      <td>3747</td>
+      <td>29.254</td>
+      <td>3724</td>
     </tr>
     <tr>
       <td>panda_jsonl_replay</td>
@@ -49,8 +49,8 @@
       <td>0.000</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>29.270</td>
-      <td>3019</td>
+      <td>29.273</td>
+      <td>3008</td>
     </tr>
   </table>
 
@@ -66,7 +66,7 @@
 
   <h2>Full Summary JSON</h2>
   <pre>{
-  "generated_at": "2026-07-05T14:41:40",
+  "generated_at": "2026-07-06T20:49:54",
   "pass": true,
   "replay": {
     "completed_episodes": 10,
@@ -75,15 +75,15 @@
     "fault_injection": false,
     "health_alarm_detected_within_1s": true,
     "health_alarm_latency_ms": null,
-    "health_events": 29,
-    "max_latency_ms": 325.806,
-    "mean_latency_ms": 2.224,
+    "health_events": 28,
+    "max_latency_ms": 304.164,
+    "mean_latency_ms": 5.534,
     "replay_path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/fixtures/planar_2dof_replay.pkl",
     "rss_peak_mb": 29.297,
     "seed": 0,
-    "std_latency_ms": 13.98,
+    "std_latency_ms": 12.705,
     "strategy": "replay",
-    "timeseries_rows": 3751
+    "timeseries_rows": 3658
   },
   "sine_wave": {
     "completed_episodes": 10,
@@ -93,14 +93,14 @@
     "health_alarm_detected_within_1s": true,
     "health_alarm_latency_ms": null,
     "health_events": 29,
-    "max_latency_ms": 240.688,
-    "mean_latency_ms": 2.315,
+    "max_latency_ms": 200.248,
+    "mean_latency_ms": 1.404,
     "replay_path": "",
-    "rss_peak_mb": 29.086,
+    "rss_peak_mb": 29.254,
     "seed": 0,
-    "std_latency_ms": 10.604,
+    "std_latency_ms": 7.322,
     "strategy": "sine_wave",
-    "timeseries_rows": 3747
+    "timeseries_rows": 3724
   },
   "panda_jsonl_replay": {
     "completed_episodes": 10,
@@ -109,15 +109,15 @@
     "fault_injection": false,
     "health_alarm_detected_within_1s": true,
     "health_alarm_latency_ms": null,
-    "health_events": 595,
+    "health_events": 599,
     "max_latency_ms": 0.0,
     "mean_latency_ms": 0.0,
     "replay_path": "",
-    "rss_peak_mb": 29.27,
+    "rss_peak_mb": 29.273,
     "seed": 0,
     "std_latency_ms": 0.0,
     "strategy": "panda_jsonl_replay",
-    "timeseries_rows": 3019
+    "timeseries_rows": 3008
   },
   "dataset": {
     "episode_data_lab_root": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab",

@@ -52,7 +52,7 @@ class PyBulletBridgeNode(Node):
         self.declare_parameter('randomization_strength', 1.0)
         self.declare_parameter('watchdog_timeout_ms', 500)
         self.declare_parameter('degraded_velocity_scale', 0.5)
-        self.declare_parameter('robot_profile', 'iiwa7')
+        self.declare_parameter('robot_profile', 'panda')
         self.declare_parameter('home_positions', [0.8, -0.6])
         self.declare_parameter('end_effector_link', 'tool0')
         self.declare_parameter('joint_damping_base', 0.04)
