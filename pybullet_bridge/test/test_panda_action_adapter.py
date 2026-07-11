@@ -31,6 +31,16 @@ def test_panda_action_adapter_mock_ik_applies_small_delta_to_first_joints():
     )
 
 
+def test_panda_action_adapter_clamps_tiny_gripper_roundoff():
+    adapter = PandaActionAdapter(PandaActionAdapterConfig(command_mode='hold'))
+    action = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0 + 5e-7])
+    obs = {'joint_positions': np.zeros(7, dtype=np.float64)}
+
+    command = adapter.to_joint_command(action, obs, [f'j{idx}' for idx in range(7)])
+
+    assert command.gripper_command == pytest.approx(1.0)
+
+
 @pytest.mark.parametrize(
     ('action', 'message'),
     [

@@ -11,6 +11,7 @@
 | 与 episode-data-lab 联调 | [INTEGRATION.md](./INTEGRATION.md) |
 | 查看三仓交接契约 / feedback loop | [INTER_REPO_CONTRACTS.md](./INTER_REPO_CONTRACTS.md) |
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
+| 查看当前作品集事实状态 | [CURRENT_STATUS.md](./CURRENT_STATUS.md) |
 | 查看 iiwa7 与 Panda 对齐路线 | [PANDA_ALIGNMENT_ROADMAP.md](./PANDA_ALIGNMENT_ROADMAP.md) |
 | 接入 Panda JSONL replay | [PANDA_JSONL_REPLAY_ROADMAP.md](./PANDA_JSONL_REPLAY_ROADMAP.md) |
 | 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |

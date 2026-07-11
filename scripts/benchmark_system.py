@@ -359,8 +359,9 @@ def _health_alarm_latency_ms(
 ) -> Optional[float]:
     if fault_start_mono is None:
         return None
+    warn_level = _diagnostic_level(DiagnosticStatus.WARN)
     for event in events:
-        if event.monotonic_sec >= fault_start_mono and event.level >= DiagnosticStatus.WARN:
+        if event.monotonic_sec >= fault_start_mono and event.level >= warn_level:
             return (event.monotonic_sec - fault_start_mono) * 1000.0
     return None
 

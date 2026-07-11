@@ -1,9 +1,13 @@
+<div align="right">
+
+[中文](#中文) | [English](#english)
+
+</div>
+
 # ros2-moveit-pybullet-bridge
 
-> **MoveIt 2 与 PyBullet 闭环仿真桥接，内置 Sim/Real 分布偏移监控与运维控制台。**
-
 [![CI](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/inayina/ros2-moveit-pybullet-bridge/actions/workflows/ci.yml)
-![Docker](https://img.shields.io/badge/Docker-✓%20verified-2496ED?logo=docker&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-verified-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)
 ![ROS 2 Jazzy](https://img.shields.io/badge/ROS%202-Jazzy-blue)
 ![MoveIt 2](https://img.shields.io/badge/MoveIt-2-green)
@@ -13,17 +17,24 @@
 
 ---
 
+## 中文
+
+> **Panda policy handoff replay and risk-monitored PyBullet execution platform.**
+
 ## 招聘作品集定位
 
-这是一个面向 **机器人集成 / ROS 2 / 仿真验证 / 机器人平台工程** 岗位的端到端作品集项目。它展示的不只是单个 demo，而是从 MoveIt 2 规划、PyBullet 物理执行、Sim2Real 偏移监控、风险闭环到 Web 运维控制台和实验报告的完整工程链路。
+这是一个面向 **机器人集成 / ROS 2 / 仿真验证 / 机器人平台工程** 岗位的下游执行与监控仓库。当前主线是消费 `robot-arm-episode-data-lab` 生成的 Panda handoff bundle，在 PyBullet 中执行/回放 Panda 关节目标，并用 tracking、distribution metrics、risk engine 和 HOC dashboard 做运行时观测。
+
+当前版本不声称已经完成真实机械臂接入、完整 Sim2Real 或下游物理抓取成功验证。KUKA iiwa7 / MoveIt / FollowJointTrajectory 链路保留为 legacy regression evidence。
 
 **我在项目中实现的核心能力：**
 
 | 能力维度 | 作品集证据 |
 |----------|------------|
 | ROS 2 系统集成 | 自定义 msg/srv/action，跨包 topic/service/action 契约，launch 组合与 `launch_testing` |
-| 运动规划闭环 | MoveIt 2 / RViz Plan & Execute 通过 `FollowJointTrajectory` 驱动 PyBullet |
-| 仿真与 Sim2Real | KUKA iiwa7 双源 PyBullet，domain randomization，LeRobot 跨仓库回放 |
+| Panda handoff replay | `panda_jsonl_replay` 读取中游 `bridge_handoff`，经 Panda adapter 转成 bridge joint targets |
+| PyBullet 执行 | Franka Panda 为当前 portfolio profile；iiwa7 保留为 legacy fallback |
+| 仿真偏移观测 | nominal PyBullet vs randomized PyBullet，domain randomization，tracking error |
 | 监控算法 | KL / W1 / MMD、滑动窗口、时间对齐、离线与在线对比 |
 | 风险与运维 | 五维风险聚合、急停/确认服务、React + ECharts HOC Dashboard |
 | 工程交付 | Docker/CI 配置、三层测试脚本、HTML 报告、README 资产生成与可复现实验脚本 |
@@ -33,13 +44,13 @@
 | 范围 | 当前状态 | 说明 |
 |------|----------|------|
 | Docker 一键验证 | **已通过** | `docker compose build` + `docker compose run --rm verify`（需挂载 `EPISODE_DATA_LAB_ROOT`）；headless 演示见 `portfolio-demo` |
-| 核心 Demo 链路 | 本机 smoke 已通过 | `portfolio_demo.launch.py` 拉起 iiwa7 双源 PyBullet、监控、风险引擎与运动 demo |
+| 核心 Demo 链路 | Panda profile 为默认主线 | `portfolio_demo.launch.py robot_profile:=panda` 拉起 PyBullet、监控、风险引擎与运动 demo |
 | HOC 控制台 | 有单独入口和组合入口 | 单独运行 `hoc.launch.py` / `hoc_prod.launch.py`，或用 `hoc_experiment.launch.py` 组合 portfolio demo + HOC |
-| MoveIt 闭环 | 可演示 | `m2_iiwa_demo.launch.py` 通过 `FollowJointTrajectory` relay 驱动 PyBullet |
-| 双仓 LeRobot 联动 | 本机 offline compare 已通过 | 依赖 `EPISODE_DATA_LAB_ROOT` 和导出的 LeRobot 数据集；完整双仓流程仍需按目标环境复验 |
-| 展示材料 M6 | 打磨中 | README 已有 pick-and-lift 抓取 GIF、HOC 浏览器截图与双仓报告；RViz 录屏作为可选本地演示证据，仍建议补完整 Demo 视频 |
+| Panda handoff 联动 | 单元与合约测试已通过 | 使用中游 `bridge_handoff_panda`；完整 ROS benchmark evidence 需要按目标环境复验 |
+| MoveIt 闭环 | Legacy 可演示 | `m2_iiwa_demo.launch.py` 通过 `FollowJointTrajectory` relay 驱动 PyBullet，作为历史回归链路 |
+| 展示材料 | 收口中 | 优先展示 Panda handoff、tracking/risk、HOC；旧 pick/GIF 与 iiwa 图只作为历史材料 |
 
-**本版本交付边界**：仿真预集成 + 分布监控 + 风险闭环 + HOC 运维控制台。真机 `real_source:=ros2`、完整 `ros2_control` 硬件接口、episode-data-lab `Ros2Robot` HAL、`/clock` + `use_sim_time` 全链路属于 Phase-2+，不作为当前面试 Demo 的阻塞项。
+**本版本交付边界**：Panda PyBullet replay + 分布监控 + 风险闭环 + HOC 运维控制台。真机 `real_source:=ros2`、完整 `ros2_control` 硬件接口、真实抓取验证、ACT online runtime 和完整 Sim2Real 属于后续阶段，不作为当前面试 Demo 的阻塞项。
 
 ### 关联仓库 · 统一作品集
 
@@ -50,7 +61,7 @@
 | [**robot-ops-dashboard**](https://github.com/inayina/robot-ops-dashboard) | **主展示入口**：FastAPI + WebSocket + MQTT，AMR 任务 / 遥测 / 评测层 |
 | [amr_warehouse_navigation](https://github.com/inayina/amr_warehouse_navigation) | Nav2 + Gazebo + Mock WMS |
 | [ros2-robot-digital-twin](https://github.com/inayina/ros2-robot-digital-twin) | micro-ROS + MQTT + 电机 bench |
-| **ros2-moveit-pybullet-bridge**（本仓库） | MoveIt + PyBullet + 监控 + 风险 + HOC + Policy Runner |
+| **ros2-moveit-pybullet-bridge**（本仓库） | Panda PyBullet replay + 监控 + 风险 + HOC + legacy MoveIt regression |
 | [robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab) | Episode 采集 + LeRobot 导出 |
 
 ### 🔗 三仓联动端到端数据流 (Three-Repository End-to-End Dataflow)
@@ -61,7 +72,22 @@
 
 ![Three-Repo End-to-End Run Evidence](docs/assets/three_repo_run_evidence.png)
 
-本作品集的核心价值在于实现了上述跨仿真的**闭环数据流**：从遥操作采集原始数据，到中游的 LeRobot 格式转换与基准训练，再到下游在 PyBullet 中进行 Sim2Real 误差验证与多维风险监控。
+本作品集的核心价值在于实现了上述跨仓库**数据交接与运行观测流**：从上游遥操作/批采集产生原始 episode，到中游做 schema 转换、baseline 训练和 handoff 打包，再到下游在 Panda PyBullet 中进行 replay、tracking、分布偏移观测与风险监控。
+
+### 下游重放性能与安全监控实证 (Panda V2.1)
+
+我们在下游 PyBullet 物理仿真与 MoveIt 校验环境中，重放了中游生成的 `panda_30_mlp_bridge_v0` 交付包，取得了以下真实的系统性能与安全指标：
+
+1. **控制时延与抖动分析 (Latency & Jitter)**：
+   ![Downstream Control Latency](docs/assets/panda_replay_control_latency.png)
+2. **PolicyRunner 资源消耗特征 (Resource Profile & GC)**：
+   ![Downstream Resource Usage](docs/assets/panda_replay_resource_usage.png)
+3. **在线分布偏移与看门狗报警 (Drift Monitoring & Watchdog Safety)**：
+   * **分布偏移指标 (KL & MMD)**：![Downstream Distribution Monitoring](docs/assets/panda_replay_distribution_monitoring.png)
+   * **安全看门狗诊断响应 (Stall watchdog)**：![Watchdog Safety Response](docs/assets/panda_fault_injection_safety_response.png)
+4. **Sim2Sim 与域随机化评估 (Sim-to-Sim & Domain Randomization)**：
+   * **域随机化红盒子初始分布**：![Domain Randomization Distribution](docs/assets/panda_domain_randomization_distribution.png)
+   * **跨仿真器轨迹跟踪残差**：![Sim2Sim Trajectory Alignment](docs/assets/panda_sim2sim_trajectory_alignment.png)
 
 ### 五仓统一架构
 
@@ -98,10 +124,10 @@ flowchart TB
     LR["LeRobot export"]
   end
 
-  subgraph BRIDGE["本仓库 · Sim2Real 验证"]
-    MG["MoveIt 2"] --> PB["pybullet_bridge 双源"]
+  subgraph BRIDGE["本仓库 · Panda replay / risk validation"]
+    PR["PolicyRunner"] --> PB["pybullet_bridge · Panda PyBullet"]
     PB --> DM["dist_monitor"] --> RE["risk_engine"]
-    PR["PolicyRunner"] --> PB
+    MG["MoveIt 2 · legacy"] -.-> PB
   end
 
   DF <--> DAPI
@@ -393,9 +419,9 @@ export LEROBOT_EXPORT=$EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
 
 最近本机双仓复验：episode-data-lab `validate_dataset.py` 通过（20 episodes，20/20 success）；online `real_source:=lerobot` smoke 样本 `sim=421` / `real=421`；same-task LeRobot replay 样本 `sim=1543` / `real=1542`。
 
-> Current bridge demos use KUKA iiwa7 as a legacy validation backend. The portfolio-wide manipulation schema is being standardized on Franka Panda through `robot-arm-episode-data-lab`. A future Panda backend will align PolicyRunner, LeRobot replay, and Sim/Real distribution monitoring under the same observation/action schema.
+> Current bridge demos default to Franka Panda for the portfolio replay path. KUKA iiwa7 remains a legacy MoveIt / FollowJointTrajectory validation backend. Panda handoff loading, action adaptation, and PyBullet profile support are implemented; full ROS benchmark evidence should be regenerated against the latest midstream `bridge_handoff_panda` before using it as final portfolio proof.
 >
-> 当前 bridge demo 使用 KUKA iiwa7 作为早期验证后端。作品集主线操作臂 schema 将通过 `robot-arm-episode-data-lab` 统一到 Franka Panda。后续 Panda backend 会让 PolicyRunner、LeRobot replay 与 Sim/Real 分布监控使用同一套 observation/action schema。迁移路线见 [docs/PANDA_ALIGNMENT_ROADMAP.md](docs/PANDA_ALIGNMENT_ROADMAP.md)，新周期开发时间线与里程碑细化见 [docs/ROADMAP.md](docs/ROADMAP.md)。
+> 当前 bridge demo 的作品集主线默认使用 Franka Panda。KUKA iiwa7 保留为 legacy MoveIt / FollowJointTrajectory 验证后端。Panda handoff 加载、动作适配与 PyBullet profile 已实现；用于求职最终展示前，应使用最新中游 `bridge_handoff_panda` 重新生成完整 ROS benchmark 证据。
 
 ---
 
@@ -498,6 +524,112 @@ ros2-moveit-pybullet-bridge/
 - 统一作品集主入口：[robot-ops-dashboard](https://github.com/inayina/robot-ops-dashboard)（AMR / MQTT / 运维 Dashboard）
 - 跨仓库数据侧：[robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab)（LeRobot 导出与离线采集）
 - 设计文档：[docs/design/](docs/design/README.md) · 作品集：[docs/portfolio/](docs/portfolio/README.md)
+
+---
+
+## English
+
+> **MoveIt 2 ↔ PyBullet closed-loop simulation bridge with Sim/Real distribution-shift monitoring and an operations console.**
+
+### Portfolio Positioning
+
+End-to-end portfolio for **robot integration / ROS 2 / simulation validation / platform engineering**: MoveIt 2 planning, PyBullet execution, Sim2Real-readiness monitoring, risk engine, HOC dashboard, and HTML experiment reports.
+
+**Delivery boundary**: simulation pre-integration + distribution monitoring + risk loop + HOC. Real robot (`real_source:=ros2`), full hardware `ros2_control`, and certified safety are Phase-2+ — not blockers for the current demo.
+
+### Three-Repository Dataflow
+
+![Three-Repository End-to-End Dataflow](docs/assets/three_repo_dataflow_diagram.png)
+
+![Three-Repo End-to-End Run Evidence](docs/assets/three_repo_run_evidence.png)
+
+Upstream teleop → midstream LeRobot / baseline training → downstream PyBullet Sim2Real-readiness validation. See [docs/portfolio/UNIFIED_ARCHITECTURE.md](docs/portfolio/UNIFIED_ARCHITECTURE.md).
+
+| Repository | Role |
+|---|---|
+| [robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab) | Episode schema, training, handoff |
+| **ros2-moveit-pybullet-bridge** (this repo) | MoveIt + PyBullet + monitor + risk + Policy Runner |
+| [ros2-arm-teleoperation-suite](https://github.com/inayina/ros2-arm-teleoperation-suite) | MuJoCo upstream teleop + recorder |
+
+### Quick Start
+
+**Docker (recommended)**
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+docker compose build
+docker compose run --rm verify
+```
+
+**Demo launch**
+
+```bash
+# Panda (mainline)
+ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI robot_profile:=panda
+# KUKA iiwa7 (legacy)
+ros2 launch pybullet_bridge portfolio_demo.launch.py sim_mode:=GUI robot_profile:=iiwa7
+# Portfolio + HOC
+ros2 launch hoc_console hoc_experiment.launch.py sim_mode:=DIRECT robot_profile:=panda
+```
+
+**MoveIt + RViz (optional)**
+
+```bash
+ros2 launch moveit_config m2_iiwa_demo.launch.py sim_mode:=GUI
+```
+
+**Tests**
+
+```bash
+./scripts/run_tests.sh
+```
+
+Full setup: [docs/SETUP.md](docs/SETUP.md).
+
+### Core Capabilities
+
+- **MoveIt 2 ⇄ PyBullet**: `/bridge/command` JointTrajectory in, `/joint_states` feedback out
+- **Distribution monitor**: KL / W1 / MMD on Sim vs Real joint streams (`dist_monitor`)
+- **Risk engine**: aggregated `/risk/status`, E-stop and acknowledge services
+- **HOC dashboard**: React + ECharts over WebSocket `:8765`
+- **Policy Runner**: JSONL replay from midstream handoff (`panda_jsonl_replay`)
+
+> **Panda alignment**: Panda is the current portfolio replay profile. iiwa7 remains the legacy MoveIt / FollowJointTrajectory backend. See [docs/PANDA_ALIGNMENT_ROADMAP.md](docs/PANDA_ALIGNMENT_ROADMAP.md).
+
+### Key Interfaces
+
+| Type | Name | Purpose |
+|---|---|---|
+| Topic | `/bridge/command` | Trajectory command (MoveIt → PyBullet) |
+| Topic | `/bridge/sim/joint_states` · `/bridge/real/joint_states` | Dual-source joint states |
+| Topic | `/monitor/distribution_metrics` | KL / W1 / MMD |
+| Topic | `/risk/status` | Aggregated risk level |
+| Service | `/bridge/set_randomization` | Domain randomization |
+| WebSocket | `ws://localhost:8765` | HOC real-time feed |
+
+Spec: [docs/design/05-ros2-node-interface-and-dataflow-spec.md](docs/design/05-ros2-node-interface-and-dataflow-spec.md)
+
+### Experiments & Reports
+
+```bash
+export EPISODE_DATA_LAB_ROOT=~/robot-sim-lab/robot-arm-episode-data-lab
+./scripts/run_dual_repo_integration.sh
+./scripts/run_same_task_calibration.sh
+```
+
+See [docs/EXPERIMENTS.md](docs/EXPERIMENTS.md), [docs/samples/](docs/samples/README.md).
+
+### Package Layout
+
+```
+ros2-moveit-pybullet-bridge/
+├── pybullet_bridge/    # PyBullet dual-source bridge
+├── dist_monitor/       # KL / W1 / MMD monitoring
+├── risk_engine/        # Risk aggregation + E-stop
+├── hoc_console/        # HOC backend + React frontend
+├── moveit_config/      # MoveIt 2 (iiwa7 + UR5)
+└── docs/               # Design, experiments, portfolio
+```
 
 ---
 

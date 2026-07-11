@@ -1,67 +1,68 @@
-# Panda Alignment Roadmap
+# Panda Alignment Current Status
 
-本文档说明 `ros2-moveit-pybullet-bridge` 当前 KUKA iiwa7 后端与作品集长期 Franka Panda schema 的关系。这里的目标是明确边界和迁移路线，不在当前阶段重写 PyBullet 后端，也不把现有 iiwa7 demo 直接替换成 Panda。
+This document records the current facts for the Panda migration in
+`ros2-moveit-pybullet-bridge`. It supersedes the older wording that described
+Panda support as purely future work.
 
-## 1. 当前后端
+## Current Mainline
 
-当前仓库使用 KUKA iiwa7 作为早期 MoveIt-PyBullet 验证后端。它的职责是证明 ROS 2 / MoveIt / PyBullet / 监控 / 运维链路可以端到端跑通，包括：
+The portfolio mainline is now:
 
-- `FollowJointTrajectory` relay；
-- MoveIt -> PyBullet 执行链；
-- Sim / Real 双源 PyBullet；
-- KL / W1 / MMD 分布偏移监控；
-- risk engine；
-- HOC 控制台。
+1. Upstream Panda collection in `ros2-arm-teleoperation-suite`.
+2. Midstream schema adaptation, baseline replay, and `bridge_handoff_panda` in
+   `robot-arm-episode-data-lab`.
+3. Downstream Panda PyBullet replay and risk monitoring in this repository.
 
-因此，当前 iiwa7 后端会继续保留为 legacy validation backend。它用于维护可运行 demo、复验脚本和面试讲解中的 MoveIt-PyBullet 闭环证据，不作为作品集未来统一操作臂 schema 的终态。
+The downstream repository provides a Panda robot profile, Panda handoff loader,
+`panda_jsonl_replay`, and `PandaActionAdapter`. Launch files default to
+`robot_profile:=panda` for the portfolio path.
 
-## 2. 统一目标
+## What Is Implemented
 
-作品集主线操作臂 schema 将逐步统一到 Franka Panda，覆盖：
+- `panda` is registered in `robot_profiles.py`.
+- `DEFAULT_PORTFOLIO_PROFILE` is `panda`.
+- `bridge_config.yaml` and `robot_profiles.yaml` default to `panda`.
+- `portfolio_demo.launch.py` and `hoc_experiment.launch.py` default to Panda.
+- `JsonlActionReplayPolicy` can load midstream Panda handoff bundles.
+- `PandaActionAdapter` converts `ee_delta_gripper[7]` actions into bridge joint
+  targets using `hold`, `mock_ik`, or `pybullet_ik`.
+- Distribution monitoring, tracking metrics, risk aggregation, and HOC remain
+  robot-profile agnostic enough for Panda replay demos.
 
-- MuJoCo teleoperation；
-- `robot-arm-episode-data-lab` training；
-- 未来 PyBullet bridge backend。
+## Remaining Gaps
 
-统一后的目标是让 teleoperation、episode 数据、policy action、LeRobot replay、PyBullet bridge 和 Sim/Real 监控共享同一套 observation/action schema，减少跨仓库 joint names、action dimension 和数据解释上的转换成本。
+- Full ROS benchmark evidence should be regenerated against the latest
+  `robot-arm-episode-data-lab/data/bridge_handoff_panda` before using it as
+  final portfolio proof.
+- Downstream does not yet provide a complete physical grasp scene with object
+  contact validation.
+- ACT online chunked inference is not implemented in the downstream runtime.
+- `RealSource` remains randomized PyBullet or replay input, not a real robot.
+- MoveIt / FollowJointTrajectory demos are legacy regression evidence, not the
+  Panda portfolio mainline.
 
-## 3. 为什么不立刻切换
+## Legacy Scope
 
-当前阶段不直接把 iiwa7 backend 改成 Panda，原因是：
+KUKA iiwa7 stays in the repository for:
 
-- 避免破坏当前可运行的 MoveIt / PyBullet demo；
-- 当前优先级是 schema 统一和面试表达清晰；
-- 完整 Panda backend 迁移放到 Phase-2。
+- MoveIt / RViz / FollowJointTrajectory regression;
+- older screenshots and reports;
+- compatibility tests around the original bridge architecture.
 
-换句话说，当前仓库先把“已有链路能跑、边界讲清楚、未来方向一致”做好。Panda backend 是后续增强，不阻塞当前 portfolio demo、分布监控和 HOC 展示。
+Do not describe iiwa7 as the current portfolio robot. Do not describe Panda as a
+future-only backend.
 
-## 4. Phase-2 迁移步骤
+## Safe Interview Wording
 
-未来 Panda backend 迁移计划包括：
+Current wording:
 
-1. 新增 Panda URDF / SRDF / MoveIt config；
-2. 新增 Panda joint name mapping；
-3. 新增 Panda PyBullet loader；
-4. 将 `/bridge/command` action dimension 对齐 Panda schema；
-5. 支持读取 `robot-arm-episode-data-lab` 导出的 `predicted_actions.jsonl`；
-6. 用 Panda sim-source vs real-source 验证 KL / W1 / MMD 和 tracking error。
+> The downstream repository executes Panda policy handoff replay in PyBullet and
+> adds tracking, distribution-shift monitoring, risk aggregation, and an HOC
+> dashboard. iiwa7 / MoveIt remains as a legacy regression path.
 
-这些步骤应作为独立 Phase-2 任务推进，并在迁移期间继续保留 iiwa7 legacy backend，避免把 schema 调整、机器人模型迁移和监控验证混在一次高风险改动中。
+Avoid wording:
 
-## 5. 边界说明
-
-当前 `Real-Source` 不是真实机械臂。
-
-当前 `Real-Source` 指以下两类真实世界代理：
-
-- randomized PyBullet source；
-- LeRobot replay source。
-
-物理真机支持需要额外工程工作，包括：
-
-- `ros2_control` hardware interface 或厂商 SDK；
-- 机器人、夹爪、相机和工作空间标定；
-- 关节限位、速度限制、急停和碰撞保护等安全验证；
-- 低速、分阶段 bring-up，从单关节、空载轨迹、受限工作空间逐步过渡到完整任务。
-
-因此，在当前版本中可以说 bridge 已经完成 MoveIt-PyBullet 闭环、双源分布监控和 LeRobot replay 联动；不应把 `Real-Source` 表述成已经接入真实 Panda 或真实 iiwa7 机械臂。
+- completed real-robot Sim2Real;
+- downstream grasp-success validation platform;
+- ACT online controller;
+- LeRobot replay as real robot execution.

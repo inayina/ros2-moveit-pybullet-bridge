@@ -608,7 +608,7 @@ class HocServerNode(Node):
 
     def _default_grasp_pose(self, params: dict[str, Any]) -> PoseStamped:
         pose = PoseStamped()
-        pose.header.frame_id = str(params.get('frame_id', 'lbr_iiwa_link_0'))
+        pose.header.frame_id = str(params.get('frame_id', 'panda_link0'))
         pose.pose = Pose(
             position=Point(
                 x=float(params.get('x', 0.45)),
@@ -626,7 +626,7 @@ class HocServerNode(Node):
 
     def _default_place_pose(self, params: dict[str, Any]) -> PoseStamped:
         pose = PoseStamped()
-        pose.header.frame_id = str(params.get('frame_id', 'lbr_iiwa_link_0'))
+        pose.header.frame_id = str(params.get('frame_id', 'panda_link0'))
         pose.pose = Pose(
             position=Point(
                 x=float(params.get('x', 0.40)),
@@ -650,7 +650,7 @@ class HocServerNode(Node):
                 return
             goal = Pick.Goal()
             goal.grasp_pose = self._default_grasp_pose(params)
-            goal.end_effector_link = str(params.get('end_effector_link', 'lbr_iiwa_link_7'))
+            goal.end_effector_link = str(params.get('end_effector_link', 'panda_link7'))
             goal.planning_group = str(params.get('planning_group', 'manipulator'))
             goal.pre_grasp_offset_m = float(params.get('pre_grasp_offset_m', 0.10))
             goal.grasp_timeout_sec = float(params.get('grasp_timeout_sec', 45.0))

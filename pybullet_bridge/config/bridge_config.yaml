@@ -1,7 +1,7 @@
 pybullet_bridge:
   ros__parameters:
     urdf_path: ""
-    robot_profile: iiwa7
+    robot_profile: panda
     sim_mode: "DIRECT"
     physics_frequency: 240.0
     publish_frequency: 100.0

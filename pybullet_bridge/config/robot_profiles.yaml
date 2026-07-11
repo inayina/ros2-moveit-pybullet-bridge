@@ -1,19 +1,22 @@
 # Robot profile metadata (resolved in code by robot_profiles.py).
-# Launch files pass robot:=planar_2dof | iiwa7
+# Launch files pass robot_profile:=planar_2dof | panda | iiwa7
 
 pybullet_bridge:
   ros__parameters:
     # Default when launch does not override (portfolio integration line).
-    robot_profile: iiwa7
+    robot_profile: panda
 
 profiles:
   planar_2dof:
     role: "CI / M1 smoke tests"
     dof: 2
     urdf: planar_2dof.urdf
+  panda:
+    role: "Portfolio / Panda handoff replay / PyBullet validation"
+    dof: 7
+    urdf: franka_panda/panda.urdf
+    # Handoff path: robot-arm-episode-data-lab/data/bridge_handoff_panda
   iiwa7:
-    role: "Portfolio / episode-data-lab / M4 calibration"
+    role: "Legacy MoveIt / FollowJointTrajectory regression"
     dof: 7
     urdf: kuka_iiwa/model.urdf
-    # LeRobot export path: EPISODE_DATA_LAB_ROOT/dataset/v1/lerobot_export
-    # or set LEROBOT_EXPORT (see pybullet_bridge.integration_paths)

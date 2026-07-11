@@ -9,17 +9,17 @@ from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
 
-IIWA_JOINTS = [
-    'lbr_iiwa_joint_1',
-    'lbr_iiwa_joint_2',
-    'lbr_iiwa_joint_3',
-    'lbr_iiwa_joint_4',
-    'lbr_iiwa_joint_5',
-    'lbr_iiwa_joint_6',
-    'lbr_iiwa_joint_7',
+PANDA_JOINTS = [
+    'panda_joint1',
+    'panda_joint2',
+    'panda_joint3',
+    'panda_joint4',
+    'panda_joint5',
+    'panda_joint6',
+    'panda_joint7',
 ]
 
-IIWA_HOME = [0.0, 0.4, 0.0, -1.2, 0.0, 1.6, 0.0]
+PANDA_HOME = [0.0, -0.785398, 0.0, -2.356194, 0.0, 1.570796, 0.785398]
 
 
 def publish_iiwa_sweep(
@@ -30,10 +30,14 @@ def publish_iiwa_sweep(
     seed: int = 0,
     steps: int = 50,
 ) -> None:
-    """Send one smooth trajectory to /bridge/command (visible in sim + metrics)."""
+    """Send one smooth trajectory to /bridge/command (visible in sim + metrics).
+
+    The function name is kept for backward compatibility with existing HOC
+    scenario callers; the default portfolio profile is now Franka Panda.
+    """
     pub = node.create_publisher(JointTrajectory, '/bridge/command', 10)
-    joint_names = IIWA_JOINTS
-    home = IIWA_HOME[: len(joint_names)]
+    joint_names = PANDA_JOINTS
+    home = PANDA_HOME[: len(joint_names)]
 
     msg = JointTrajectory()
     msg.joint_names = joint_names

@@ -26,6 +26,7 @@ class PandaActionAdapterConfig:
     max_delta_rpy: float = 0.25
     gripper_min: float = 0.0
     gripper_max: float = 1.0
+    gripper_tolerance: float = 1e-6
 
     # Deadband, backlash, and joint limit constraints
     enable_deadband: bool = False
@@ -277,12 +278,15 @@ class PandaActionAdapter:
 
     def _validate_gripper(self, value: float) -> float:
         gripper = float(value)
-        if gripper < self._config.gripper_min or gripper > self._config.gripper_max:
+        lower = self._config.gripper_min
+        upper = self._config.gripper_max
+        tolerance = max(0.0, float(self._config.gripper_tolerance))
+        if gripper < lower - tolerance or gripper > upper + tolerance:
             raise ValueError(
                 f'Panda gripper command out of range: {gripper:.6f} not in '
-                f'[{self._config.gripper_min:.6f}, {self._config.gripper_max:.6f}]'
+                f'[{lower:.6f}, {upper:.6f}]'
             )
-        return gripper
+        return float(np.clip(gripper, lower, upper))
 
     @staticmethod
     def _mock_ik(action: np.ndarray, joint_positions: np.ndarray) -> np.ndarray:
