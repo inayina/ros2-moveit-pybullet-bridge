@@ -2,7 +2,7 @@
 
 **主投方向**：机器人系统工程 / 平台集成 / 仿真验证  
 **更新**：2026-06-21  
-**关联**：[MASTER_PORTFOLIO_PLAN.md](./MASTER_PORTFOLIO_PLAN.md) · [UNIFIED_RESUME.md](./UNIFIED_RESUME.md)
+**关联**：[MASTER_PORTFOLIO_PLAN.md](../archive/portfolio/MASTER_PORTFOLIO_PLAN.md) · [UNIFIED_RESUME.md](../archive/portfolio/UNIFIED_RESUME.md)
 
 ---
 
@@ -230,8 +230,8 @@ CI 是**工程可复现的下限证据**，不是量产就绪。
 
 | 文档 | 用途 |
 |------|------|
-| [MASTER_PORTFOLIO_PLAN.md](./MASTER_PORTFOLIO_PLAN.md) | 下周开发 + 资料索引 |
-| [UNIFIED_RESUME.md](./UNIFIED_RESUME.md) | 简历 bullet 与边界 |
+| [MASTER_PORTFOLIO_PLAN.md](../archive/portfolio/MASTER_PORTFOLIO_PLAN.md) | 下周开发 + 资料索引 |
+| [UNIFIED_RESUME.md](../archive/portfolio/UNIFIED_RESUME.md) | 简历 bullet 与边界 |
 | [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) | Bridge 录屏顺序 |
 | [CODE_WALKTHROUGH.md](./CODE_WALKTHROUGH.md) | 源码深挖 |
 | dashboard `docs/dashboard_demo_storyboard.md` | Dashboard 录屏 |

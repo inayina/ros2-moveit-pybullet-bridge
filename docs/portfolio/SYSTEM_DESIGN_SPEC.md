@@ -54,38 +54,44 @@
 
 ## 2. 系统整体架构
 
-### 2.0 双仓库作品集架构
+### 2.0 三仓闭环作品集架构
 
-本作品集由两个独立仓库组成：`robot-arm-episode-data-lab` 负责操作数据采集与 LeRobot 导出，`ros2-moveit-pybullet-bridge` 负责 ROS 2 联调、MoveIt 闭环、分布监控、风险管理和 HOC 报告。
+本作品集由三个联动仓库组成，打通了“**上游物理遥操作采集 ── 中游数据适配训练 ── 下游仿真回放监控与安全硬化**”的具身智能闭环数据流：
+
+1. **上游仓库 (`ros2-arm-teleoperation-suite`)**：负责 L0-L7 遥操作（手柄/键盘/VR）、C++ 安全监测、MoveIt Servo 笛卡尔伺服、1kHz 阻抗控制、CANopen DS402 虚拟总线与 MuJoCo 视触觉多模态数据录制。
+2. **中游仓库 (`robot-arm-episode-data-lab`)**：负责数据适配转换（Data Adapter）、数据 schema 与指标探索性质量门禁检测（Dataset Inspector），以及离线行为克隆（ACT）策略训练。
+3. **下游仓库 (`ros2-moveit-pybullet-bridge`)**：本仓库，负责模型策略重放（PolicyRunner）、双源 Sim/Real 分布偏移量化监控（dist_monitor）、五维风险评估引擎（risk_engine）与 React + ECharts HOC 前端运维控制台。
 
 ```mermaid
 flowchart LR
-    subgraph DataRepo["robot-arm-episode-data-lab · 数据采集仓库"]
-        PBCollect["PyBullet 离线采集"]
-        FSM["任务 FSM / HAL"]
-        LeRobot["LeRobot v2.1 export"]
+    subgraph Upstream["ros2-arm-teleoperation-suite · 上游采集"]
+        Teleop["遥操作 & 控制栈"]
+        MuJoCo["MuJoCo v3 (EGL)"]
+        Recorder["LeRobot 录制器"]
+        Teleop --> MuJoCo --> Recorder
     end
 
-    subgraph BridgeRepo["ros2-moveit-pybullet-bridge · ROS 2 联调仓库"]
-        MoveIt["MoveIt 2 / RViz"]
-        Bridge["pybullet_bridge"]
-        SimReal["Sim / Real Proxy"]
+    subgraph Midstream["robot-arm-episode-data-lab · 中游训练"]
+        Adapter["Data Adapter"]
+        Inspector["Dataset Inspector"]
+        ACT["ACT 离线训练"]
+        Adapter --> Inspector --> ACT
+    end
+
+    subgraph Downstream["ros2-moveit-pybullet-bridge · 下游验证"]
+        Runner["PolicyRunner"]
+        SimReal["双源 Sim / Real Proxy"]
         Monitor["dist_monitor<br/>KL / W1 / MMD"]
-        Risk["risk_engine<br/>R0-R3"]
-        HOC["HOC 控制台"]
-        Reports["HTML / JSON / CSV / rosbag"]
+        Risk["risk_engine<br/>五维风险 R0-R3"]
+        HOC["HOC 控制台 (React)"]
+        Runner --> SimReal --> Monitor --> Risk --> HOC
     end
 
-    PBCollect --> FSM --> LeRobot
-    LeRobot -->|"LEROBOT_EXPORT"| SimReal
-    MoveIt --> Bridge --> SimReal
-    SimReal --> Monitor --> Risk --> HOC
-    Monitor --> Reports
-    Risk --> Reports
-    HOC --> Reports
+    Recorder -->|"导出轨迹 (HDF5 / JSON)"| Adapter
+    ACT -->|"Handoff Bundle (模型权重)"| Runner
 ```
 
-**边界说明**：采集仓库提供外部数据源与 LeRobot 格式契约；本仓库不宣称当前版本已完成真机接入，而是证明外部数据可进入 ROS 2 监控与验收报告链路。
+**边界说明**：上游负责原始数据采集与控制，中游负责处理与模型训练，下游负责回放执行、偏移监控与安全硬化。系统遵守真实性边界，不宣称当前已接入实体硬件，而是通过域随机化的双源仿真和 LeRobot 数据回放代理 Real 侧，证明全链路的 ROS 2 监控与安全闭环可行性。
 
 ### 2.1 分层模块图
 
@@ -448,7 +454,7 @@ checkout → apt 依赖 → pip requirements → colcon build (7 packages)
 | M1–M5 核心功能 | ~98% | ✅ 可 Live Demo |
 | S5 五维风险补全 | ~98% | 本机 `verify_risk_complete.sh` 已通过 |
 | M6 展示材料 | ~95% | 本地视频、HOC 截图、双仓报告与样例报告已入库；5–8 分钟公开视频链接与公开 CI 仍待补 |
-| 双仓库一体验收 | ~95% | episode-data-lab 数据集、LeRobot export、bridge online/offline 联调与同任务校准已有本机样例证据；HAL / 真机迁移属 Phase-2+ |
+| 三仓闭环一体验收 | ~95% | teleop-suite 数据采集、episode-data-lab 适配训练、bridge 仿真回放监控与同任务校准已通过本机验证；真机迁移属 Phase-2+ |
 
 ### 6.2 已知限制（写入验收说明）
 
@@ -561,7 +567,7 @@ enable_dual_source: true
 | 分布监控算法 | [03-distribution-monitoring-algorithm.md](../design/03-distribution-monitoring-algorithm.md) |
 | HOC 设计 | [04-hoc-console-design.md](../design/04-hoc-console-design.md) |
 | 节点与数据流 | [05-ros2-node-interface-and-dataflow-spec.md](../design/05-ros2-node-interface-and-dataflow-spec.md) |
-| 双仓库集成 | [08-dual-repo-portfolio-integration-spec.md](../design/08-dual-repo-portfolio-integration-spec.md) |
+| 三仓/双仓集成 | [08-dual-repo-portfolio-integration-spec.md](../design/08-dual-repo-portfolio-integration-spec.md) |
 | 风险监控补全 | [09-risk-monitoring-completion-spec.md](../design/09-risk-monitoring-completion-spec.md) |
 | 环境搭建 | [SETUP.md](../SETUP.md) |
 | 导出说明 | [portfolio/README.md](./README.md) |

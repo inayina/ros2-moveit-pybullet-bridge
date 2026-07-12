@@ -40,7 +40,7 @@ export const RiskBanner = memo(function RiskBanner() {
     >
       <Space size="large" wrap>
         <Title level={4} style={{ margin: 0, color: '#e8e8e8' }}>
-          ◉ Sim2Real Monitor
+          ◉ Panda Policy Replay · Readiness Monitor
         </Title>
         <Badge
           status={connected ? 'processing' : 'error'}

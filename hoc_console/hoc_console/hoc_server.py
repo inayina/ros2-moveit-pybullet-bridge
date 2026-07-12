@@ -23,7 +23,13 @@ from std_msgs.msg import String
 from std_srvs.srv import SetBool, Trigger
 
 from bridge_monitor_msgs.action import ExecuteScenario, Pick, Place
-from bridge_monitor_msgs.msg import DistributionMetrics, DomainRandomizationConfig, ExperimentMetadata, RiskStatus
+from bridge_monitor_msgs.msg import (
+    DistributionMetrics,
+    DomainRandomizationConfig,
+    ExperimentMetadata,
+    GraspStatus,
+    RiskStatus,
+)
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
 from rclpy.action import ActionClient
 from bridge_monitor_msgs.srv import AcknowledgeRisk, ExportExperiment, InjectShift, SetRandomization
@@ -35,6 +41,7 @@ from hoc_console.report_csv import render_csv_report
 from hoc_console.report_html import render_html_report
 from hoc_console.ros_bridge import (
     distribution_metrics_to_dict,
+    grasp_status_to_dict,
     risk_status_to_dict,
     tracking_error_to_dict,
 )
@@ -135,6 +142,7 @@ class HocServerNode(Node):
         self._latest_risk: RiskStatus | None = None
         self._latest_metrics: DistributionMetrics | None = None
         self._latest_tracking = None
+        self._latest_grasp: GraspStatus | None = None
         self._latest_camera_jpeg: bytes | None = None
         self._camera_logged = False
         self._history = SessionHistory()
@@ -149,6 +157,12 @@ class HocServerNode(Node):
         self.create_subscription(
             DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
         self.create_subscription(JointState, '/monitor/tracking_error', self._on_tracking, qos_profile_sensor_data)
+        self.create_subscription(
+            GraspStatus,
+            '/bridge/sim/grasp_status',
+            self._on_grasp,
+            qos_profile_sensor_data,
+        )
         self.create_subscription(
             CompressedImage, '/bridge/camera/image_compressed', self._on_camera, qos_profile_sensor_data)
         self.create_subscription(String, '/risk/alerts', self._on_alert, 10)
@@ -304,6 +318,9 @@ class HocServerNode(Node):
     def _on_tracking(self, msg: JointState) -> None:
         self._latest_tracking = msg
 
+    def _on_grasp(self, msg: GraspStatus) -> None:
+        self._latest_grasp = msg
+
     def _on_camera(self, msg: CompressedImage) -> None:
         if msg.data:
             self._latest_camera_jpeg = bytes(msg.data)
@@ -371,6 +388,12 @@ class HocServerNode(Node):
                 self._ws_hub.broadcast(
                     'tracking_error',
                     tracking_error_to_dict(self._latest_tracking)),
+                loop,
+            )
+        if self._latest_grasp:
+            asyncio.run_coroutine_threadsafe(
+                self._ws_hub.broadcast(
+                    'grasp_status', grasp_status_to_dict(self._latest_grasp)),
                 loop,
             )
 

@@ -2,9 +2,11 @@ import { ConfigProvider, Layout, Space, Button, theme, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, useRef } from 'react';
 import { AlertTimeline } from './components/AlertTimeline';
+import { CanonicalRunPanel } from './components/CanonicalRunPanel';
 import { DistributionPanel } from './components/DistributionPanel';
 import { EStopButton } from './components/EStopButton';
 import { ExperimentControl } from './components/ExperimentControl';
+import { GraspStatusPanel } from './components/GraspStatusPanel';
 import { RobotCameraPanel } from './components/RobotCameraPanel';
 import { R3Modal } from './components/R3Modal';
 import { RiskBanner } from './components/RiskBanner';
@@ -64,13 +66,17 @@ function App() {
         <div ref={dashboardRef} className="dashboard-root">
           <RiskBanner />
           <Content className="dashboard-content">
+            <CanonicalRunPanel />
             <Space className="toolbar" wrap>
               <EStopButton onEStop={() => sendCommand('e_stop')} />
               <Button onClick={() => sendCommand('pause')}>暂停</Button>
               <Button onClick={handleResume}>恢复</Button>
             </Space>
             <div className="dashboard-grid dashboard-grid--main">
-              <RobotCameraPanel />
+              <div className="dashboard-stack">
+                <RobotCameraPanel />
+                <GraspStatusPanel />
+              </div>
               <div className="dashboard-stack">
                 <div className="dashboard-grid dashboard-grid--3">
                   <RiskRadar />

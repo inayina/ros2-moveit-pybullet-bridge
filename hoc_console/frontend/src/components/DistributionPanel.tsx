@@ -56,7 +56,7 @@ export const DistributionPanel = memo(function DistributionPanel() {
       animation: false,
       tooltip: { trigger: 'item' },
       legend: {
-        data: ['Sim 位置', 'Real 位置'],
+        data: ['PyBullet 执行', 'Reference 回放'],
         textStyle: { color: '#aaa' },
         top: 0,
       },
@@ -78,13 +78,13 @@ export const DistributionPanel = memo(function DistributionPanel() {
       },
       series: [
         {
-          name: 'Sim 位置',
+          name: 'PyBullet 执行',
           type: 'boxplot',
           data: simData.length ? simData : [],
           itemStyle: { color: '#69b1ff', borderColor: '#69b1ff' },
         },
         {
-          name: 'Real 位置',
+          name: 'Reference 回放',
           type: 'boxplot',
           data: realData.length ? realData : [],
           itemStyle: { color: '#95de64', borderColor: '#95de64' },
@@ -92,8 +92,8 @@ export const DistributionPanel = memo(function DistributionPanel() {
       ],
       title: {
         subtext: hasWindowBoxplot
-          ? `窗口分布 · Sim n=${simCount} · Real n=${realCount} · ${metrics?.window_duration_sec?.toFixed(1) ?? '—'}s`
-          : `样本不足 · Sim n=${simCount} · Real n=${realCount}`,
+          ? `窗口分布 · execution n=${simCount} · reference n=${realCount} · ${metrics?.window_duration_sec?.toFixed(1) ?? '—'}s`
+          : `样本不足 · execution n=${simCount} · reference n=${realCount}`,
         subtextStyle: { color: '#888' },
         left: 'center',
       },
@@ -139,7 +139,7 @@ export const DistributionPanel = memo(function DistributionPanel() {
   return (
     <div className="panel panel--distribution">
       <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-        <h3>Sim / Real 分布对比</h3>
+        <h3>Panda 执行 / Reference 分布</h3>
         {metrics?.shift_detected ? (
           <Tag color="warning">⚠ 检出偏移 ({metrics.detection_method})</Tag>
         ) : (

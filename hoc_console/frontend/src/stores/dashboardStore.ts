@@ -3,6 +3,7 @@ import type {
   AlertEvent,
   DistributionMetricsPayload,
   ExperimentProgressPayload,
+  GraspStatusPayload,
   MetricsHistoryPoint,
   RiskHistoryPoint,
   RiskStatusPayload,
@@ -21,6 +22,7 @@ interface DashboardState {
   risk: RiskStatusPayload | null;
   metrics: DistributionMetricsPayload | null;
   tracking: TrackingErrorPayload | null;
+  grasp: GraspStatusPayload | null;
   alerts: AlertEvent[];
   riskHistory: RiskHistoryPoint[];
   metricsHistory: MetricsHistoryPoint[];
@@ -36,6 +38,7 @@ interface DashboardState {
   ingestRisk: (payload: RiskStatusPayload) => void;
   ingestMetrics: (payload: DistributionMetricsPayload) => void;
   ingestTracking: (payload: TrackingErrorPayload) => void;
+  ingestGrasp: (payload: GraspStatusPayload) => void;
   ingestAlert: (payload: AlertEvent) => void;
   setRecording: (recording: boolean, bagPath?: string) => void;
   dismissR3Modal: () => void;
@@ -63,6 +66,7 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   risk: null,
   metrics: null,
   tracking: null,
+  grasp: null,
   alerts: [],
   riskHistory: [],
   metricsHistory: [],
@@ -131,6 +135,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     }
     set({ tracking: payload, lastMessageAt: Date.now() });
   },
+
+  ingestGrasp: (payload) => set({ grasp: payload, lastMessageAt: Date.now() }),
 
   ingestAlert: (payload) =>
     set((state) => ({
