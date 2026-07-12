@@ -28,7 +28,7 @@ function riskPayload(level: number, score: number) {
 }
 
 function metricsPayload(tick: number) {
-  const joints = ['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3'];
+  const joints = ['panda_joint1', 'panda_joint2', 'panda_joint3'];
   const wave = Math.sin(tick * 0.2) * 0.02;
   return {
     joint_names: joints,
@@ -66,7 +66,7 @@ function metricsPayload(tick: number) {
 
 function trackingPayload() {
   return {
-    joint_names: ['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3'],
+    joint_names: ['panda_joint1', 'panda_joint2', 'panda_joint3'],
     errors: [0.001, 0.002, 0.0015],
   };
 }
@@ -139,7 +139,7 @@ export async function installMockWebSocket(page: Page) {
           })),
         };
         const metrics = {
-          joint_names: ['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3'],
+          joint_names: ['panda_joint1', 'panda_joint2', 'panda_joint3'],
           kl_divergence_per_joint: [0.04, 0.05, 0.06],
           kl_divergence_mean: 0.05,
           wasserstein_per_joint: [0.03, 0.04, 0.05],
@@ -187,8 +187,21 @@ export async function installMockWebSocket(page: Page) {
           topic: '/monitor/tracking_error',
           timestamp: { sec: this.tick, nanosec: 0 },
           payload: {
-            joint_names: ['lbr_iiwa_joint_1', 'lbr_iiwa_joint_2', 'lbr_iiwa_joint_3'],
+            joint_names: ['panda_joint1', 'panda_joint2', 'panda_joint3'],
             errors: [0.001, 0.002, 0.0015],
+          },
+        });
+        this.sendJson({
+          type: 'data',
+          topic: '/bridge/sim/grasp_status',
+          timestamp: { sec: this.tick, nanosec: 0 },
+          payload: {
+            grasp_established: true,
+            object_slipped: false,
+            force_xyz: [2.4, 0.3, 0.1],
+            torque_xyz: [0.01, 0.02, 0.01],
+            force_norm: 2.42,
+            confidence: 0.95,
           },
         });
       }

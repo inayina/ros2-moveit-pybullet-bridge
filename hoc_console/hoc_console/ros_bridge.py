@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from bridge_monitor_msgs.msg import DistributionMetrics, DomainRandomizationConfig, RiskStatus
+from bridge_monitor_msgs.msg import (
+    DistributionMetrics,
+    DomainRandomizationConfig,
+    GraspStatus,
+    RiskStatus,
+)
 from sensor_msgs.msg import JointState
 
 
@@ -10,6 +15,19 @@ def tracking_error_to_dict(msg: JointState) -> dict:
     return {
         'joint_names': list(msg.name),
         'errors': list(msg.position),
+    }
+
+
+def grasp_status_to_dict(msg: GraspStatus) -> dict:
+    force = msg.net_wrench.force
+    torque = msg.net_wrench.torque
+    return {
+        'grasp_established': msg.grasp_established,
+        'object_slipped': msg.object_slipped,
+        'force_xyz': [force.x, force.y, force.z],
+        'torque_xyz': [torque.x, torque.y, torque.z],
+        'force_norm': (force.x ** 2 + force.y ** 2 + force.z ** 2) ** 0.5,
+        'confidence': msg.confidence,
     }
 
 

@@ -1,70 +1,68 @@
 # 简历描述整理
 
-本页把 `robot-arm-episode-data-lab` 与 `ros2-moveit-pybullet-bridge` 合并成一个作品集项目描述。建议在简历中按“一个端到端机器人数据与仿真验证平台”呈现，而不是拆成两个孤立项目。
+本页把上游 `ros2-arm-teleoperation-suite`、中游 `robot-arm-episode-data-lab` 与下游 `ros2-moveit-pybullet-bridge` 合并成一个完整的三仓闭环作品集项目描述。建议在简历中按“工业级机器人遥操作与 Sim2Real 联调验证平台”呈现。
 
 ## 推荐项目名称
 
-**机器人操作数据采集与 ROS 2 / MoveIt / PyBullet 联调验证平台**
+**工业级机器人遥操作数据采集与 ROS 2 / Sim2Real 联调验证平台**
 
 可选英文名：
 
-**Robot Episode Data Collection and ROS 2 Sim2Real Validation Platform**
+**Industrial Robotic Teleoperation, Data Collection & ROS 2 Sim2Real Validation Platform**
 
 ## 一句话版本
 
-构建双仓库机器人作品集项目：采集仓库负责 PyBullet 任务数据生成与 LeRobot 格式导出，ROS 2 联调仓库负责 MoveIt 规划闭环、PyBullet 双源仿真、可插拔 Policy Runner、Sim2Real 分布监控、风险急停和 HOC 可视化运维，形成从数据采集到验证报告的可复现实验链路。
+构建三仓联动机器人闭环验证平台：上游负责 L0-L7 遥操作与 MuJoCo 视触觉数据录制，中游负责数据适配、质检与 ACT 策略训练，下游负责策略重放、Sim2Real 分布偏移监控、五维风险急停联动以及 React + ECharts HOC 前端可视化运维。
 
 ## 简历项目描述
 
-**机器人操作数据采集与 ROS 2 / MoveIt / PyBullet 联调验证平台**  
-个人项目｜ROS 2 Jazzy、MoveIt 2、PyBullet、LeRobot、React、ECharts、Docker、pytest
+**工业级机器人遥操作数据采集与 ROS 2 / Sim2Real 联调验证平台**  
+个人项目｜ROS 2 Jazzy、MoveIt 2、ros2_control、CANopen DS402、MuJoCo、React、ECharts、Docker、pytest、ACT
 
-- 设计并实现双仓库机器人验证平台：`robot-arm-episode-data-lab` 负责离线 PyBullet episode 采集、任务 FSM 与 LeRobot v2.1 数据导出；`ros2-moveit-pybullet-bridge` 负责 ROS 2 桥接、MoveIt 闭环执行、分布监控、风险管理与 HOC 控制台。
-- 打通 MoveIt 2 到 PyBullet 的轨迹执行闭环，将 `FollowJointTrajectory` / JointTrajectory 转换为 PyBullet 控制，并发布 `/joint_states`、双源 joint states、TF 与监控输入；复验中 4/4 MoveGroup joint goals 成功，最大执行 RMSE 0.006004 rad。
-- 构建 Sim/Real 双源分布偏移监控链路，支持双 PyBullet 实例、LeRobot 回放与离线对比，使用 KL、Wasserstein-1、MMD 量化关节分布差异；10 Hz 监控输出、5 s 滑窗、3/3 偏移注入检出。
-- 实现五维风险管理与安全闭环，将分布偏移、tracking error、安全、通信和系统健康聚合为 R0-R3 风险等级；R3 自动触发 E-stop，速度归零延迟 0.796 ms，HOC acknowledge 后才允许恢复。
-- 开发 React + ECharts HOC 运维控制台，展示风险横幅、五维雷达、分布曲线、tracking error、实验控制和报告导出；WebSocket 三路 stream 达到 5 Hz，最大延迟 70.712 ms，支持 JSON/CSV 审计记录。
-- 实现可插拔 Policy Runner（`ReplayPolicy` / `SineWavePolicy`），订阅 `/bridge/sim/joint_states`、发布 `/bridge/command`，含 lifecycle、`/system_health` 与故障注入；`run_system_validation.sh` 一键 benchmark 输出 HTML/JSON/CSV，SineWave 策略 mean latency 4.785 ms。
-- 建立可复现实验与验收体系，编写 `verify_*.sh`、pytest、HTML 报告与指标导出脚本，覆盖 bridge 通信、MoveIt 闭环、监控、风险、HOC、Policy Runner、性能、安全、可靠性和可维护性；核心包测试 142 passed，coverage 73.2%。
+- **三仓全链路闭环系统架构**：设计并打通上游遥操作采集（MuJoCo v3）、中游数据适配训练（LeRobot 格式/ACT 算法）与下游回放验证（PyBullet 物理引擎）的三仓数据流与运行观测环。
+- **上游工业级控制总线与采集**：上游实现 L0 遥操作驱动（键盘/手柄）、L1 C++ 独立安全监测、L2 MoveIt Servo 笛卡尔伺服、L3 1kHz 阻抗控制、L4 CANopen DS402 虚拟总线驱动，最终通过多模态录制生成 LeRobot 兼容数据集。
+- **中游数据适配与离线训练**：中游实现数据状态与动作的语义转换（Adapter），完成 schema 规约校验与数据集质检（Inspector），离线进行行为克隆（ACT）模型训练并打包为 handoff 交付件。
+- **下游双源监控与偏移量化**：下游构建 Sim/Real 双源分布偏移监控链路，利用 KL 散度、Wasserstein-1 距离和 MMD 量化关节与控制分布差异，实现 10 Hz 在线输出、5 s 滑窗和 3/3 偏移注入报警检出。
+- **五维风险决策与安全闭环**：聚合分布偏移、跟踪误差、物理碰撞、通信抖动和系统健康至 R0-R3 风险等级；R3 自动触发 E-stop 保护，速度归零延迟仅 0.796 ms。
+- **前端 HOC 可视化运维控制台（作品集主亮点）**：基于 **React + ECharts** 搭建 HOC 运维浏览器控制台，通过 WebSocket 5 Hz 实时渲染五维风险雷达、分布偏移曲线、三路数据流与相机预览，实现人机协同的异常确认（Acknowledge）与复位（Resume）闭环控制。
+- **测试与验证体系**：编写 `verify_*.sh` 与 pytest 覆盖全栈功能与非功能（NFR）验收，核心包通过 142 项测试，单元/节点测试覆盖率达 73.2%，PolicyRunner 推理平均时延 4.785 ms。
 
 ## 精简版项目描述
 
-**机器人操作数据采集与 ROS 2 仿真验证平台**  
-个人项目｜ROS 2、MoveIt 2、PyBullet、LeRobot、React
+**机器人遥操作采集与 ROS 2 仿真验证平台**  
+个人项目｜ROS 2、MoveIt 2、PyBullet、LeRobot、React、ECharts
 
-- 搭建双仓库端到端链路：采集仓库生成 PyBullet episode 并导出 LeRobot 数据，ROS 2 仓库完成 MoveIt 规划闭环、PyBullet 双源仿真、Sim2Real 监控和 HOC 运维展示。
-- 实现 JointTrajectory 到 PyBullet 的执行桥接，发布 `/joint_states` 与双源状态供 MoveIt、TF、监控和风险引擎消费；复验中 4/4 MoveGroup goals 成功，最大 RMSE 0.006004 rad。
-- 基于 KL / W1 / MMD 构建 10 Hz 分布偏移监控，支持 LeRobot 回放、偏移注入和离线报告；3/3 注入检出。
-- 实现 R0-R3 风险闭环与 HOC 控制台，R3 自动 E-stop，支持 acknowledge / resume、参数调节和 JSON/CSV 报告导出。
-- 实现 Policy Runner 策略抽象与系统 benchmark，`run_system_validation.sh` 生成可审计验证报告。
+- 搭建三仓端到端闭环：上游负责键盘/手柄遥操作与多模态数据录制，中游完成适配质检与策略训练，下游实现回放执行、分布偏移监控与 HOC 控制台展示。
+- 基于 KL / W1 / MMD 实现 10 Hz 双源分布偏移监控，支持偏置注入与离线报告生成；3/3 注入检出。
+- 研发 React + ECharts HOC 运维控制台，通过 WebSocket 实现风险态势可视化、异常 acknowledge 复位互锁及 JSON/CSV 报告导出。
+- 建立 R0-R3 风险决策机制与 PolicyRunner 策略执行抽象，在 R3 触发自动急停与 degraded 降速保护。
 
 ## 如果简历空间很短
 
-- 搭建机器人数据采集与 ROS 2 仿真验证双仓库项目，串联 PyBullet episode 采集、LeRobot 导出、MoveIt 规划闭环、Sim2Real 分布监控、R0-R3 风险急停和 React HOC 控制台。
-- 使用 KL / W1 / MMD 实现 10 Hz 双源偏移监控，支持偏移注入、LeRobot 回放和 HTML/JSON/CSV 报告；MoveIt 闭环复验 4/4 成功，最大 RMSE 0.006004 rad。
+- 研发工业级机器人遥操作、多模态数据采集与 ROS 2 验证平台。打通上游遥操作采集（MuJoCo）、中游训练（ACT）与下游回放监控（PyBullet）三仓闭环。
+- 设计并开发基于 React + ECharts 的 HOC 可视化控制台，实现 Sim2Real 分布偏移（KL/W1/MMD）、五维风险状态的实时观测与异常 acknowledge 复位互锁，沉淀可审计验证报告。
 
 ## 中文面试口述版
 
-这个项目我按两个仓库来组织：第一个仓库做机器人操作数据采集，基于 PyBullet 生成 episode，并导出 LeRobot 格式数据；第二个仓库是 ROS 2 联调验证环境，把 MoveIt 2 规划结果接到 PyBullet 执行，同时发布双源关节状态给分布监控和风险引擎。在 MoveIt 之外我还做了可插拔 Policy Runner，用 Replay / SineWave 策略驱动同一套 bridge 和监控链路，并有一键 benchmark 验证。监控层用 KL、W1、MMD 判断 Sim/Real 偏移，风险层聚合成 R0-R3，R3 会触发急停，HOC 控制台负责可视化、控制和报告导出。它不是单个动画 demo，而是一条从数据采集、仿真执行、策略运行、偏移检测、风险处置到验收报告的完整工程链路。
+这个项目我按三仓闭环来组织：上游是遥操作采集仓，实现了 Teleop $\rightarrow$ 安全监视 $\rightarrow$ MoveIt Servo $\rightarrow$ ros2_control 阻抗控制 $\rightarrow$ CANopen DS402 虚拟总线 $\rightarrow$ MuJoCo 物理与多模态数据录制的七层软硬件架构；中游是数据加工和训练仓，做格式转换和质检后训练 ACT 行为克隆模型；下游是回放与监控验证仓，重放动作包的同时，基于双源数据在在线运行 KL、W1、MMD 检测 Sim/Real 分布偏移，聚合成五维风险 R0-R3。我们在下游做了一个 React + ECharts 的前端 HOC 运维控制台，通过 WebSocket 把这些漂移指标、雷达图和相机画面实时渲染出来，并提供了 Acknowledge 复位控制逻辑。通过这个控制台，能够直观地演示“注入偏置 $\rightarrow$ 警报触发 $\rightarrow$ 急停锁死 $\rightarrow$ 人工确认复位”的安全闭环。
 
 ## 英文简历版本
 
-**Robot Episode Data Collection and ROS 2 Sim2Real Validation Platform**  
-Personal Project｜ROS 2 Jazzy, MoveIt 2, PyBullet, LeRobot, React, ECharts, Docker, pytest
+**Industrial Robotic Teleoperation, Data Collection & ROS 2 Sim2Real Validation Platform**  
+Personal Project | ROS 2 Jazzy, MoveIt 2, ros2_control, CANopen DS402, MuJoCo, React, ECharts, Docker, pytest, ACT
 
-- Built a two-repository robotics validation platform: `robot-arm-episode-data-lab` generates PyBullet manipulation episodes and exports LeRobot datasets, while `ros2-moveit-pybullet-bridge` provides ROS 2 integration, MoveIt execution, Sim2Real monitoring, risk control, and an HOC dashboard.
-- Implemented a MoveIt 2 to PyBullet execution bridge that converts JointTrajectory commands into physics simulation control and publishes `/joint_states`, dual-source joint states, TF, and monitoring inputs; validation achieved 4/4 successful MoveGroup goals with max RMSE of 0.006004 rad.
-- Developed a dual-source distribution monitoring pipeline using KL divergence, Wasserstein-1, and MMD for Sim/Real drift detection, supporting PyBullet domain randomization, LeRobot replay, offline comparison, and 10 Hz online metrics.
-- Implemented an R0-R3 risk management loop with five-dimensional attribution, automatic E-stop on R3, acknowledge-gated recovery, and JSON/CSV audit export through a React + ECharts HOC dashboard.
-- Implemented a pluggable PolicyRunner with ReplayPolicy and SineWavePolicy, lifecycle management, `/system_health` diagnostics, and fault injection; `run_system_validation.sh` produces HTML/JSON/CSV benchmark reports (SineWave mean latency 4.785 ms).
-- Added reproducible verification scripts and reports covering bridge latency, MoveIt closure, monitoring, risk, HOC, Policy Runner, performance, safety, reliability, and maintainability; core package tests reached 142 passed with 73.2% coverage.
+- **Three-Repo Closed-Loop Architecture**: Designed and integrated a closed-loop robot pipeline connecting upstream teleoperation (MuJoCo v3), midstream adaptation/training (LeRobot/ACT), and downstream replay validation (PyBullet).
+- **Upstream Teleoperation & Recording**: Implemented pluggable teleop input (L0), C++ safety monitor (L1), MoveIt Servo (L2), 1kHz Cartesian impedance control (L3), and virtual CANopen DS402 servo bus (L4) in MuJoCo, exporting multi-modal datasets.
+- **Downstream Sim/Real Drift Monitoring**: Built a dual-source distribution monitoring pipeline using KL divergence, Wasserstein-1, and MMD for online Sim2Real drift detection, supporting 10 Hz metric updates and 5 s sliding window.
+- **Multi-Dimensional Risk Management**: Aggregated distribution shift, tracking error, safety, communication, and health metrics into R0-R3 risk levels, triggering automatic E-stop on R3 with a velocity zeroing latency of 0.796 ms.
+- **HOC Web Cockpit (Portfolio Highlight)**: Developed a **React + ECharts** HOC dashboard, rendering 5 Hz real-time radar charts, distribution curves, and camera feeds via WebSockets, allowing human-in-the-loop Acknowledge & Resume controls.
+- **System Verification & Benchmarking**: Created reproducible verification suites and benchmark scripts; achieved 142 passed tests with 73.2% coverage for the core bridge package, with policy inference latency averaging 4.785 ms.
 
 ## 表述边界
 
-简历和面试中建议保持以下边界：
+在简历和面试中建议保持以下真实性边界，防止 Overclaim：
 
-- 可以说“LeRobot 数据回放 / 外部采集仓库联调”，不要说“已完成真机接入”。
-- 可以说“MoveIt 到 PyBullet 的 `FollowJointTrajectory` relay 闭环”，不要说“完整 `ros2_control` 硬件接口已完成”。
-- 可以说“短时 smoke、脚本化验收和样例报告已完成”，不要把 2 小时长稳说成已完成。
-- 可以说“可插拔 Policy Runner 与系统 benchmark”，不要说“已完成 RL 训练或模型部署”。
-- 可以强调“可复现工程链路”，少强调单次视觉效果。
+- 可以说“LeRobot 数据回放 / 外部采集与适配仓联调”，不要说“已部署真机”。
+- 可以说“MuJoCo 中 CANopen DS402 总线仿真与 ros2_control 硬件接口重构”，不要说“实体总线硬件联调已全部拉起”。
+- 可以说“通过 PolicyRunner 实现了可插拔 Replay 策略重放与在线监控”，不要宣称“已实现稳定在线自主抓取”。
+- 强调系统的**“可观测性”**、**“工程验证与测试”**以及**“安全硬化闭环”**作为核心卖点。

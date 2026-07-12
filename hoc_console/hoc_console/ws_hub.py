@@ -10,11 +10,13 @@ from typing import Any
 TOPIC_RISK = '/risk/status'
 TOPIC_METRICS = '/monitor/distribution_metrics'
 TOPIC_TRACKING = '/monitor/tracking_error'
+TOPIC_GRASP = '/bridge/sim/grasp_status'
 
 TOPIC_TYPE_MAP = {
     TOPIC_RISK: 'risk_status',
     TOPIC_METRICS: 'distribution_metrics',
     TOPIC_TRACKING: 'tracking_error',
+    TOPIC_GRASP: 'grasp_status',
 }
 
 TYPE_TOPIC_MAP = {v: k for k, v in TOPIC_TYPE_MAP.items()}
@@ -36,7 +38,8 @@ class WsHub:
         self._clients: dict[Any, set[str]] = {}
 
     def register(self, websocket) -> None:
-        self._clients[websocket] = {TOPIC_RISK, TOPIC_METRICS, TOPIC_TRACKING}
+        self._clients[websocket] = {
+            TOPIC_RISK, TOPIC_METRICS, TOPIC_TRACKING, TOPIC_GRASP}
 
     def unregister(self, websocket) -> None:
         self._clients.pop(websocket, None)

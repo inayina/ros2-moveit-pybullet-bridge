@@ -45,7 +45,7 @@ python3 scripts/capture_pick_lift_asset.py
 
 ## 五仓统一架构（作品集主图）
 
-- Mermaid 源：`docs/portfolio/unified-architecture-overview.mmd`
-- 说明文档：`docs/portfolio/UNIFIED_ARCHITECTURE.md`
+- Mermaid 源：`docs/archive/portfolio/unified-architecture-overview.mmd`
+- 说明文档：`docs/archive/portfolio/UNIFIED_ARCHITECTURE.md`
 - 可选 PNG：`unified-architecture-overview.png`（`mmdc -i ../portfolio/unified-architecture-overview.mmd -o unified-architecture-overview.png`）
 - 已嵌入：根目录 `README.md` 与 `robot-ops-dashboard` README

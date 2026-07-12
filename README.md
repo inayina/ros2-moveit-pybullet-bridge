@@ -54,7 +54,7 @@
 
 ### 关联仓库 · 统一作品集
 
-本仓库是 **机器人系统集成与验证平台** 的操作臂 / Sim2Real **深度验证**子系统。运维聚合与 AMR / MQTT 遥测见主展示入口 [robot-ops-dashboard](https://github.com/inayina/robot-ops-dashboard)；五仓投递计划见 [docs/portfolio/MASTER_PORTFOLIO_PLAN.md](docs/portfolio/MASTER_PORTFOLIO_PLAN.md)。
+本仓库是 **机器人系统集成与验证平台** 的操作臂 / Sim2Real **深度验证**子系统。运维聚合与 AMR / MQTT 遥测见主展示入口 [robot-ops-dashboard](https://github.com/inayina/robot-ops-dashboard)；五仓投递计划见 [docs/archive/portfolio/MASTER_PORTFOLIO_PLAN.md](docs/archive/portfolio/MASTER_PORTFOLIO_PLAN.md)。
 
 | 仓库 | 角色 |
 |------|------|
@@ -65,6 +65,10 @@
 | [robot-arm-episode-data-lab](https://github.com/inayina/robot-arm-episode-data-lab) | Episode 采集 + LeRobot 导出 |
 
 ### 🔗 三仓联动端到端数据流 (Three-Repository End-to-End Dataflow)
+
+> **当前主实验**：HOC 与作品集结果统一展示 2026-07-11 Panda 30-episode 闭环：
+> 71,737 frames → MLP BC → panda_30_mlp_bridge_v0 → panda_jsonl_replay /
+> pybullet_ik → normal + fault benchmark。旧实验数字仅作历史材料，不与当前结论混用。
 
 ![三仓联动端到端数据流](docs/assets/three_repo_dataflow_diagram.png)
 
@@ -91,7 +95,7 @@
 
 ### 五仓统一架构
 
-完整说明与三条链细节图见 [docs/portfolio/UNIFIED_ARCHITECTURE.md](docs/portfolio/UNIFIED_ARCHITECTURE.md)。
+完整说明与三条链细节图见 [docs/archive/portfolio/UNIFIED_ARCHITECTURE.md](docs/archive/portfolio/UNIFIED_ARCHITECTURE.md)。
 
 ```mermaid
 flowchart TB
@@ -543,7 +547,7 @@ End-to-end portfolio for **robot integration / ROS 2 / simulation validation / p
 
 ![Three-Repo End-to-End Run Evidence](docs/assets/three_repo_run_evidence.png)
 
-Upstream teleop → midstream LeRobot / baseline training → downstream PyBullet Sim2Real-readiness validation. See [docs/portfolio/UNIFIED_ARCHITECTURE.md](docs/portfolio/UNIFIED_ARCHITECTURE.md).
+Upstream teleop → midstream LeRobot / baseline training → downstream PyBullet Sim2Real-readiness validation. See [docs/archive/portfolio/UNIFIED_ARCHITECTURE.md](docs/archive/portfolio/UNIFIED_ARCHITECTURE.md).
 
 | Repository | Role |
 |---|---|

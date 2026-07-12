@@ -43,6 +43,7 @@ docs/
 ├── FMEA.md                 失效模式与影响分析
 ├── design/                01–10 技术设计 Spec
 ├── portfolio/             作品集入口、Demo 脚本、验收摘要、代码导览、简历描述、系统设计说明书 + Marp 幻灯片
+├── archive/               历史规划与非主线材料归档（MASTER_PORTFOLIO_PLAN, UNIFIED_ARCHITECTURE 等）
 ├── samples/               HTML 报告、JSON 指标、NPZ 轨迹
 └── assets/                PNG/GIF/SVG 配图
 ```

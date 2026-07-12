@@ -26,7 +26,7 @@ def _launch_setup(context, *args, **kwargs):
     lerobot_path = LaunchConfiguration('lerobot_dataset_path').perform(context)
     episode_index = int(LaunchConfiguration('episode_index').perform(context))
     enable_camera = LaunchConfiguration('enable_camera').perform(context) == 'true'
-    robot_profile = LaunchConfiguration('robot_profile').perform(context)
+    robot_profile = LaunchConfiguration('robot').perform(context)
 
     bridge_pkg = FindPackageShare('pybullet_bridge').perform(context)
     dist_pkg = FindPackageShare('dist_monitor').perform(context)

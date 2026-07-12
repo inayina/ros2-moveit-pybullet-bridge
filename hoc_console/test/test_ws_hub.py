@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from hoc_console.ws_hub import TOPIC_METRICS, TOPIC_RISK, WsHub
+from hoc_console.ws_hub import TOPIC_GRASP, TOPIC_METRICS, TOPIC_RISK, WsHub
 
 
 class _FakeWebSocket:
@@ -63,3 +63,16 @@ def test_camera_frame_reaches_all_subscribers():
     frame = json.loads(ws.sent[0])
     assert frame['type'] == 'camera_frame'
     assert frame['payload']['image_b64'] == 'abc123'
+
+
+def test_grasp_status_is_a_subscribable_data_topic():
+    hub = WsHub()
+    ws = _FakeWebSocket()
+    hub.register(ws)
+    hub.subscribe(ws, [TOPIC_GRASP])
+
+    asyncio.run(hub.broadcast('grasp_status', {'grasp_established': True}))
+
+    frame = json.loads(ws.sent[0])
+    assert frame['topic'] == TOPIC_GRASP
+    assert frame['payload']['grasp_established'] is True

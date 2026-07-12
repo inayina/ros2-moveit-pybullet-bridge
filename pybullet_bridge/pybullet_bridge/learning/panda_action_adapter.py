@@ -296,10 +296,50 @@ class PandaActionAdapter:
         return joint_targets
 
     def _pybullet_ik(self, action: np.ndarray, joint_positions: np.ndarray) -> np.ndarray:
+        """Solve IK via PyBullet and apply a Jacobian-based kinematic singularity check.
+
+        Singularity detection:
+            The 6×7 arm Jacobian is assembled from PyBullet's ``calculateJacobian``
+            (linear + angular rows, first-7 columns).  Its minimum singular value
+            ``sigma_min`` is obtained with ``np.linalg.svd``.  When
+            ``sigma_min < 0.01`` the configuration is near a kinematic singularity
+            and a warning is emitted; the IK result is still returned so the caller
+            can decide whether to execute or hold.
+
+        Args:
+            action: ee_delta_gripper[7] task-space increment.
+            joint_positions: Current 7-DOF joint position vector (radians).
+
+        Returns:
+            7-DOF joint target array (radians).
+        """
         import pybullet as p
 
         for i in range(min(7, len(joint_positions))):
             p.resetJointState(self._robot_id, i, joint_positions[i], physicsClientId=self._client_id)
+
+        # Kinematic singularity check using Jacobian minimum singular value SVD
+        try:
+            q_pos = [0.0] * 9
+            for i in range(min(7, len(joint_positions))):
+                q_pos[i] = joint_positions[i]
+            q_vel = [0.0] * 9
+            q_acc = [0.0] * 9
+            jac_lin, jac_ang = p.calculateJacobian(
+                self._robot_id,
+                self._ee_link_idx,
+                localPosition=[0.0, 0.0, 0.0],
+                objPositions=q_pos,
+                objVelocities=q_vel,
+                objAccelerations=q_acc,
+                physicsClientId=self._client_id,
+            )
+            J = np.vstack([np.array(jac_lin)[:, :7], np.array(jac_ang)[:, :7]])
+            min_sv = float(np.min(np.linalg.svd(J, compute_uv=False)))
+            if min_sv < 0.01:
+                print(f"[WARN] Robot is near kinematic singularity! Min singular value: {min_sv:.4f}")
+        except Exception as e:
+            print(f"[DEBUG] Singularity check failed: {e}")
 
         state = p.getLinkState(self._robot_id, self._ee_link_idx, physicsClientId=self._client_id)
         current_pos = np.array(state[0], dtype=np.float64)

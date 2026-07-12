@@ -4,17 +4,17 @@
 
 > 一句话定位：这是一个 ROS 2 / MoveIt 2 / PyBullet 端到端联调项目，覆盖运动规划闭环、可插拔 Policy Runner、双源 Sim2Real 偏移监控、五维风险管理、 HOC 运维控制台和可复现实验报告。
 
-**跨仓库统一计划（Dashboard 三仓 + Bridge 双仓）**：见 **[MASTER_PORTFOLIO_PLAN.md](./MASTER_PORTFOLIO_PLAN.md)** — 含资料索引、下周开发日程与面试巩固安排。Dashboard 主入口：`~/workspace/robot-ops-dashboard`。
+**跨仓库统一计划（Dashboard 三仓 + Bridge 双仓）**：见 **[MASTER_PORTFOLIO_PLAN.md](../archive/portfolio/MASTER_PORTFOLIO_PLAN.md)** — 含资料索引、下周开发日程与面试巩固安排。Dashboard 主入口：`~/workspace/robot-ops-dashboard`。
 
 ## 推荐阅读顺序
 
 | 顺序 | 材料 | 适合回答的问题 |
 |------|------|----------------|
-| 0 | [统一作品集主计划](./MASTER_PORTFOLIO_PLAN.md) | 五仓怎么投、下周做什么、面试背什么 |
-| 0b | [统一简历描述](./UNIFIED_RESUME.md) | Dashboard + Bridge 五仓合并写进简历 |
+| 0 | [统一作品集主计划](../archive/portfolio/MASTER_PORTFOLIO_PLAN.md) | 五仓怎么投、下周做什么、面试背什么 |
+| 0b | [统一简历描述](../archive/portfolio/UNIFIED_RESUME.md) | Dashboard + Bridge 五仓合并写进简历 |
 | 0c | [系统设计幻灯片](./system-design-slides.md) | Marp 导出 PDF/PPTX（含 Dashboard 章节 v1.1） |
 | 0d | [面试巩固 · 标准答法](./INTERVIEW_PREP.md) | 必掌握清单、10 题答法、48h checklist |
-| 0e | [五仓统一架构总图](./UNIFIED_ARCHITECTURE.md) | 作品集主图、三链细节、仓库对照表 |
+| 0e | [五仓统一架构总图](../archive/portfolio/UNIFIED_ARCHITECTURE.md) | 作品集主图、三链细节、仓库对照表 |
 | 1 | [项目首页](../../README.md) | 这个项目解决什么问题，系统怎么跑起来 |
 | 2 | [验收摘要](./ACCEPTANCE_SUMMARY.md) | 哪些 FR/NFR 已经验证，有哪些明确边界 |
 | 3 | [Demo 脚本](./DEMO_SCRIPT.md) | 5-8 分钟如何演示，讲解顺序是什么 |
@@ -35,7 +35,7 @@
 
 ## 双仓库综合架构图
 
-这张图是作品集主图口径：采集仓库负责“数据从哪里来”，联调仓库负责“数据如何进入 ROS 2 验证、监控、风险和报告闭环”。
+本图展示了中下游的数据流与验证闭环：中游数据采集仓库负责“数据从哪里来”，下游联调验证仓库负责“数据如何进入 ROS 2 验证、监控、风险和报告闭环”。在三仓闭环主线中，上游遥操作套件负责物理世界的操纵采集并输出给中游。
 
 ```mermaid
 flowchart LR
@@ -67,7 +67,7 @@ flowchart LR
     HOC -.->|"inject_shift / set_randomization / acknowledge"| Bridge
 ```
 
-简历或面试中建议这样概括：两个仓库共同组成“机器人操作数据采集 + ROS 2 Sim2Real 验证平台”。采集仓库输出 LeRobot 数据，联调仓库消费这些数据并完成 MoveIt 闭环、分布监控、风险处置和可审计报告。
+简历或面试中建议这样概括：三仓共同组成“机器人遥操作控制、多模态数据采集与 ROS 2 Sim2Real 验证平台”。其中上游负责数据采集，中游负责处理与训练，下游负责回放执行、分布偏移观测与 HOC 前端运维决策闭环。
 
 ## 现有材料索引
 

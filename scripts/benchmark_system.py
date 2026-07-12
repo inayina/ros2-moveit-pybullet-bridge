@@ -194,6 +194,7 @@ def _launch_stack(
     seed: int,
     fault_injection: bool,
     inference_freq: int,
+    panda_command_mode: str,
 ) -> tuple[subprocess.Popen, subprocess.Popen]:
     robot_profile = 'panda' if strategy == 'panda_jsonl_replay' else 'planar_2dof'
     launch = subprocess.Popen(
@@ -219,7 +220,7 @@ def _launch_stack(
     elif strategy == 'panda_jsonl_replay':
         runner_args.extend([
             '-p', f'panda_handoff_path:={panda_handoff_path}',
-            '-p', 'panda_command_mode:=pybullet_ik',
+            '-p', f'panda_command_mode:={panda_command_mode}',
         ])
     if fault_injection:
         runner_args.extend([
@@ -371,6 +372,26 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     replay_path = args.replay_path
+    panda_handoff_path = ''
+    panda_replay_path = ''
+    handoff_id = ''
+    release_id = ''
+    if args.strategy == 'panda_jsonl_replay':
+        bundle = Path(args.panda_handoff_path).expanduser().resolve()
+        manifest_path = bundle / 'handoff_manifest.json'
+        if not manifest_path.is_file():
+            raise FileNotFoundError(
+                f'Panda handoff manifest not found: {manifest_path}')
+        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+        replay_name = manifest.get('files', {}).get(
+            'replay', 'predicted_actions.jsonl')
+        replay_file = bundle / replay_name
+        if not replay_file.is_file():
+            raise FileNotFoundError(f'Panda replay not found: {replay_file}')
+        panda_handoff_path = str(bundle)
+        panda_replay_path = str(replay_file.resolve())
+        handoff_id = str(manifest.get('handoff_id', ''))
+        release_id = str(manifest.get('release_id', ''))
     if args.strategy == 'replay' and not replay_path:
         fixture = Path(__file__).resolve().parents[1] / 'pybullet_bridge' / 'test' / 'fixtures' / 'planar_2dof_replay.pkl'
         if not fixture.is_file():
@@ -388,6 +409,7 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
             seed=args.seed,
             fault_injection=args.fault_injection,
             inference_freq=args.inference_freq,
+            panda_command_mode=args.panda_command_mode,
         )
         if not _wait_for_topics(args.startup_timeout_sec):
             raise RuntimeError('Timed out waiting for benchmark ROS topics')
@@ -440,7 +462,17 @@ def run_benchmark(args: argparse.Namespace) -> dict[str, Any]:
             'health_alarm_latency_ms': round(alarm_latency, 3) if alarm_latency is not None else None,
             'seed': args.seed,
             'fault_injection': args.fault_injection,
-            'replay_path': replay_path if args.strategy == 'replay' else '',
+            'replay_path': (
+                replay_path if args.strategy == 'replay' else panda_replay_path
+            ),
+            'panda_handoff_path': panda_handoff_path,
+            'handoff_id': handoff_id,
+            'release_id': release_id,
+            'panda_command_mode': (
+                args.panda_command_mode
+                if args.strategy == 'panda_jsonl_replay'
+                else ''
+            ),
             'timeseries_rows': len(collector.timeseries),
             'health_events': len(collector.health_events),
         }
@@ -473,6 +505,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--replay-path', default='')
     parser.add_argument('--panda-handoff-path', default='')
+    parser.add_argument(
+        '--panda-command-mode',
+        choices=['hold', 'mock_ik', 'pybullet_ik'],
+        default='pybullet_ik',
+        help='How ee_delta_gripper actions are converted to Panda joint commands',
+    )
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--fault-injection', action='store_true')
     parser.add_argument('--process-name', default='policy_runner')

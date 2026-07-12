@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useDashboardStore } from '../stores/dashboardStore';
 
 const SCENARIOS = [
-  { value: 'SC-01', label: 'SC-01 点到点' },
-  { value: 'SC-02', label: 'SC-02 轨迹跟踪' },
-  { value: 'SC-03', label: 'SC-03 碰撞规避' },
-  { value: 'SC-04', label: 'SC-04 域随机化扫描' },
-  { value: 'SC-05', label: 'SC-05 急停恢复' },
+  { value: 'SC-01', label: 'SC-01 Panda 基线运动' },
+  { value: 'SC-02', label: 'SC-02 Panda 轨迹跟踪' },
+  { value: 'SC-03', label: 'SC-03 限位 / 碰撞守护' },
+  { value: 'SC-04', label: 'SC-04 Sim-to-Sim 偏移扫描' },
+  { value: 'SC-05', label: 'SC-05 Fault → E-stop → 恢复' },
 ];
 
 interface ExperimentControlProps {
@@ -61,7 +61,7 @@ export function ExperimentControl({ sendCommand, dashboardRef }: ExperimentContr
 
   return (
     <div className="panel panel--wide experiment-control">
-      <h3>实验控制</h3>
+      <h3>Panda 执行与故障实验</h3>
       <div className={`experiment-progress-slot ${experiment ? '' : 'experiment-progress-slot--empty'}`}>
         {experiment ? (
           <>

@@ -3,6 +3,7 @@ import type {
   AlertEvent,
   DistributionMetricsPayload,
   ExperimentProgressPayload,
+  GraspStatusPayload,
   RiskStatusPayload,
   TrackingErrorPayload,
   WsFrame,
@@ -13,6 +14,7 @@ const SUBSCRIBE_TOPICS = [
   '/monitor/distribution_metrics',
   '/risk/status',
   '/monitor/tracking_error',
+  '/bridge/sim/grasp_status',
 ];
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
@@ -31,6 +33,16 @@ function isTrackingPayload(payload: unknown): payload is TrackingErrorPayload {
     payload !== null &&
     'joint_names' in payload &&
     'errors' in payload
+  );
+}
+
+function isGraspPayload(payload: unknown): payload is GraspStatusPayload {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'grasp_established' in payload &&
+    'object_slipped' in payload &&
+    'force_norm' in payload
   );
 }
 
@@ -68,6 +80,7 @@ export function useWebSocket() {
   const ingestRisk = useDashboardStore((s) => s.ingestRisk);
   const ingestMetrics = useDashboardStore((s) => s.ingestMetrics);
   const ingestTracking = useDashboardStore((s) => s.ingestTracking);
+  const ingestGrasp = useDashboardStore((s) => s.ingestGrasp);
   const ingestAlert = useDashboardStore((s) => s.ingestAlert);
   const setRecording = useDashboardStore((s) => s.setRecording);
   const ingestExperimentProgress = useDashboardStore((s) => s.ingestExperimentProgress);
@@ -95,6 +108,11 @@ export function useWebSocket() {
           isTrackingPayload(frame.payload)
         ) {
           ingestTracking(frame.payload);
+        } else if (
+          frame.topic === '/bridge/sim/grasp_status' &&
+          isGraspPayload(frame.payload)
+        ) {
+          ingestGrasp(frame.payload);
         } else if (frame.topic === 'alert_event' && isAlertPayload(frame.payload)) {
           ingestAlert(frame.payload);
         }
@@ -118,6 +136,13 @@ export function useWebSocket() {
       ) {
         setConnected(true);
         ingestTracking(frame.payload);
+      } else if (
+        frame.type === 'grasp_status' &&
+        'payload' in frame &&
+        isGraspPayload(frame.payload)
+      ) {
+        setConnected(true);
+        ingestGrasp(frame.payload);
       } else if (frame.type === 'alert_event' && 'payload' in frame && isAlertPayload(frame.payload)) {
         setConnected(true);
         ingestAlert(frame.payload);
@@ -160,7 +185,7 @@ export function useWebSocket() {
         }
       }
     },
-    [ingestAlert, ingestExperimentProgress, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
+    [ingestAlert, ingestExperimentProgress, ingestGrasp, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
   );
 
   const connect = useCallback(() => {

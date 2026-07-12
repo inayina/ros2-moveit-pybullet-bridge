@@ -1,5 +1,15 @@
 # HOC WebSocket troubleshooting
 
+当前首页以 `panda_30_mlp_20260711` 为 canonical portfolio run，展示
+dataset → MLP BC → handoff → Panda replay → fault response。实时区域消费：
+
+- `/monitor/distribution_metrics`
+- `/monitor/tracking_error`
+- `/risk/status`
+- `/bridge/sim/grasp_status`（可选；没有 Sensor Fusion 消息时明确显示等待，不生成假数据）
+
+“Reference”表示 LeRobot/代理参考流，不表示已经接入真实机械臂。
+
 ## 正确启动顺序
 
 WebSocket 由 **`hoc_server`** 提供，不会随 `portfolio_demo` 自动启动。

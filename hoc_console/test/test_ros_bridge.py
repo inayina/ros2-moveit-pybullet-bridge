@@ -1,10 +1,11 @@
 """Unit tests for ROS message to JSON conversion."""
 
-from bridge_monitor_msgs.msg import DistributionMetrics, RiskAttribution, RiskStatus
+from bridge_monitor_msgs.msg import DistributionMetrics, GraspStatus, RiskAttribution, RiskStatus
 from sensor_msgs.msg import JointState
 
 from hoc_console.ros_bridge import (
     distribution_metrics_to_dict,
+    grasp_status_to_dict,
     risk_status_to_dict,
     tracking_error_to_dict,
 )
@@ -86,3 +87,19 @@ def test_tracking_error_to_dict():
     data = tracking_error_to_dict(msg)
     assert data['joint_names'] == ['joint_1', 'joint_2']
     assert data['errors'] == [0.01, 0.02]
+
+
+def test_grasp_status_to_dict():
+    msg = GraspStatus()
+    msg.grasp_established = True
+    msg.object_slipped = False
+    msg.net_wrench.force.x = 3.0
+    msg.net_wrench.force.y = 4.0
+    msg.confidence = 0.95
+
+    data = grasp_status_to_dict(msg)
+
+    assert data['grasp_established'] is True
+    assert data['object_slipped'] is False
+    assert data['force_norm'] == 5.0
+    assert data['confidence'] == 0.95

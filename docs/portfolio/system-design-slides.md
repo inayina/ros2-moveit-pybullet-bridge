@@ -552,6 +552,6 @@ enable_dual_source: true
 | 操作臂 Sim2Real | github.com/inayina/ros2-moveit-pybullet-bridge |
 | 数据采集 | github.com/inayina/robot-arm-episode-data-lab |
 
-作品集 · `docs/portfolio/` · 统一计划 · `MASTER_PORTFOLIO_PLAN.md`
+作品集归档 · `docs/archive/portfolio/` · 统一计划 · `MASTER_PORTFOLIO_PLAN.md`
 
 **Apache-2.0** · inayina · 2026

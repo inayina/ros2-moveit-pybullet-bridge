@@ -87,6 +87,15 @@ export interface TrackingErrorPayload {
   errors: number[];
 }
 
+export interface GraspStatusPayload {
+  grasp_established: boolean;
+  object_slipped: boolean;
+  force_xyz: number[];
+  torque_xyz: number[];
+  force_norm: number;
+  confidence: number;
+}
+
 export interface AlertEvent {
   timestamp?: number;
   event_type?: string;

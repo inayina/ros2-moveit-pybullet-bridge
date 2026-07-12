@@ -52,6 +52,119 @@ html[data-risk-level='3'] .dashboard-root {
   margin-bottom: 8px;
 }
 
+.canonical-run {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid #164e63;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 0 0, rgba(14, 116, 144, 0.22), transparent 34%),
+    linear-gradient(135deg, #0b1620, #10161f);
+}
+
+.canonical-run__header,
+.canonical-run__badges,
+.canonical-run__stage-wrap,
+.panel-title-row,
+.grasp-stats {
+  display: flex;
+  align-items: center;
+}
+
+.canonical-run__header {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.canonical-run__header > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.canonical-run__kicker,
+.canonical-run__stage > span {
+  color: #67e8f9;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.canonical-run__badges {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.canonical-run__flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.canonical-run__stage-wrap {
+  min-width: 0;
+  gap: 8px;
+}
+
+.canonical-run__stage {
+  min-width: 0;
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #233346;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.78);
+}
+
+.canonical-run__stage h3 {
+  margin: 4px 0 6px;
+  color: #f8fafc;
+  font-size: 14px;
+}
+
+.canonical-run__stage strong,
+.canonical-run__stage small {
+  display: block;
+}
+
+.canonical-run__stage strong {
+  color: #86efac;
+  font-size: 13px;
+}
+
+.canonical-run__stage small {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canonical-run__arrow {
+  flex: 0 0 auto;
+  color: #22d3ee;
+}
+
+.panel-title-row {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.grasp-stats {
+  justify-content: space-between;
+  margin: 6px 0;
+}
+
+@media (max-width: 1100px) {
+  .canonical-run__flow {
+    grid-template-columns: 1fr;
+  }
+
+  .canonical-run__arrow {
+    display: none;
+  }
+}
+
 .dashboard-grid {
   display: grid;
   gap: 12px;
@@ -124,8 +237,7 @@ html[data-risk-level='3'] .dashboard-root {
 }
 
 .panel--camera {
-  position: sticky;
-  top: 12px;
+  position: relative;
 }
 
 .panel h3 {

@@ -58,7 +58,9 @@ test.describe('HOC dashboard stability', () => {
   test('dashboard renders key panels under load', async ({ page }) => {
     await page.waitForTimeout(2000);
     await expect(page.getByText('五维风险雷达')).toBeVisible();
-    await expect(page.getByText('Sim / Real 分布对比')).toBeVisible();
+    await expect(page.getByText('Panda 执行 / Reference 分布')).toBeVisible();
+    await expect(page.getByText('Panda Dataset')).toBeVisible();
+    await expect(page.getByText('Panda 抓取 / 传感融合')).toBeVisible();
     await expect(page.getByText('关节跟踪误差')).toBeVisible();
     await expect(page.getByText('KL / W1 / MMD / 通信健康 时序趋势')).toBeVisible();
     await expect(page.locator('.distribution-charts')).toBeVisible();
