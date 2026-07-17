@@ -221,7 +221,7 @@ A：同一能力的两条腿——Dashboard 证明**多子系统聚合与运维*
 | Socket | 记 dashboard `/ws/status` vs bridge HOC `:8765`；TCP 之上 WebSocket 帧 |
 | 算法细节 | 只需讲 KL=分布差、MMD=核方法、窗口 5s/10Hz；不必推公式 |
 | conda / ROS 冲突 | 演示前 `unset CONDA_PREFIX`，系统 Python 3.12 |
-| 模拟面试十题 | 见 [INTERVIEW_PREP.md](./INTERVIEW_PREP.md) §4 标准答法 |
+| 模拟面试十题 | 见 [INTERVIEW_PREP.md](../../portfolio/INTERVIEW_PREP.md) §4 标准答法 |
 
 ### 4.5 面试前 48 小时 checklist
 
@@ -274,10 +274,10 @@ A：同一能力的两条腿——Dashboard 证明**多子系统聚合与运维*
 
 ### Bridge（本仓库）
 
-- [portfolio/README.md](./README.md)
-- [RESUME_SUMMARY.md](./RESUME_SUMMARY.md)
-- [DEMO_SCRIPT.md](./DEMO_SCRIPT.md)
-- [ACCEPTANCE_SUMMARY.md](./ACCEPTANCE_SUMMARY.md)
+- [portfolio/README.md](../../portfolio/README.md)
+- [RESUME_SUMMARY.md](../../portfolio/RESUME_SUMMARY.md)
+- [DEMO_SCRIPT.md](../../portfolio/DEMO_SCRIPT.md)
+- [ACCEPTANCE_SUMMARY.md](../../portfolio/ACCEPTANCE_SUMMARY.md)
 
 ---
 

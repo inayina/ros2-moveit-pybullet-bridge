@@ -44,16 +44,16 @@ flowchart TB
     subgraph DOWN["下游：ros2-moveit-pybullet-bridge (闭环评测与就绪度验收)"]
         MID_OUT --> D1["JSONL Replay Loader<br/>(PandaHandoff)"]
         D1 --> D2["PolicyRunner Strategy Engine"]
-        
+
         subgraph ADAPT["动作适配层 (PandaActionAdapter)"]
             D2 -->|"ee_delta_gripper"| DA1["Kinematic Frame Conversion"]
             DA1 -->|"Target EE Pose"| DA2["Inverse Kinematics (IK)"]
             DA2 -->|"Joint Positions"| DA3["Deadzone & PID Compensation"]
             DA3 -->|"Filtered command"| DA4["Torque / Velocity Limit Filter"]
         end
-        
+
         DA4 -->|"/bridge/command"| D3["PyBullet Sim Bridge"]
-        
+
         subgraph FUSION["异步多源传感器融合 (sensor_fusion_node)"]
             D3 -->|"/bridge/sim/joint_states @100Hz"| F1["ApproximateTime Sync"]
             D3 -->|"/ft_sensor @100Hz"| F2["Dynamic Gravity & Inertia Compensator"]
@@ -61,10 +61,10 @@ flowchart TB
             F2 -->|"Net Contact Wrench"| F3["Grasp Contact & Slip Estimator"]
             F1 --> F3
         end
-        
+
         F3 -->|"/bridge/sim/grasp_status"| D4["dist_monitor & risk_engine"]
         D3 -->|"/bridge/sim_real_error"| D4
-        
+
         subgraph HOC["人机运维控制台 (HOC Console)"]
             D4 -->|"/risk/status / /monitor/metrics"| H1["Multi-Model Compare Dashboard"]
             H1 -->|"Online Switch Checkpoint"| D2
@@ -175,12 +175,12 @@ gantt
 ### Phase 3：真机就绪度实施验证文档落地与进程管理加固
 - **联合输出任务**：
   下游仓库按照 [12-real-machine-readiness-spec](12-real-machine-readiness-spec.md) 落地以下 6 份验证文档：
-  1.  [REAL_MACHINE_READINESS.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/REAL_MACHINE_READINESS.md)：包含重力补偿标定、多源传感器采样率一致性、DDS 局域网隔离和上电顺序的 Go/No-Go Checklist。
-  2.  [INTEGRATION_TEST_PLAN.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/INTEGRATION_TEST_PLAN.md)：包含从单关节低速验证到多关节联动、DDS 丢包压测和限制范围（Joint Limit）校验。
-  3.  [SAFETY_ACCEPTANCE_PLAN.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/SAFETY_ACCEPTANCE_PLAN.md)：定义轨迹 $C^2$ 连续性校验（速度/加速度限制拦截）、死区补偿突变过滤以及抱闸释放重力下沉消除（Brake Release Sag）的安全 SOP。
-  4.  [FRAME_AND_CALIBRATION_CHECK.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/FRAME_AND_CALIBRATION_CHECK.md)：定义手眼标定矩阵（Eye-in-Hand / Eye-to-Hand）在 5 点法下的精度验收规范与 TCP 旋转一致性检查。
-  5.  [GRASP_EVALUATION_PROTOCOL.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/GRASP_EVALUATION_PROTOCOL.md)：定义包含接触力对称性（Force Balance）、动态扰动晃动测试（Shake Test）的稳定抓取评估协议。
-  6.  [IMPLEMENTATION_REPORT_TEMPLATE.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/IMPLEMENTATION_REPORT_TEMPLATE.md)：可直接复制复用的现场实施报告 Markdown 模板。
+  1.  [REAL_MACHINE_READINESS.md](../REAL_MACHINE_READINESS.md)：包含重力补偿标定、多源传感器采样率一致性、DDS 局域网隔离和上电顺序的 Go/No-Go Checklist。
+  2.  [INTEGRATION_TEST_PLAN.md](../INTEGRATION_TEST_PLAN.md)：包含从单关节低速验证到多关节联动、DDS 丢包压测和限制范围（Joint Limit）校验。
+  3.  [SAFETY_ACCEPTANCE_PLAN.md](../SAFETY_ACCEPTANCE_PLAN.md)：定义轨迹 $C^2$ 连续性校验（速度/加速度限制拦截）、死区补偿突变过滤以及抱闸释放重力下沉消除（Brake Release Sag）的安全 SOP。
+  4.  [FRAME_AND_CALIBRATION_CHECK.md](../FRAME_AND_CALIBRATION_CHECK.md)：定义手眼标定矩阵（Eye-in-Hand / Eye-to-Hand）在 5 点法下的精度验收规范与 TCP 旋转一致性检查。
+  5.  [GRASP_EVALUATION_PROTOCOL.md](../GRASP_EVALUATION_PROTOCOL.md)：定义包含接触力对称性（Force Balance）、动态扰动晃动测试（Shake Test）的稳定抓取评估协议。
+  6.  [IMPLEMENTATION_REPORT_TEMPLATE.md](../IMPLEMENTATION_REPORT_TEMPLATE.md)：可直接复制复用的现场实施报告 Markdown 模板。
 - **进程生命周期加固 (Process Lifecycle Enforcement)**：
   - 在所有的集成验证脚本和测试启动入口中，加固**孤立进程检测与清理机制**（基于 Bash `trap cleanup EXIT`，精准捕获 `ros2 launch` 相关守护进程、PyBullet headless 进程及 HOC 前端 Node/Vite 进程）。
   - 增加对 zombie 节点和端口占用（如 `5173`, `8080`, `9090`）的预检和强杀逻辑，确保 CI 环境在多次运行之间完全保持纯净。

@@ -9,12 +9,39 @@ from bridge_monitor_msgs.msg import (
     RiskStatus,
 )
 from sensor_msgs.msg import JointState
+from diagnostic_msgs.msg import DiagnosticArray
+import json
 
 
 def tracking_error_to_dict(msg: JointState) -> dict:
     return {
         'joint_names': list(msg.name),
         'errors': list(msg.position),
+    }
+
+
+def _parse_diagnostic_value(value: str):
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return value
+
+
+def diagnostic_array_to_dict(msg: DiagnosticArray) -> dict:
+    return {
+        'statuses': [
+            {
+                'name': status.name,
+                'level': status.level,
+                'message': status.message,
+                'hardware_id': status.hardware_id,
+                'values': {
+                    item.key: _parse_diagnostic_value(item.value)
+                    for item in status.values
+                },
+            }
+            for status in msg.status
+        ],
     }
 
 

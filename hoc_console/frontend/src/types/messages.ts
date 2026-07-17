@@ -96,6 +96,25 @@ export interface GraspStatusPayload {
   confidence: number;
 }
 
+export interface DiagnosticStatusPayload {
+  name: string;
+  level: number;
+  message: string;
+  hardware_id: string;
+  values: Record<string, unknown>;
+}
+
+export interface DiagnosticArrayPayload {
+  statuses: DiagnosticStatusPayload[];
+}
+
+export interface ResourceHistoryPoint {
+  t: number;
+  cpuTotal: number;
+  recorderHz: number;
+  sceneAge: number;
+}
+
 export interface AlertEvent {
   timestamp?: number;
   event_type?: string;
@@ -128,6 +147,7 @@ export const DIMENSION_LABELS: Record<string, string> = {
   dynamics_anomaly: '动力学异常',
   comm_health: '通信健康',
   planning_failure: '规划失败',
+  resource_pressure: '资源压力',
 };
 
 export const RISK_COLORS: Record<number, string> = {

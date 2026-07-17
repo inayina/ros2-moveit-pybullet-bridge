@@ -11,6 +11,7 @@ import { RobotCameraPanel } from './components/RobotCameraPanel';
 import { R3Modal } from './components/R3Modal';
 import { RiskBanner } from './components/RiskBanner';
 import { RiskRadar } from './components/RiskRadar';
+import { ResourcePanel } from './components/ResourcePanel';
 import { TrendChart } from './components/TrendChart';
 import { TrackingChart } from './components/TrackingChart';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -84,6 +85,7 @@ function App() {
                   <TrackingChart />
                 </div>
                 <TrendChart />
+                <ResourcePanel />
               </div>
             </div>
             <ExperimentControl sendCommand={sendCommand} dashboardRef={dashboardRef} />

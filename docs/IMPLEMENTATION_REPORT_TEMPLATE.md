@@ -1,8 +1,8 @@
 # 机械臂实机部署现场实施报告 (docs/IMPLEMENTATION_REPORT_TEMPLATE.md)
 
-**文档版本**：v1.0  
-**状态**：Template / 实施模板  
-**关联文件**：[REAL_MACHINE_READINESS.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/REAL_MACHINE_READINESS.md)  
+**文档版本**：v1.0
+**状态**：Template / 实施模板
+**关联文件**：[REAL_MACHINE_READINESS.md](REAL_MACHINE_READINESS.md)
 
 ---
 
@@ -19,7 +19,7 @@
 
 ## 2. 集成与就绪度验收测试记录
 
-实施人员需对照 [INTEGRATION_TEST_PLAN.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/INTEGRATION_TEST_PLAN.md) 与 [SAFETY_ACCEPTANCE_PLAN.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/SAFETY_ACCEPTANCE_PLAN.md)，对每个调试动作进行记录并保存对应证据：
+实施人员需对照 [INTEGRATION_TEST_PLAN.md](INTEGRATION_TEST_PLAN.md) 与 [SAFETY_ACCEPTANCE_PLAN.md](SAFETY_ACCEPTANCE_PLAN.md)，对每个调试动作进行记录并保存对应证据：
 
 | 测试项 ID | 验收内容与指标 | 预期结果 | 现场实际结果 | Pass / Fail | 证据路径 (Evidence Path) | 遗留 Issue ID | 负责人 |
 |---|---|---|---|---|---|---|---|
@@ -59,9 +59,9 @@
 
 ### 4.2 遗留残留风险评估 (Residual Risks)
 请在此记录并告知业主/操作员在后续运行中需要注意的残留风险（如光线突变导致手眼图像丢失、特定极限姿态下的关节奇异降速）：
-1. 
-2. 
+1.
+2.
 
 ### 4.3 现场复查与签署 (Signatures)
-* **操作实施员签字**：___________________  **日期**：2026年___月___日  
+* **操作实施员签字**：___________________  **日期**：2026年___月___日
 * **现场复核员签字**：___________________  **日期**：2026年___月___日

@@ -2,9 +2,11 @@
 
 from bridge_monitor_msgs.msg import DistributionMetrics, GraspStatus, RiskAttribution, RiskStatus
 from sensor_msgs.msg import JointState
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 from hoc_console.ros_bridge import (
     distribution_metrics_to_dict,
+    diagnostic_array_to_dict,
     grasp_status_to_dict,
     risk_status_to_dict,
     tracking_error_to_dict,
@@ -103,3 +105,23 @@ def test_grasp_status_to_dict():
     assert data['object_slipped'] is False
     assert data['force_norm'] == 5.0
     assert data['confidence'] == 0.95
+
+
+def test_diagnostic_array_to_dict_parses_numeric_and_array_values():
+    msg = DiagnosticArray()
+    status = DiagnosticStatus()
+    status.name = 'system_telemetry/host'
+    status.message = 'ok'
+    status.values = [
+        KeyValue(key='cpu_total_percent', value='87.5'),
+        KeyValue(key='cpu_per_core_percent', value='[80.0, 95.0]'),
+        KeyValue(key='recording', value='true'),
+    ]
+    msg.status = [status]
+
+    data = diagnostic_array_to_dict(msg)
+
+    values = data['statuses'][0]['values']
+    assert values['cpu_total_percent'] == 87.5
+    assert values['cpu_per_core_percent'] == [80.0, 95.0]
+    assert values['recording'] is True

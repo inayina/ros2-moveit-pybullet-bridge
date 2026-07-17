@@ -1,8 +1,8 @@
 # 系统集成测试矩阵 (docs/INTEGRATION_TEST_PLAN.md)
 
-**文档版本**：v1.0  
-**状态**：Released  
-**关联里程碑**：RM-M3 / RM-SPEC-03  
+**文档版本**：v1.0
+**状态**：Released
+**关联里程碑**：RM-M3 / RM-SPEC-03
 
 本文档定义了真实机械臂接入硬件前系统集成的验证用例矩阵，确保控制链路、状态发布、轨迹限制与安全保护动作行为符合预期。
 
@@ -39,7 +39,7 @@
 * **Expected result**: 控制接口 `/bridge/command`，监控接口 `/bridge/sim/joint_states`、`/monitor/distribution_metrics`，安全接口 `/risk/status` 及服务存在。
 * **Metrics**: 接口存在率。
 * **Pass criteria**: 所有接口定义无缺失。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_01_interface.log`
+* **Evidence path**: `<ros2_ws>/reports/it_01_interface.log`
 * **Risk if failed**: 系统节点启动后无法建立通信连接，导致系统异常瘫痪。
 * **Next action**: 调整 package.xml 中的依赖关系与 launch 启动节点声明。
 
@@ -53,9 +53,9 @@
 * **Expected result**: 显示加载对应机器人（如 `panda`）的关节参数与限幅设置。
 * **Metrics**: 参数读取正确率。
 * **Pass criteria**: 关节名称与数目匹配，限位值符合 profile。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_02_limits.json`
+* **Evidence path**: `<ros2_ws>/reports/it_02_limits.json`
 * **Risk if failed**: 关节名称不匹配或限位缺失会导致轨迹计算失常、奇异或超出实机机械极限。
-* **Next action**: 修改 [robot_profiles.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/robot_profiles.py) 对齐参数定义。
+* **Next action**: 修改 [robot_profiles.py](../pybullet_bridge/pybullet_bridge/robot_profiles.py) 对齐参数定义。
 
 ### IT-03: Single Joint Motion
 * **Objective**: 验证向特定单关节发布指令时，机械臂各关节运动及反馈的独立性。
@@ -65,7 +65,7 @@
 * **Expected result**: 对应关节响应运动，其余关节保持锁死。
 * **Metrics**: 非目标关节的最大偏移量 < $10^{-4}$ rad。
 * **Pass criteria**: 只有目标关节随动，且反馈状态正常。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_03_single_joint.csv`
+* **Evidence path**: `<ros2_ws>/reports/it_03_single_joint.csv`
 * **Risk if failed**: 控制通道映射错乱会导致机械臂失控碰撞。
 * **Next action**: 重新标定关节控制的 index 对应关系。
 
@@ -77,7 +77,7 @@
 * **Expected result**: 机械臂顺滑过度，无奇异点卡顿。
 * **Metrics**: 关节响应时滞 < 50ms。
 * **Pass criteria**: 机械臂以预定轨迹完成运动，无抖动与鸣颤。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_04_multi_joint.csv`
+* **Evidence path**: `<ros2_ws>/reports/it_04_multi_joint.csv`
 * **Risk if failed**: 联动轨迹突变产生力矩过载，烧毁实机驱动器或触发硬件紧急制动。
 * **Next action**: 调整动作适配器的导数限幅与死区值。
 
@@ -91,7 +91,7 @@
 * **Expected result**: 规划生成轨迹，仿真桥读取并跟踪，到达目标点。
 * **Metrics**: 跟踪 RMSE < 0.01 rad。
 * **Pass criteria**: `verify_moveit_closure.sh` 脚本输出为 SUCCESS。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_05_moveit.log`
+* **Evidence path**: `<ros2_ws>/reports/it_05_moveit.log`
 * **Risk if failed**: 规划与控制解耦不良，实机无法闭环运行复杂长轨迹。
 * **Next action**: 调整 MoveIt controller manager 与仿真器之间的轨迹下发时间步长。
 
@@ -105,7 +105,7 @@
 * **Expected result**: PolicyRunner 输出控制指令，轨迹无越界。
 * **Metrics**: 系统验证成功率 100%。
 * **Pass criteria**: 自动化 Replay 测试无 failure。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_06_policy.log`
+* **Evidence path**: `<ros2_ws>/reports/it_06_policy.log`
 * **Risk if failed**: 模型预测指令下发导致控制中断或超界，损坏设备。
 * **Next action**: 检查 Handoff 动作的格式完整性与 adapter 配置。
 
@@ -117,9 +117,9 @@
 * **Expected result**: 夹爪在仿真中产生位移，且反馈观测值一致。
 * **Metrics**: 夹爪开度跟踪误差 < 1mm。
 * **Pass criteria**: 成功合拢和张开，无命令丢失。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_07_gripper.csv`
+* **Evidence path**: `<ros2_ws>/reports/it_07_gripper.csv`
 * **Risk if failed**: 抓取动作失败或由于闭合命令丢失导致物体掉落。
-* **Next action**: 修复 [panda_action_adapter.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py) 中夹爪位置映射。
+* **Next action**: 修复 [panda_action_adapter.py](../pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py) 中夹爪位置映射。
 
 ### IT-08: Pick-Lift-Place
 * **Objective**: 验证由动作适配器和物理仿真组成的端到端抓取-抬升-放置完整管线。
@@ -131,7 +131,7 @@
 * **Expected result**: 顺利抓取、抬升、运送并放置，状态监控输出 success。
 * **Metrics**: 抓取成功率。
 * **Pass criteria**: 拾取率符合预期，并且 `verify_pick.sh` 返回成功。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_08_pick.log`
+* **Evidence path**: `<ros2_ws>/reports/it_08_pick.log`
 * **Risk if failed**: 无法正常获取数据样本或导致仿真假成功样本混入。
 * **Next action**: 调整抓取补偿偏置与力矩限幅。
 
@@ -143,7 +143,7 @@
 * **Expected result**: `risk_engine` 检测到状态不一致或延迟严重，发布 E-Stop。
 * **Metrics**: 安全响应延时 < 100ms。
 * **Pass criteria**: 触发 R3 警报，轨迹被截断且机械臂 HOLD。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_09_fault.log`
+* **Evidence path**: `<ros2_ws>/reports/it_09_fault.log`
 * **Risk if failed**: 遇到硬件死机或 DDS 异常时，实机无法紧急制动导致失控。
 * **Next action**: 优化 `risk_engine` 的看门狗评估周期。
 
@@ -155,6 +155,6 @@
 * **Expected result**: 警报解除，系统重置为 Home，恢复 RUNNING。
 * **Metrics**: 重置时间。
 * **Pass criteria**: 清空警报标志且可重新被控制。
-* **Evidence path**: `/home/ina/ros2_ws/reports/it_10_recovery.log`
+* **Evidence path**: `<ros2_ws>/reports/it_10_recovery.log`
 * **Risk if failed**: 报警无法复位导致系统死锁，或复位不当导致二次冲击。
 * **Next action**: 重新编写系统状态重置状态机逻辑。

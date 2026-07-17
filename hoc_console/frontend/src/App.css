@@ -350,3 +350,33 @@ html[data-risk-level='3'] .dashboard-root {
 .ant-statistic-content {
   color: #e8e8e8 !important;
 }
+
+.resource-bars {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.resource-bars span,
+.process-row span {
+  color: #a3a3a3;
+  font-size: 12px;
+}
+
+.process-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin-top: 12px;
+}
+
+.process-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto;
+  gap: 2px 8px;
+}
+
+.process-row .ant-progress {
+  grid-column: 1 / -1;
+}

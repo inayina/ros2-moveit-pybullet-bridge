@@ -48,7 +48,7 @@
 在联调脚本启动时，系统自动生成随机的 `ROS_DOMAIN_ID`（本轮运行为 `ROS_DOMAIN_ID=157`），以物理隔绝 DDS 历史缓存消息。这完全避免了在短时间内多次运行仿真时，DDS 缓存的上一轮大图（如 `640x480`）被错误对齐到新一轮小图（如 `320x240`）的现象。
 
 ### 2.2 动态图像形状过滤 (Shape Consistency Filter)
-由于 ROS 2 参数生命周期的异步覆盖特性，相机节点在启动首帧时可能使用 constructor 的默认值（`640x480`）发布，随后立即被 launch 参数覆盖为 `320x240`。我们在中游数据写入层 [`lerobot_writer.py`](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/lerobot_writer.py#L93-L105) 实现了动态形状过滤器，自动剔除首帧等形状不一致的 DDS 竞争瞬态帧，确保导出的 HuggingFace 格式数据集各维度 100% 规整一致。
+由于 ROS 2 参数生命周期的异步覆盖特性，相机节点在启动首帧时可能使用 constructor 的默认值（`640x480`）发布，随后立即被 launch 参数覆盖为 `320x240`。我们在中游数据写入层 [`lerobot_writer.py`](https://github.com/inayina/ros2-arm-teleoperation-suite/blob/main/src/lerobot_recorder/lerobot_recorder/lerobot_writer.py#L93-L105) 实现了动态形状过滤器，自动剔除首帧等形状不一致的 DDS 竞争瞬态帧，确保导出的 HuggingFace 格式数据集各维度 100% 规整一致。
 
 ---
 

@@ -223,5 +223,5 @@ mmdc -i unified-architecture-overview.mmd -o ../assets/unified-architecture-over
 ## 7. 相关文档
 
 - [MASTER_PORTFOLIO_PLAN.md](./MASTER_PORTFOLIO_PLAN.md)
-- [INTERVIEW_PREP.md](./INTERVIEW_PREP.md)
+- [INTERVIEW_PREP.md](../../portfolio/INTERVIEW_PREP.md)
 - dashboard：[portfolio_demo_summary.md](https://github.com/inayina/robot-ops-dashboard/blob/main/docs/portfolio_demo_summary.md)

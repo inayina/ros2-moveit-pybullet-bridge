@@ -27,11 +27,15 @@ class RiskEngineNode(Node):
     def __init__(self) -> None:
         super().__init__('risk_engine')
 
-        self.declare_parameter('weights.distribution_shift', 0.35)
+        self.declare_parameter('weights.distribution_shift', 0.30)
         self.declare_parameter('weights.tracking_error', 0.25)
         self.declare_parameter('weights.dynamics_anomaly', 0.20)
         self.declare_parameter('weights.comm_health', 0.10)
-        self.declare_parameter('weights.planning_failure', 0.10)
+        self.declare_parameter('weights.planning_failure', 0.05)
+        self.declare_parameter('weights.resource_pressure', 0.10)
+        self.declare_parameter('resource_cpu_threshold_percent', 85.0)
+        self.declare_parameter('resource_effective_hz_min', 8.0)
+        self.declare_parameter('resource_scene_age_threshold_s', 0.5)
         self.declare_parameter('level_thresholds', [0.25, 0.50, 0.75])
         self.declare_parameter('tracking_rmse_threshold', 0.05)
         self.declare_parameter('planning_failure_rate_threshold', 0.1)
@@ -46,6 +50,7 @@ class RiskEngineNode(Node):
             dynamics_anomaly=self.get_parameter('weights.dynamics_anomaly').value,
             comm_health=self.get_parameter('weights.comm_health').value,
             planning_failure=self.get_parameter('weights.planning_failure').value,
+            resource_pressure=self.get_parameter('weights.resource_pressure').value,
         )
         thresholds = tuple(self.get_parameter('level_thresholds').value)
         self._aggregator = RiskAggregator(weights=weights, level_thresholds=thresholds)
@@ -63,6 +68,11 @@ class RiskEngineNode(Node):
             window_size=int(self.get_parameter('planning_stats_window_size').value),
         )
         self._bridge_system_state = 'RUNNING'
+        self._host_cpu_percent = 0.0
+        self._host_memory_percent = 0.0
+        self._recorder_effective_hz = 0.0
+        self._scene_age_s = 0.0
+        self._recorder_recording = False
 
         self.create_subscription(
             DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
@@ -72,6 +82,10 @@ class RiskEngineNode(Node):
             String, '/manipulation/planning_result', self._on_planning_result, 10)
         self.create_subscription(
             String, '/bridge/system_state', self._on_bridge_system_state, 10)
+        self.create_subscription(
+            DiagnosticArray, '/system/telemetry', self._on_system_telemetry, 10)
+        self.create_subscription(
+            DiagnosticArray, '/recorder/diagnostics', self._on_recorder_diagnostics, 10)
 
         self._status_pub = self.create_publisher(RiskStatus, '/risk/status', 10)
         self._alerts_pub = self.create_publisher(String, '/risk/alerts', 10)
@@ -121,6 +135,34 @@ class RiskEngineNode(Node):
     def _on_bridge_system_state(self, msg: String) -> None:
         self._bridge_system_state = msg.data
 
+    @staticmethod
+    def _diagnostic_values(status) -> dict[str, str]:
+        return {value.key: value.value for value in status.values}
+
+    def _on_system_telemetry(self, msg: DiagnosticArray) -> None:
+        for status in msg.status:
+            if status.name != 'system_telemetry/host':
+                continue
+            values = self._diagnostic_values(status)
+            try:
+                self._host_cpu_percent = float(values.get('cpu_total_percent', 0.0))
+                self._host_memory_percent = float(values.get('memory_percent', 0.0))
+            except ValueError:
+                return
+
+    def _on_recorder_diagnostics(self, msg: DiagnosticArray) -> None:
+        for status in msg.status:
+            if status.name != 'lerobot_recorder/health':
+                continue
+            values = self._diagnostic_values(status)
+            try:
+                self._recorder_effective_hz = float(values.get('effective_hz', 0.0))
+                self._scene_age_s = float(values.get('scene_age_s', 0.0))
+                self._recorder_recording = (
+                    values.get('recording', 'False').lower() == 'true')
+            except ValueError:
+                return
+
     def _compute_raw_scores(self) -> dict[str, float]:
         scores = {
             'distribution_shift': 0.0,
@@ -128,6 +170,7 @@ class RiskEngineNode(Node):
             'dynamics_anomaly': 0.0,
             'comm_health': 0.0,
             'planning_failure': 0.0,
+            'resource_pressure': 0.0,
         }
         if self._latest_metrics:
             kl_norm = self._latest_metrics.kl_divergence_mean / 0.30
@@ -157,10 +200,41 @@ class RiskEngineNode(Node):
                 1.0,
             )
 
+        cpu_threshold = float(
+            self.get_parameter('resource_cpu_threshold_percent').value)
+        hz_min = float(self.get_parameter('resource_effective_hz_min').value)
+        age_threshold = float(
+            self.get_parameter('resource_scene_age_threshold_s').value)
+        cpu_score = (
+            max(0.0, (self._host_cpu_percent - cpu_threshold) / max(100.0 - cpu_threshold, 1.0))
+            if cpu_threshold > 0.0 else 0.0
+        )
+        memory_score = max(0.0, (self._host_memory_percent - 85.0) / 15.0)
+        capture_score = 0.0
+        if self._recorder_recording:
+            if hz_min > 0.0:
+                capture_score = max(
+                    capture_score,
+                    max(0.0, (hz_min - self._recorder_effective_hz) / hz_min),
+                )
+            if age_threshold > 0.0:
+                capture_score = max(
+                    capture_score, self._scene_age_s / age_threshold)
+        scores['resource_pressure'] = min(
+            1.0, max(cpu_score, memory_score, capture_score))
+
         return scores
 
     def _publish_risk(self) -> None:
-        result = self._aggregator.aggregate(self._compute_raw_scores())
+        raw_scores = self._compute_raw_scores()
+        result = self._aggregator.aggregate(raw_scores)
+        safety_scores = dict(raw_scores)
+        safety_scores['resource_pressure'] = 0.0
+        safety_result = self._aggregator.aggregate(safety_scores)
+        if raw_scores['resource_pressure'] >= 0.85 and result.level < 2:
+            result.level = 2
+            result.primary_driver = 'resource_pressure'
+            result.recommendation = RECOMMENDATIONS['resource_pressure']
         if self._latest_metrics and self._latest_metrics.soft_limit_triggered and result.level < 2:
             # A soft-limit breach is a safety override: require degraded operation even
             # when the weighted aggregate score would otherwise stay below R2.
@@ -170,7 +244,7 @@ class RiskEngineNode(Node):
 
         if (
             self.get_parameter('auto_e_stop_on_r3').value
-            and result.level >= 3
+            and safety_result.level >= 3
             and not self._e_stop_active
         ):
             self._trigger_e_stop(result, reason='e_stop_triggered')

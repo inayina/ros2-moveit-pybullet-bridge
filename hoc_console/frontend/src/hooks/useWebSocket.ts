@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import type {
   AlertEvent,
   DistributionMetricsPayload,
+  DiagnosticArrayPayload,
   ExperimentProgressPayload,
   GraspStatusPayload,
   RiskStatusPayload,
@@ -15,6 +16,8 @@ const SUBSCRIBE_TOPICS = [
   '/risk/status',
   '/monitor/tracking_error',
   '/bridge/sim/grasp_status',
+  '/system/telemetry',
+  '/recorder/diagnostics',
 ];
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
@@ -69,6 +72,15 @@ function isExperimentProgress(payload: unknown): payload is ExperimentProgressPa
   );
 }
 
+function isDiagnosticPayload(payload: unknown): payload is DiagnosticArrayPayload {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'statuses' in payload &&
+    Array.isArray(payload.statuses)
+  );
+}
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -86,6 +98,8 @@ export function useWebSocket() {
   const ingestExperimentProgress = useDashboardStore((s) => s.ingestExperimentProgress);
   const setCameraFrame = useDashboardStore((s) => s.setCameraFrame);
   const setSystemState = useDashboardStore((s) => s.setSystemState);
+  const ingestSystemTelemetry = useDashboardStore((s) => s.ingestSystemTelemetry);
+  const ingestRecorderDiagnostics = useDashboardStore((s) => s.ingestRecorderDiagnostics);
 
   const handleFrame = useCallback(
     (frame: WsFrame) => {
@@ -113,6 +127,16 @@ export function useWebSocket() {
           isGraspPayload(frame.payload)
         ) {
           ingestGrasp(frame.payload);
+        } else if (
+          frame.topic === '/system/telemetry' &&
+          isDiagnosticPayload(frame.payload)
+        ) {
+          ingestSystemTelemetry(frame.payload);
+        } else if (
+          frame.topic === '/recorder/diagnostics' &&
+          isDiagnosticPayload(frame.payload)
+        ) {
+          ingestRecorderDiagnostics(frame.payload);
         } else if (frame.topic === 'alert_event' && isAlertPayload(frame.payload)) {
           ingestAlert(frame.payload);
         }
@@ -185,7 +209,7 @@ export function useWebSocket() {
         }
       }
     },
-    [ingestAlert, ingestExperimentProgress, ingestGrasp, ingestMetrics, ingestRisk, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
+    [ingestAlert, ingestExperimentProgress, ingestGrasp, ingestMetrics, ingestRecorderDiagnostics, ingestRisk, ingestSystemTelemetry, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
   );
 
   const connect = useCallback(() => {

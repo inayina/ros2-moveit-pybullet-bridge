@@ -93,3 +93,189 @@
 * **规范要求**：
   - 关节状态（`/joint_states`）与控制指令的话题必须配置为 **Best Effort** 的可靠性策略（只保实时性，丢帧不补发，避免指令积压造成“追赶效应”）。
   - 安全心跳与 E-Stop 信号必须配置为 **Reliable** 和 **Transient Local**，确保所有节点均能实时且准确地收到安全状态变更。
+
+---
+
+## 四、跨机器部署补充规范（设计规划，非已实现）
+
+> [!NOTE]
+> 以下内容为从单机仿真向真实双机部署迁移时的技术规划，当前项目仅在单机仿真环境中完成验证，尚未接入真实 Franka Panda 硬件。
+
+---
+
+### 1. Franka Control Interface（FCI）网络与实时内核要求
+
+真实 Panda 机械臂通过 **FCI（Franka Control Interface）** 与控制 PC 通信，对网络和操作系统有严格的实时性要求。
+
+#### 网络配置
+
+```
+控制 PC（运行 ROS2 节点）
+    ├── eth0 → 局域网 / 办公网络（普通流量）
+    └── eth1 → 192.168.1.x（直连 Panda 控制柜，专用网口）
+                         ↓ 1Gbps 直连网线（不经过交换机）
+              Panda 控制柜（固定 IP: 192.168.1.1）
+```
+
+- Panda FCI 要求控制 PC 与控制柜之间的**往返延迟 < 1ms**
+- 必须使用**专用网口直连**，不能共用办公网络，否则网络抖动会触发 FCI 通信超时保护（机械臂自动制动）
+- 关闭控制 PC 上 eth1 的网卡节能（Energy Efficient Ethernet）：
+  ```bash
+  sudo ethtool -s eth1 speed 1000 duplex full autoneg off
+  sudo ethtool --set-eee eth1 eee off
+  ```
+
+#### 实时内核（RT Kernel）要求
+
+FCI 要求控制 PC 运行 **PREEMPT-RT 实时内核**，保证控制周期抖动 < 100μs：
+
+```bash
+# 验证当前内核是否为实时内核
+uname -r
+# 期望输出包含 "-rt" 或 "PREEMPT_RT"，例如：
+# 5.15.0-76-generic-rt
+
+# 检查实时调度权限
+ulimit -r   # 应 > 0
+
+# 设置 ROS2 控制节点的实时优先级（需 root 或 CAP_SYS_NICE）
+sudo chrt -f 80 ros2 run controller_manager ros2_control_node
+```
+
+> [!WARNING]
+> 不使用实时内核直接运行 FCI 会导致控制周期超时，Panda 控制柜会频繁触发 `communication_constraints_violation` 错误并强制停机。
+
+---
+
+### 2. vcan0 → 真实 CAN 总线切换
+
+当前项目的 `canopen_hw_interface` 通过 `use_sim` 参数区分仿真和真机模式：
+
+```cpp
+// canopen_system.cpp — 参数控制仿真/真机分支
+use_sim_ = (use_sim_text == "true");
+
+if (use_sim_) {
+    // 仿真：订阅 /sim/encoder_state，发布 /sim/joint_effort_cmd
+} else {
+    // 真机：open_can_socket() 连接真实 CAN 总线
+    can_socket_ = socket(PF_CAN, SOCK_RAW, CAN_RAW);
+}
+```
+
+#### 仿真 → 真机的切换步骤
+
+**第一步：配置真实 CAN 总线接口**
+
+```bash
+# 加载 CAN 内核模块
+sudo modprobe can
+sudo modprobe can_raw
+sudo modprobe gs_usb    # USB-CAN 适配器（如 PEAK PCAN-USB）
+
+# 启动真实 CAN 接口（替代 vcan0）
+sudo ip link set can0 type can bitrate 1000000   # 1Mbit/s（CANopen 标准）
+sudo ip link set can0 up
+
+# 验证接口在线
+ip link show can0
+candump can0   # 应能看到驱动器心跳帧 701~707
+```
+
+**第二步：修改 launch 参数**
+
+```bash
+# 仿真模式（当前默认）
+ros2 launch teleop_bringup full_system.launch.py use_sim:=true  can_interface:=vcan0
+
+# 真机模式
+ros2 launch teleop_bringup full_system.launch.py use_sim:=false can_interface:=can0
+```
+
+**第三步：验证 DS402 状态机上电序列**
+
+真机启动时 `canopen_hw_interface` 会依次执行：
+
+```
+NMT Start → Switch On Disabled → Ready to Switch On → Switched On → Operation Enabled
+```
+
+通过 `candump can0` 观察各节点（COB-ID `0x701`~`0x707`）的心跳状态码应为 `0x05`（Operational），否则检查电源和节点 ID 配置。
+
+> [!CAUTION]
+> 真机首次上电前必须确认：急停按钮处于可触发状态、机械臂周围无人、阻抗控制刚度系数已降至仿真值的 10%。
+
+---
+
+### 3. 跨机器 ROS_DOMAIN_ID 与 DDS 配置
+
+单机仿真时所有节点在同一台机器上，DDS 自动使用共享内存传输。真机部署时，控制 PC 和 Panda 控制柜（或上位机）是两台机器，DDS 退回 UDP 组播通信，需要统一以下配置。
+
+#### ROS_DOMAIN_ID 统一
+
+```bash
+# 两台机器必须使用相同的 Domain ID，且在同一局域网子网
+# 控制 PC（~/.bashrc 或 /etc/environment）
+export ROS_DOMAIN_ID=42
+
+# Panda 控制柜上位机（同样配置）
+export ROS_DOMAIN_ID=42
+```
+
+Domain ID 决定 DDS 使用的 UDP 组播地址（`239.255.0.{domain_id}`），不同 Domain 的节点完全隔离，看不到彼此的话题。
+
+#### 组播路由验证
+
+```bash
+# 验证两台机器的组播包能互达
+# 在控制 PC 上
+ping 239.255.0.42
+
+# 检查网络接口是否支持组播
+ip link show eth1 | grep MULTICAST
+
+# 如果交换机过滤了组播，可切换为单播发现（FastDDS XML 配置）
+export FASTRTPS_DEFAULT_PROFILES_FILE=/path/to/unicast_discovery.xml
+```
+
+`unicast_discovery.xml` 示例（避免组播被网络设备过滤）：
+
+```xml
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="default_profile" is_default_profile="true">
+    <rtps>
+      <builtin>
+        <metatrafficUnicastLocatorList>
+          <locator>
+            <udpv4>
+              <address>192.168.1.100</address>  <!-- 控制 PC IP -->
+            </udpv4>
+          </locator>
+        </metatrafficUnicastLocatorList>
+        <initialPeersList>
+          <locator>
+            <udpv4>
+              <address>192.168.1.1</address>   <!-- Panda 控制柜 IP -->
+            </udpv4>
+          </locator>
+        </initialPeersList>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>
+```
+
+#### 跨机器 QoS 注意事项
+
+DDS 切换到 UDP 后，之前依赖共享内存的性能优势消失，需要重新评估：
+
+| 话题 | 单机延迟 | 跨机器 UDP 延迟 | 处理方式 |
+|------|---------|----------------|---------|
+| `/joint_states` @ 1kHz | ~1μs | ~200μs | 可接受，保持 `BEST_EFFORT` |
+| `/sim/encoder_state` @ 1kHz | ~1μs | ~200μs | 可接受，保持 `BEST_EFFORT` |
+| `/safety/estop` | ~1μs | ~1ms | 必须 `RELIABLE + TRANSIENT_LOCAL` |
+| `/bridge/camera/image` @ 30Hz | ~1ms | ~5~20ms | 考虑压缩或降帧率 |
+
+> [!TIP]
+> 跨机器部署时建议用 `ros2 topic delay /joint_states` 实时监测端到端延迟，目标保持 < 50ms（与 M4 验收标准一致）。若延迟持续超标，优先排查网络设备是否有 QoS 限速或组播过滤策略。

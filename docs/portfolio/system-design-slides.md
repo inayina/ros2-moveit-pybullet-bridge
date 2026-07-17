@@ -45,7 +45,7 @@ inayina · v1.1 · 2026-06-21
 
 <!-- _class: lead -->
 
-# 1. 项目背景与目标
+## 1. 项目背景与目标
 
 ---
 
@@ -95,7 +95,7 @@ ros2-moveit-pybullet-bridge  ← MoveIt + PyBullet + 监控 + 风险 + HOC
 
 <!-- _class: lead -->
 
-# 1.2 robot-ops-dashboard
+## 1.2 robot-ops-dashboard
 ### 运维聚合子系统
 
 ---
@@ -119,7 +119,7 @@ ros2-moveit-pybullet-bridge  ← MoveIt + PyBullet + 监控 + 风险 + HOC
 
 <!-- _class: lead -->
 
-# 1.3 Dashboard 数据链（1/2）
+## 1.3 Dashboard 数据链（1/2）
 ### AMR · 遥测
 
 ---
@@ -150,7 +150,7 @@ Dashboard **不**直接 import ROS 2 / Nav2 代码
 
 <!-- _class: lead -->
 
-# 1.3 Dashboard 数据链（2/2）
+## 1.3 Dashboard 数据链（2/2）
 ### Motor bench · Evaluation
 
 ---
@@ -180,7 +180,7 @@ POST /api/robot/motor/cmd → MQTT robot/motor/cmd
 
 <!-- _class: lead -->
 
-# 1.4 操作臂验证子系统
+## 1.4 操作臂验证子系统
 ### 本仓库职责摘要
 
 ---
@@ -209,7 +209,7 @@ PolicyRunner (Replay/SineWave) ──► /bridge/command
 
 <!-- _class: lead -->
 
-# 2. 系统整体架构（1/2）
+## 2. 系统整体架构（1/2）
 ### 分层模块
 
 ---
@@ -243,7 +243,7 @@ PolicyRunner (Replay/SineWave) ──► /bridge/command
 
 <!-- _class: lead -->
 
-# 2. 系统整体架构（2/2）
+## 2. 系统整体架构（2/2）
 ### 数据流
 
 ---
@@ -275,7 +275,7 @@ RViz 拖拽 → move_group → FollowJointTrajectory
 
 <!-- _class: lead -->
 
-# 3. 核心模块（1/3）
+## 3. 核心模块（1/3）
 ### MoveIt 2 桥接器
 
 ---
@@ -303,7 +303,7 @@ RViz 拖拽 → move_group → FollowJointTrajectory
 
 <!-- _class: lead -->
 
-# 3. 核心模块（2/3）
+## 3. 核心模块（2/3）
 ### Sim/Real 分布监控器
 
 ---
@@ -339,7 +339,7 @@ RViz 拖拽 → move_group → FollowJointTrajectory
 
 <!-- _class: lead -->
 
-# 3. 核心模块（3/3）
+## 3. 核心模块（3/3）
 ### 风险引擎 + HOC
 
 ---
@@ -371,7 +371,7 @@ D1 分布偏移 · D2 跟踪误差 · D3 动力学 · D4 通信 · D5 规划失�
 
 <!-- _class: lead -->
 
-# 4. 部署与运维（1/2）
+## 4. 部署与运维（1/2）
 ### 环境与依赖
 
 ---
@@ -402,7 +402,7 @@ docker compose run --rm verify
 
 <!-- _class: lead -->
 
-# 4. 部署与运维（2/2）
+## 4. 部署与运维（2/2）
 ### 配置与启动
 
 ---
@@ -429,7 +429,7 @@ ros2 launch hoc_console hoc.launch.py  # → :5173
 
 <!-- _class: lead -->
 
-# 5. 测试策略与 CI/CD
+## 5. 测试策略与 CI/CD
 
 ---
 
@@ -460,7 +460,7 @@ L1 单元（KL/MMD/插值）
 
 <!-- _class: lead -->
 
-# 6. 已知问题与后续规划
+## 6. 已知问题与后续规划
 
 ---
 
@@ -490,7 +490,7 @@ L1 单元（KL/MMD/插值）
 
 <!-- _class: lead -->
 
-# 附录 A
+## 附录 A
 ### 接口清单（摘要）
 
 ---
@@ -509,7 +509,7 @@ L1 单元（KL/MMD/插值）
 
 <!-- _class: lead -->
 
-# 附录 B
+## 附录 B
 ### 配置示例
 
 ---
@@ -542,7 +542,7 @@ enable_dual_source: true
 <!-- _class: lead -->
 <!-- _paginate: false -->
 
-# 谢谢
+## 谢谢
 
 **机器人系统集成与验证平台 · 五仓作品集**
 

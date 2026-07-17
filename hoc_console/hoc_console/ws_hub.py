@@ -11,12 +11,16 @@ TOPIC_RISK = '/risk/status'
 TOPIC_METRICS = '/monitor/distribution_metrics'
 TOPIC_TRACKING = '/monitor/tracking_error'
 TOPIC_GRASP = '/bridge/sim/grasp_status'
+TOPIC_SYSTEM_TELEMETRY = '/system/telemetry'
+TOPIC_RECORDER_DIAGNOSTICS = '/recorder/diagnostics'
 
 TOPIC_TYPE_MAP = {
     TOPIC_RISK: 'risk_status',
     TOPIC_METRICS: 'distribution_metrics',
     TOPIC_TRACKING: 'tracking_error',
     TOPIC_GRASP: 'grasp_status',
+    TOPIC_SYSTEM_TELEMETRY: 'system_telemetry',
+    TOPIC_RECORDER_DIAGNOSTICS: 'recorder_diagnostics',
 }
 
 TYPE_TOPIC_MAP = {v: k for k, v in TOPIC_TYPE_MAP.items()}
@@ -39,7 +43,8 @@ class WsHub:
 
     def register(self, websocket) -> None:
         self._clients[websocket] = {
-            TOPIC_RISK, TOPIC_METRICS, TOPIC_TRACKING, TOPIC_GRASP}
+            TOPIC_RISK, TOPIC_METRICS, TOPIC_TRACKING, TOPIC_GRASP,
+            TOPIC_SYSTEM_TELEMETRY, TOPIC_RECORDER_DIAGNOSTICS}
 
     def unregister(self, websocket) -> None:
         self._clients.pop(websocket, None)

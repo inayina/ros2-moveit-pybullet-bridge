@@ -1,6 +1,17 @@
 # 文档索引
 
-本目录包含设计规格、集成指南、实验报告与作品集导出材料。
+本目录包含当前指南、历史设计规格、实验样例与作品集材料。新人建议先读：
+[仓库 README](../README.md) → [CURRENT_STATUS.md](./CURRENT_STATUS.md) →
+[AGENTS.md](./AGENTS.md) → [INTER_REPO_CONTRACTS.md](./INTER_REPO_CONTRACTS.md) → [SETUP.md](./SETUP.md)。
+
+跨三仓项目事实查询与本仓变更影响分析：
+
+```bash
+bin/ask-project "下游当前负责什么？"
+bin/project-evidence impact --base HEAD~1 --head HEAD
+```
+
+入口通过 `EPISODE_DATA_LAB_ROOT` 定位中游 Project Evidence Agent 核心。
 
 ## 快速导航
 
@@ -12,8 +23,8 @@
 | 查看三仓交接契约 / feedback loop | [INTER_REPO_CONTRACTS.md](./INTER_REPO_CONTRACTS.md) |
 | 跑实验、看报告 | [EXPERIMENTS.md](./EXPERIMENTS.md) |
 | 查看当前作品集事实状态 | [CURRENT_STATUS.md](./CURRENT_STATUS.md) |
-| 查看 iiwa7 与 Panda 对齐路线 | [PANDA_ALIGNMENT_ROADMAP.md](./PANDA_ALIGNMENT_ROADMAP.md) |
-| 接入 Panda JSONL replay | [PANDA_JSONL_REPLAY_ROADMAP.md](./PANDA_JSONL_REPLAY_ROADMAP.md) |
+| 查看 Legacy iiwa7 与 Panda 对齐历史 | [PANDA_ALIGNMENT_ROADMAP.md](./PANDA_ALIGNMENT_ROADMAP.md) |
+| 查看 Panda JSONL replay 的历史接入路线 | [PANDA_JSONL_REPLAY_ROADMAP.md](./PANDA_JSONL_REPLAY_ROADMAP.md)；当前实现状态以 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 为准 |
 | 对照验收标准查差距 | [ACCEPTANCE_GAP.md](./ACCEPTANCE_GAP.md) |
 | 阅读系统架构 | [design/README.md](./design/README.md) |
 | 查看系统工程架构 / ICD / FMEA | [ARCHITECTURE.md](./ARCHITECTURE.md) · [ICD.md](./ICD.md) · [FMEA.md](./FMEA.md) |
@@ -48,11 +59,11 @@ docs/
 └── assets/                PNG/GIF/SVG 配图
 ```
 
-## 实验报告一览
+## 历史样例报告（不能替代当前运行产物）
 
 | 报告 | 类型 | 说明 |
 |------|------|------|
-| [samples/dual-repo-experiment-report.html](./samples/dual-repo-experiment-report.html) | 跨仓库联调 | Sim（bridge）vs Real（LeRobot），含局限说明 |
+| [samples/dual-repo-experiment-report.html](./samples/dual-repo-experiment-report.html) | 历史跨仓库联调样例 | “Real” 是历史代理源命名，不代表真实机器人 |
 | [samples/same-task-calibration-report.html](./samples/same-task-calibration-report.html) | 同任务校准 | 双源同 JointTrajectory，KL/W1/MMD 可解释 |
 | [samples/dual-repo-integration-report.html](./samples/dual-repo-integration-report.html) | 验收摘要 | 指标表 + 嵌入图表 |
 | [samples/sample-experiment-report.html](./samples/sample-experiment-report.html) | HOC 样例 | 五维风险 + dashboard 截图 |

@@ -21,6 +21,7 @@ from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String
 from std_srvs.srv import SetBool, Trigger
+from diagnostic_msgs.msg import DiagnosticArray
 
 from bridge_monitor_msgs.action import ExecuteScenario, Pick, Place
 from bridge_monitor_msgs.msg import (
@@ -41,6 +42,7 @@ from hoc_console.report_csv import render_csv_report
 from hoc_console.report_html import render_html_report
 from hoc_console.ros_bridge import (
     distribution_metrics_to_dict,
+    diagnostic_array_to_dict,
     grasp_status_to_dict,
     risk_status_to_dict,
     tracking_error_to_dict,
@@ -72,6 +74,9 @@ class SessionHistory:
     mmd_sum: float = 0.0
     mmd_max: float = 0.0
     metrics_count: int = 0
+    system_telemetry_timeline: deque = field(default_factory=lambda: deque(maxlen=3600))
+    recorder_diagnostics_timeline: deque = field(default_factory=lambda: deque(maxlen=3600))
+    max_host_cpu_percent: float = 0.0
 
     def record_risk(self, payload: dict[str, Any]) -> None:
         t = time.time() - self.start_time
@@ -118,7 +123,21 @@ class SessionHistory:
             'max_w1': self.w1_max,
             'mean_mmd': mean_mmd,
             'max_mmd': self.mmd_max,
+            'max_host_cpu_percent': self.max_host_cpu_percent,
+            'system_telemetry_samples': len(self.system_telemetry_timeline),
+            'recorder_diagnostic_samples': len(self.recorder_diagnostics_timeline),
         }
+
+    def record_diagnostic(self, topic: str, payload: dict[str, Any]) -> None:
+        sample = {'t': time.time() - self.start_time, **payload}
+        if topic == '/system/telemetry':
+            self.system_telemetry_timeline.append(sample)
+            for status in payload.get('statuses', []):
+                if status.get('name') == 'system_telemetry/host':
+                    cpu = float(status.get('values', {}).get('cpu_total_percent', 0.0))
+                    self.max_host_cpu_percent = max(self.max_host_cpu_percent, cpu)
+        else:
+            self.recorder_diagnostics_timeline.append(sample)
 
 
 class HocServerNode(Node):
@@ -143,6 +162,8 @@ class HocServerNode(Node):
         self._latest_metrics: DistributionMetrics | None = None
         self._latest_tracking = None
         self._latest_grasp: GraspStatus | None = None
+        self._latest_system_telemetry: DiagnosticArray | None = None
+        self._latest_recorder_diagnostics: DiagnosticArray | None = None
         self._latest_camera_jpeg: bytes | None = None
         self._camera_logged = False
         self._history = SessionHistory()
@@ -169,6 +190,10 @@ class HocServerNode(Node):
         self.create_subscription(
             ExperimentMetadata, '/bridge/experiment_metadata', self._on_experiment_metadata, 10)
         self.create_subscription(String, '/bridge/system_state', self._on_bridge_system_state, 10)
+        self.create_subscription(
+            DiagnosticArray, '/system/telemetry', self._on_system_telemetry, 10)
+        self.create_subscription(
+            DiagnosticArray, '/recorder/diagnostics', self._on_recorder_diagnostics, 10)
 
         self._e_stop_client = self.create_client(Trigger, '/risk/force_e_stop')
         self._ack_client = self.create_client(AcknowledgeRisk, '/risk/acknowledge')
@@ -321,6 +346,16 @@ class HocServerNode(Node):
     def _on_grasp(self, msg: GraspStatus) -> None:
         self._latest_grasp = msg
 
+    def _on_system_telemetry(self, msg: DiagnosticArray) -> None:
+        self._latest_system_telemetry = msg
+        self._history.record_diagnostic(
+            '/system/telemetry', diagnostic_array_to_dict(msg))
+
+    def _on_recorder_diagnostics(self, msg: DiagnosticArray) -> None:
+        self._latest_recorder_diagnostics = msg
+        self._history.record_diagnostic(
+            '/recorder/diagnostics', diagnostic_array_to_dict(msg))
+
     def _on_camera(self, msg: CompressedImage) -> None:
         if msg.data:
             self._latest_camera_jpeg = bytes(msg.data)
@@ -394,6 +429,20 @@ class HocServerNode(Node):
             asyncio.run_coroutine_threadsafe(
                 self._ws_hub.broadcast(
                     'grasp_status', grasp_status_to_dict(self._latest_grasp)),
+                loop,
+            )
+        if self._latest_system_telemetry:
+            asyncio.run_coroutine_threadsafe(
+                self._ws_hub.broadcast(
+                    'system_telemetry',
+                    diagnostic_array_to_dict(self._latest_system_telemetry)),
+                loop,
+            )
+        if self._latest_recorder_diagnostics:
+            asyncio.run_coroutine_threadsafe(
+                self._ws_hub.broadcast(
+                    'recorder_diagnostics',
+                    diagnostic_array_to_dict(self._latest_recorder_diagnostics)),
                 loop,
             )
 
@@ -816,6 +865,10 @@ class HocServerNode(Node):
                 'risk_timeline': list(self._history.risk_timeline),
                 'metrics_timeline': list(self._history.metrics_timeline),
                 'alerts': self._history.alerts,
+                'system_telemetry_timeline': list(
+                    self._history.system_telemetry_timeline),
+                'recorder_diagnostics_timeline': list(
+                    self._history.recorder_diagnostics_timeline),
                 'recommendation': recommendation,
             }
             Path(out_path).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -866,6 +919,8 @@ class HocServerNode(Node):
             '/monitor/distribution_metrics',
             '/risk/status',
             '/risk/alerts',
+            '/system/telemetry',
+            '/recorder/diagnostics',
         ]
         cmd = ['ros2', 'bag', 'record', '-o', self._bag_path, *topics]
         try:

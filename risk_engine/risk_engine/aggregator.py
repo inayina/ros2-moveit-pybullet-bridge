@@ -1,4 +1,4 @@
-"""Aggregate five risk dimensions into composite R0-R3 score."""
+"""Aggregate six risk dimensions into composite R0-R3 score."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ DIMENSIONS = (
     'dynamics_anomaly',
     'comm_health',
     'planning_failure',
+    'resource_pressure',
 )
 
 RECOMMENDATIONS = {
@@ -19,16 +20,18 @@ RECOMMENDATIONS = {
     'dynamics_anomaly': '检查力矩饱和与负载变化',
     'comm_health': '检查话题延迟与网络负载',
     'planning_failure': '检查规划场景与碰撞体配置',
+    'resource_pressure': '降低视觉/录制负载并检查进程 CPU、内存与相机新鲜度',
 }
 
 
 @dataclass
 class RiskWeights:
-    distribution_shift: float = 0.35
+    distribution_shift: float = 0.30
     tracking_error: float = 0.25
     dynamics_anomaly: float = 0.20
     comm_health: float = 0.10
-    planning_failure: float = 0.10
+    planning_failure: float = 0.05
+    resource_pressure: float = 0.10
 
 
 @dataclass

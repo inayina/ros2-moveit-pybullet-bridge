@@ -12,6 +12,7 @@ from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import JointState
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 from risk_engine.risk_node import RiskEngineNode
 
@@ -26,6 +27,8 @@ class _MonitorFeed(Node):
         from std_msgs.msg import String
         self.planning_pub = self.create_publisher(
             String, '/manipulation/planning_result', 10)
+        self.telemetry_pub = self.create_publisher(
+            DiagnosticArray, '/system/telemetry', 10)
 
     def publish_shifted_metrics(self) -> None:
         metrics = DistributionMetrics()
@@ -49,6 +52,18 @@ class _MonitorFeed(Node):
         msg = String()
         msg.data = '{"action":"pick","success":false,"message":"canceled"}'
         self.planning_pub.publish(msg)
+
+    def publish_critical_cpu(self) -> None:
+        msg = DiagnosticArray()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        status = DiagnosticStatus()
+        status.name = 'system_telemetry/host'
+        status.values = [
+            KeyValue(key='cpu_total_percent', value='100.0'),
+            KeyValue(key='memory_percent', value='50.0'),
+        ]
+        msg.status = [status]
+        self.telemetry_pub.publish(msg)
 
 
 @pytest.fixture(scope='module')
@@ -102,10 +117,34 @@ def test_risk_node_publishes_status(risk_node):
     assert latest.level >= 0
     assert latest.composite_score > 0.0
     assert latest.primary_driver
-    assert len(latest.attribution) == 5
+    assert len(latest.attribution) == 6
     comm_attr = next(a for a in latest.attribution if a.dimension == 'comm_health')
     assert comm_attr.raw_score > 0.5
     dyn_attr = next(a for a in latest.attribution if a.dimension == 'dynamics_anomaly')
     assert dyn_attr.raw_score > 0.5
     plan_attr = next(a for a in latest.attribution if a.dimension == 'planning_failure')
     assert plan_attr.raw_score >= 1.0
+
+
+def test_resource_pressure_caps_at_r2_without_auto_estop(risk_node):
+    risk, feed = risk_node
+    statuses: list[RiskStatus] = []
+    risk.create_subscription(RiskStatus, '/risk/status', statuses.append, 10)
+    feed.publish_critical_cpu()
+
+    deadline = time.time() + 2.0
+    while time.time() < deadline and not any(
+        any(attr.dimension == 'resource_pressure' and attr.raw_score >= 1.0
+            for attr in status.attribution)
+        for status in statuses
+    ):
+        time.sleep(0.05)
+
+    resource_status = next(
+        status for status in reversed(statuses)
+        if any(attr.dimension == 'resource_pressure' and attr.raw_score >= 1.0
+               for attr in status.attribution)
+    )
+    assert resource_status.level == 2
+    assert resource_status.primary_driver == 'resource_pressure'
+    assert resource_status.e_stop_active is False

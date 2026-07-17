@@ -36,7 +36,7 @@ def test_aggregate_high_distribution_shift():
     agg = RiskAggregator()
     result = agg.aggregate({'distribution_shift': 1.0})
     assert result.level == 1
-    assert result.composite_score == 0.35
+    assert result.composite_score == 0.30
     assert result.primary_driver == 'distribution_shift'
     assert '域随机化' in result.recommendation
 
@@ -49,6 +49,7 @@ def test_aggregate_all_dimensions_critical():
         'dynamics_anomaly',
         'comm_health',
         'planning_failure',
+        'resource_pressure',
     )})
     assert result.level == 3
     assert result.composite_score == 1.0
@@ -57,8 +58,15 @@ def test_aggregate_all_dimensions_critical():
 def test_aggregate_missing_dimensions_default_zero():
     agg = RiskAggregator(weights=RiskWeights())
     result = agg.aggregate({'tracking_error': 0.4})
-    assert len(result.dimensions) == 5
+    assert len(result.dimensions) == 6
     assert result.primary_driver == 'tracking_error'
     tracking = next(d for d in result.dimensions if d.dimension == 'tracking_error')
     assert tracking.raw_score == 0.4
     assert tracking.weighted_score == 0.4 * 0.25
+
+
+def test_resource_pressure_is_exposed_as_sixth_dimension():
+    result = RiskAggregator().aggregate({'resource_pressure': 1.0})
+    assert result.primary_driver == 'resource_pressure'
+    assert result.composite_score == 0.10
+    assert len(result.dimensions) == 6

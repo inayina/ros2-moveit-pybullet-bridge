@@ -75,3 +75,27 @@ python3 scripts/benchmark_system.py \
 契约：[docs/INTER_REPO_CONTRACTS.md](INTER_REPO_CONTRACTS.md)
 
 Handoff 计划：[docs/design/13-three-repo-integration-development-plan.md](design/13-three-repo-integration-development-plan.md)
+
+---
+
+## 7. Project Evidence Agent 集成
+
+Project Evidence Agent 的 registry、检索、audit 和 impact 核心由中游
+`robot-arm-episode-data-lab/project_knowledge/` 维护；本仓只提供薄入口，不重复实现知识检索逻辑。
+
+```bash
+# 项目事实查询
+bin/ask-project "下游 Panda handoff loader 是否已实现？"
+
+# 三仓 audit
+bin/project-evidence audit --json-out /tmp/project-audit.json --markdown-out /tmp/project-audit.md
+
+# 本仓 Git 影响分析；wrapper 自动注入 downstream repository 名
+bin/project-evidence impact --base HEAD~1 --head HEAD
+```
+
+入口沿用本仓已有环境变量：
+
+```bash
+export EPISODE_DATA_LAB_ROOT=/path/to/robot-arm-episode-data-lab
+```

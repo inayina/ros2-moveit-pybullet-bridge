@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   AlertEvent,
   DistributionMetricsPayload,
+  DiagnosticArrayPayload,
   ExperimentProgressPayload,
   GraspStatusPayload,
   MetricsHistoryPoint,
@@ -9,6 +10,7 @@ import type {
   RiskStatusPayload,
   TrackingErrorPayload,
   TrendDirection,
+  ResourceHistoryPoint,
 } from '../types/messages';
 import { shouldThrottle } from '../utils/throttle';
 
@@ -34,6 +36,9 @@ interface DashboardState {
   experiment: ExperimentProgressPayload | null;
   cameraFrame: string | null;
   systemState: string;
+  systemTelemetry: DiagnosticArrayPayload | null;
+  recorderDiagnostics: DiagnosticArrayPayload | null;
+  resourceHistory: ResourceHistoryPoint[];
   setConnected: (connected: boolean) => void;
   ingestRisk: (payload: RiskStatusPayload) => void;
   ingestMetrics: (payload: DistributionMetricsPayload) => void;
@@ -46,6 +51,8 @@ interface DashboardState {
   ingestExperimentProgress: (payload: ExperimentProgressPayload) => void;
   setCameraFrame: (dataUrl: string | null) => void;
   setSystemState: (state: string) => void;
+  ingestSystemTelemetry: (payload: DiagnosticArrayPayload) => void;
+  ingestRecorderDiagnostics: (payload: DiagnosticArrayPayload) => void;
 }
 
 function computeTrend(history: RiskHistoryPoint[]): TrendDirection {
@@ -78,6 +85,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   experiment: null,
   cameraFrame: null,
   systemState: 'RUNNING',
+  systemTelemetry: null,
+  recorderDiagnostics: null,
+  resourceHistory: [],
 
   setConnected: (connected) => set({ connected }),
 
@@ -159,4 +169,26 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setCameraFrame: (cameraFrame) => set({ cameraFrame }),
 
   setSystemState: (systemState) => set({ systemState }),
+
+  ingestSystemTelemetry: (systemTelemetry) => {
+    const host = systemTelemetry.statuses.find((status) => status.name === 'system_telemetry/host');
+    const cpuTotal = Number(host?.values.cpu_total_percent ?? 0);
+    const recorder = get().recorderDiagnostics?.statuses.find(
+      (status) => status.name === 'lerobot_recorder/health',
+    );
+    const point: ResourceHistoryPoint = {
+      t: Date.now() / 1000,
+      cpuTotal,
+      recorderHz: Number(recorder?.values.effective_hz ?? 0),
+      sceneAge: Number(recorder?.values.scene_age_s ?? -1),
+    };
+    const resourceHistory = [...get().resourceHistory, point].filter(
+      (sample) => sample.t >= point.t - HISTORY_SECONDS,
+    );
+    set({ systemTelemetry, resourceHistory, lastMessageAt: Date.now() });
+  },
+
+  ingestRecorderDiagnostics: (recorderDiagnostics) => {
+    set({ recorderDiagnostics, lastMessageAt: Date.now() });
+  },
 }));

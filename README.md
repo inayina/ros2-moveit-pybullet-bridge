@@ -20,43 +20,43 @@
 
 | 能力 | 当前状态 | 证据 |
 | --- | --- | --- |
-| Handoff bundle static validation | `implemented_and_verified` | `pybullet_bridge/learning/panda_handoff.py`, `pybullet_bridge/test/test_panda_handoff.py` |
-| JSONL open-loop replay strategy | `implemented_and_verified` | `pybullet_bridge/policy/jsonl_action_replay_policy.py` |
-| Panda `ee_delta_gripper[7]` adapter | `implemented_and_verified` | `pybullet_bridge/control/panda_action_adapter.py`, adapter tests |
+| Handoff bundle static validation | `implemented_and_verified` | `pybullet_bridge/pybullet_bridge/learning/panda_handoff.py`, `pybullet_bridge/test/test_panda_handoff.py` |
+| JSONL open-loop replay strategy | `implemented_and_verified` | `pybullet_bridge/pybullet_bridge/learning/jsonl_action_replay_policy.py` |
+| Panda `ee_delta_gripper[7]` adapter | `implemented_and_verified` | `pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py`, adapter tests |
 | PyBullet replay benchmark CLI | `implemented_and_verified` | `scripts/benchmark_system.py` |
 | Distribution/risk components | `implemented_not_fully_verified` for full canonical scenario | `dist_monitor/`, `risk_engine/` |
 | Real Panda execution and full Sim2Real | `not_supported` | `docs/CURRENT_STATUS.md` |
 
-## Canonical Experiment Consumption
+## Current Verified Evidence
 
-The shared canonical handoff is `panda_30_mlp_bridge_v0`.
+The midstream handoff `panda_30_mlp_bridge_v0` and the latest archived downstream
+smoke are evidence from different runs. Current artifacts do not prove that the
+smoke consumed that 30-episode handoff.
 
 | Fact | Value |
 | --- | --- |
 | Input action type | `ee_delta_gripper` |
 | Action dim | 7 |
-| Handoff frames | 71,737 |
+| Available midstream handoff frames | 71,737 |
 | Replay strategy | `panda_jsonl_replay` |
 | Command mode used in latest archived smoke | `pybullet_ik` |
 | Latest archived downstream smoke | 1/1 completed, mean/max latency `9.79 / 34.218 ms`, no fault injection |
 
-Older canonical docs mention `17.626 / 49.508 ms` and `94.399 ms` fault-alarm timing. Those numbers should not be used as headline downstream claims until the original benchmark JSON is located or the canonical facts are updated.
+Untraceable legacy latency/fault numbers have been retired from current canonical results.
 
 ## Core Evidence
 
-![Canonical run evidence](docs/assets/three_repo_canonical_run_evidence.svg)
-
 ### 实验证据图解读
 
-这张图用于说明本仓如何消费中游 handoff 并产生 downstream replay/risk 证据。G0/G1 是输入上下文；G2 是本仓直接负责的下游验证区域。
+下表区分中游可用 handoff 与本仓独立 downstream smoke，避免把不同 run 拼成一次端到端实验。
 
 | 图中区域 | 与本仓关系 | 原始来源 | 边界 |
 | --- | --- | --- | --- |
 | G0 Upstream Dataset | 上游提供 Panda 仿真 raw episode | 中游归档的 `evidence/upstream/validate_dataset.json` | 本仓不采集 raw episode |
-| G1 Midstream Release | 中游把 release、MLP predicted actions 和 handoff 交给本仓 | `handoff_manifest.json`, `replay_check.json` | 本仓不训练 MLP/ACT，也不修正 handoff 的 gripper warning |
-| G2 Downstream Replay | 本仓加载 handoff，使用 `panda_jsonl_replay` 与 `pybullet_ik` 完成 replay smoke | `evidence/downstream/benchmark_summary.json`, `scripts/benchmark_system.py` | 证明 replay smoke 和 benchmark summary，不证明 completed Sim2Real、real-robot control 或物理抓取成功 |
+| G1 Midstream Release | 中游提供 release、MLP predicted actions 和 handoff | `handoff_manifest.json`, `replay_check.json` | 本仓不训练 MLP/ACT；当前未证明该 handoff 是下述 smoke 输入 |
+| Independent downstream smoke | 本仓使用 `panda_jsonl_replay` 与 `pybullet_ik` 完成独立 replay smoke | `evidence/downstream/benchmark_summary.json`, `scripts/benchmark_system.py` | 证明 1-episode smoke，不证明 completed Sim2Real、real-robot control 或物理抓取成功 |
 
-图中的 `9.79 / 34.218 ms` 是 latest archived 1-episode smoke 的 mean/max latency；`3,275 gripper cmds out of range` 来自中游 `replay_check.json`，表示 replay 前必须 clamp 或 reject。旧文档中的 fault alarm 数字需要原始 benchmark JSON 支撑后才能作为 README headline。
+`9.79 / 34.218 ms` 是独立 1-episode smoke 的 mean/max latency；`3,275 gripper cmds out of range` 来自另一份中游 handoff 的 `replay_check.json`，表示 replay 前必须 clamp 或 reject，不能把两组数字描述成同一 run。
 
 | Evidence | What it shows | What it does not show |
 | --- | --- | --- |
@@ -95,13 +95,23 @@ python3 scripts/benchmark_system.py \
   --panda-command-mode pybullet_ik
 ```
 
+Project evidence query and downstream change impact are also available from this checkout:
+
+```bash
+bin/ask-project "下游当前负责什么？"
+bin/project-evidence impact --base HEAD~1 --head HEAD
+```
+
+The registry and retrieval implementation remain owned by the midstream repository. Set
+`EPISODE_DATA_LAB_ROOT` when that checkout is not in a configured fallback location.
+
 ## Code Map
 
 | Path | Purpose |
 | --- | --- |
-| `pybullet_bridge/learning/panda_handoff.py` | handoff manifest and JSONL validation |
-| `pybullet_bridge/policy/jsonl_action_replay_policy.py` | open-loop handoff action replay |
-| `pybullet_bridge/control/panda_action_adapter.py` | Panda action-to-command conversion |
+| `pybullet_bridge/pybullet_bridge/learning/panda_handoff.py` | handoff manifest and JSONL validation |
+| `pybullet_bridge/pybullet_bridge/learning/jsonl_action_replay_policy.py` | open-loop handoff action replay |
+| `pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py` | Panda action-to-command conversion |
 | `scripts/benchmark_system.py` | replay benchmark and summary output |
 | `dist_monitor/` | KL/W1/MMD distribution monitoring |
 | `risk_engine/` | risk aggregation |
@@ -128,6 +138,7 @@ KUKA iiwa7, older dual-repo figures, HOC dashboard screenshots, and portfolio-wi
 - [docs/INTER_REPO_CONTRACTS.md](docs/INTER_REPO_CONTRACTS.md)
 - [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md)
 - [docs/portfolio/EVIDENCE_INDEX.md](docs/portfolio/EVIDENCE_INDEX.md)
+- [docs/AGENTS.md#7-project-evidence-agent-集成](docs/AGENTS.md#7-project-evidence-agent-集成)
 
 ## English Brief
 
