@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Policy Runner Benchmark — panda_jsonl_replay</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #141414; color: #e8e8e8; margin: 24px; }
+    h1, h2 { color: #69b1ff; }
+    table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+    th, td { border: 1px solid #434343; padding: 8px; text-align: left; }
+    th { background: #1f1f1f; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric-card { background: #1f1f1f; padding: 16px; border-radius: 8px; }
+    .metric-value { font-size: 22px; font-weight: bold; color: #95de64; }
+  </style>
+</head>
+<body>
+  <h1>Policy Runner System Benchmark</h1>
+  <p>Output directory: <code>/tmp/smolvla_v3_policyrunner_benchmark_20260724T213800Z</code></p>
+  <div class="metric-grid">
+    <div class="metric-card"><div>Mean latency</div><div class="metric-value">18.006 ms</div></div>
+    <div class="metric-card"><div>Max latency</div><div class="metric-value">357.669 ms</div></div>
+    <div class="metric-card"><div>CPU peak</div><div class="metric-value">0.0%</div></div>
+    <div class="metric-card"><div>RSS peak</div><div class="metric-value">29.3 MB</div></div>
+  </div>
+  <h2>Summary</h2>
+  <pre>{
+  "strategy": "panda_jsonl_replay",
+  "episodes": 1,
+  "completed_episodes": 1,
+  "max_latency_ms": 357.669,
+  "mean_latency_ms": 18.006,
+  "std_latency_ms": 36.168,
+  "cpu_peak_percent": 0.0,
+  "rss_peak_mb": 29.312,
+  "health_alarm_detected_within_1s": true,
+  "health_alarm_latency_ms": null,
+  "seed": 0,
+  "fault_injection": false,
+  "replay_path": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/runs/smolvla_s3/pybullet_smoke_v3_ep0/predicted_actions.jsonl",
+  "panda_handoff_path": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/runs/smolvla_s3/pybullet_smoke_v3_ep0",
+  "handoff_id": "smolvla_v3_pybullet_smoke_ep0_v0",
+  "release_id": "smolvla_s3_recovery_v3_prospective_eval10_gate_v3_20260724b",
+  "panda_command_mode": "pybullet_ik",
+  "timeseries_rows": 1105,
+  "health_events": 10
+}</pre>
+  <h2>Artifacts</h2>
+  <ul>
+    <li>benchmark_timeseries.csv</li>
+    <li>benchmark_summary.json</li>
+    <li>system_health_events.csv</li>
+  </ul>
+</body>
+</html>

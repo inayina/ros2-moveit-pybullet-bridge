@@ -1,0 +1,191 @@
+{
+  "contract_version": "risk_offline_readiness_v0",
+  "artifact_type": "risk_offline_readiness",
+  "evaluation_run_id": "smolvla_v3_ep0_risk_offline_20260724T215900Z",
+  "claims_task_success": false,
+  "claims_sim2real": false,
+  "claims_online_autonomous_grasp": false,
+  "overrides_failure_lane": false,
+  "overrides_continuous_task_evaluator": false,
+  "use_as_task_go_no_go": false,
+  "primary": {
+    "source_kind": "policyrunner_timeseries",
+    "path": "/home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/evidence/downstream/smolvla_v3_ep0_policyrunner_20260724T213800Z/benchmark_timeseries.csv",
+    "raw_scores": {
+      "distribution_shift": 0.0,
+      "tracking_error": 0.0,
+      "dynamics_anomaly": 0.0,
+      "comm_health": 0.39229675750000004,
+      "planning_failure": 0.0,
+      "resource_pressure": 0.0
+    },
+    "aggregation": {
+      "level": 0,
+      "composite_score": 0.039229675750000005,
+      "primary_driver": "comm_health",
+      "recommendation": "检查话题延迟与网络负载",
+      "dimensions": [
+        {
+          "dimension": "distribution_shift",
+          "raw_score": 0.0,
+          "weight": 0.3,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "tracking_error",
+          "raw_score": 0.0,
+          "weight": 0.25,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "dynamics_anomaly",
+          "raw_score": 0.0,
+          "weight": 0.2,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "comm_health",
+          "raw_score": 0.39229675750000004,
+          "weight": 0.1,
+          "weighted_score": 0.039229675750000005
+        },
+        {
+          "dimension": "planning_failure",
+          "raw_score": 0.0,
+          "weight": 0.05,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "resource_pressure",
+          "raw_score": 0.0,
+          "weight": 0.1,
+          "weighted_score": 0.0
+        }
+      ]
+    },
+    "input_stats": {
+      "timeseries_rows": 1105,
+      "latency_ms_mean": 18.006419005535058,
+      "latency_ms_p95": 39.229675750000006,
+      "latency_ms_max": 357.669,
+      "cpu_percent_peak": 0.0,
+      "rss_mb_peak": 29.312,
+      "inference_latency_ms_mean": 0.48833031674208144,
+      "kl_mean_peak": 0.0,
+      "w1_mean_peak": 0.0,
+      "mmd_peak": 0.0
+    },
+    "provenance": {
+      "available": [
+        "distribution_shift",
+        "comm_health",
+        "resource_pressure"
+      ],
+      "unavailable": [
+        "tracking_error",
+        "dynamics_anomaly",
+        "planning_failure"
+      ],
+      "notes": [
+        "Primary input: PolicyRunner benchmark_timeseries.csv.",
+        "tracking_error / dynamics_anomaly / planning_failure absent from this CSV → 0.0."
+      ]
+    }
+  },
+  "non_claims": [
+    "Risk readiness对照 only; not task go/no-go.",
+    "Does not claim task success.",
+    "Does not claim Sim2Real.",
+    "Does not override ContinuousTaskEvaluator or failure_lane.",
+    "Missing live monitor dimensions default to 0.0 and are listed under unavailable_dimensions."
+  ],
+  "notes": [
+    "Portfolio readiness对照 via offline RiskAggregator.",
+    "Task success remains owned by ContinuousTaskEvaluator / S4 GT funnel."
+  ],
+  "companion": {
+    "source_kind": "isaac_s4_trial_reports",
+    "path": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials",
+    "paths": [
+      "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials/seed_1/report.json",
+      "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials/seed_2/report.json",
+      "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials/seed_3/report.json",
+      "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials/seed_4/report.json",
+      "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_20260724T203700Z/trials/seed_5/report.json"
+    ],
+    "raw_scores": {
+      "distribution_shift": 0.0,
+      "tracking_error": 0.0,
+      "dynamics_anomaly": 0.0,
+      "comm_health": 0.10290712599908147,
+      "planning_failure": 0.0,
+      "resource_pressure": 0.0
+    },
+    "aggregation": {
+      "level": 0,
+      "composite_score": 0.010290712599908148,
+      "primary_driver": "comm_health",
+      "recommendation": "检查话题延迟与网络负载",
+      "dimensions": [
+        {
+          "dimension": "distribution_shift",
+          "raw_score": 0.0,
+          "weight": 0.3,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "tracking_error",
+          "raw_score": 0.0,
+          "weight": 0.25,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "dynamics_anomaly",
+          "raw_score": 0.0,
+          "weight": 0.2,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "comm_health",
+          "raw_score": 0.10290712599908147,
+          "weight": 0.1,
+          "weighted_score": 0.010290712599908148
+        },
+        {
+          "dimension": "planning_failure",
+          "raw_score": 0.0,
+          "weight": 0.05,
+          "weighted_score": 0.0
+        },
+        {
+          "dimension": "resource_pressure",
+          "raw_score": 0.0,
+          "weight": 0.1,
+          "weighted_score": 0.0
+        }
+      ]
+    },
+    "input_stats": {
+      "trials": 5,
+      "inference_latency_ms_p50_mean": 10.290712599908147,
+      "action_clipped_rate_mean": 0.0,
+      "final_safety_estop_count": 0
+    },
+    "provenance": {
+      "available": [
+        "comm_health",
+        "dynamics_anomaly"
+      ],
+      "unavailable": [
+        "distribution_shift",
+        "tracking_error",
+        "planning_failure",
+        "resource_pressure"
+      ],
+      "notes": [
+        "Companion input: Isaac S4 trial report.json (no KL/W1/MMD or tracking RMSE).",
+        "comm_health from inference_latency_ms_p50; dynamics soft proxy from action_clipped."
+      ]
+    }
+  }
+}

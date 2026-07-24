@@ -1,0 +1,21 @@
+{
+  "completed_episodes": 1,
+  "cpu_peak_percent": 0.0,
+  "episodes": 1,
+  "fault_injection": false,
+  "handoff_id": "smolvla_v3_pybullet_smoke_ep0_v0",
+  "health_alarm_detected_within_1s": true,
+  "health_alarm_latency_ms": null,
+  "health_events": 10,
+  "max_latency_ms": 357.669,
+  "mean_latency_ms": 18.006,
+  "panda_command_mode": "pybullet_ik",
+  "panda_handoff_path": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/runs/smolvla_s3/pybullet_smoke_v3_ep0",
+  "release_id": "smolvla_s3_recovery_v3_prospective_eval10_gate_v3_20260724b",
+  "replay_path": "/home/ina/robot-sim-lab/robot-arm-episode-data-lab/runs/smolvla_s3/pybullet_smoke_v3_ep0/predicted_actions.jsonl",
+  "rss_peak_mb": 29.312,
+  "seed": 0,
+  "std_latency_ms": 36.168,
+  "strategy": "panda_jsonl_replay",
+  "timeseries_rows": 1105
+}
