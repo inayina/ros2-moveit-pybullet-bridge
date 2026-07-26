@@ -22,6 +22,13 @@ from pybullet_bridge.learning.panda_action_adapter import (
     PandaActionAdapter,
     PandaActionAdapterConfig,
 )
+from pybullet_bridge.learning.panda_absolute_eef_replay_adapter import (
+    PandaAbsoluteEefReplayAdapter,
+    PandaAbsoluteEefReplayAdapterConfig,
+)
+from pybullet_bridge.learning.policy_command_replay_policy import (
+    PolicyCommandReplayPolicy,
+)
 from pybullet_bridge.learning.replay_policy import ReplayPolicy
 from pybullet_bridge.learning.sine_wave_policy import SineWavePolicy
 
@@ -39,6 +46,9 @@ class PolicyRunner(Node):
         self._latest_metrics: Optional[DistributionMetrics] = None
         self._policy: Optional[BasePolicy] = None
         self._panda_adapter: Optional[PandaActionAdapter] = None
+        self._panda_absolute_adapter: Optional[
+            PandaAbsoluteEefReplayAdapter
+        ] = None
         self._rng: Optional[np.random.Generator] = None
         self._active = False
         self._reason = 'inactive'
@@ -59,9 +69,17 @@ class PolicyRunner(Node):
         self.declare_parameter('strategy_type', 'replay')
         self.declare_parameter('replay_path', '')
         self.declare_parameter('panda_handoff_path', '')
+        self.declare_parameter('policy_trace_bundle_path', '')
         self.declare_parameter('panda_schema_id', 'panda_ee_delta_gripper_v0')
         self.declare_parameter('panda_action_type', 'ee_delta_gripper')
         self.declare_parameter('panda_command_mode', 'hold')
+        self.declare_parameter('panda_absolute_command_mode', 'hold')
+        self.declare_parameter(
+            'panda_absolute_workspace_min', [0.20, -0.40, 0.02]
+        )
+        self.declare_parameter(
+            'panda_absolute_workspace_max', [0.65, 0.40, 0.75]
+        )
         self.declare_parameter('panda_enable_deadband', False)
         self.declare_parameter('panda_deadband_val', 0.0001)
         self.declare_parameter('panda_deadband_feedforward', 0.0002)
@@ -99,6 +117,7 @@ class PolicyRunner(Node):
         self._strategy_type = str(self.get_parameter('strategy_type').value)
         self._joint_names = list(self.get_parameter('joint_names').value)
         self._panda_adapter = None
+        self._panda_absolute_adapter = None
         self._policy = self._build_policy()
         self._rng = np.random.default_rng(int(self.get_parameter('seed').value))
 
@@ -130,6 +149,8 @@ class PolicyRunner(Node):
         self._policy.reset()
         if self._panda_adapter is not None:
             self._panda_adapter.reset()
+        if self._panda_absolute_adapter is not None:
+            self._panda_absolute_adapter.reset()
         self._active = True
         self._reason = 'ok'
         self._last_successful_action_mono = time.monotonic()
@@ -215,6 +236,36 @@ class PolicyRunner(Node):
                 expected_action_type=str(self.get_parameter('panda_action_type').value),
             )
 
+        if strategy == 'panda_policy_command_replay':
+            bundle_path = str(
+                self.get_parameter('policy_trace_bundle_path').value
+            )
+            if not bundle_path:
+                raise ValueError(
+                    'policy_trace_bundle_path is required when strategy_type '
+                    'is panda_policy_command_replay'
+                )
+            inference_freq = requested_freq if requested_freq > 0 else 10
+            workspace_min = tuple(float(value) for value in self.get_parameter(
+                'panda_absolute_workspace_min'
+            ).value)
+            workspace_max = tuple(float(value) for value in self.get_parameter(
+                'panda_absolute_workspace_max'
+            ).value)
+            self._panda_absolute_adapter = PandaAbsoluteEefReplayAdapter(
+                PandaAbsoluteEefReplayAdapterConfig(
+                    command_mode=str(self.get_parameter(
+                        'panda_absolute_command_mode'
+                    ).value),
+                    workspace_min=workspace_min,
+                    workspace_max=workspace_max,
+                )
+            )
+            return PolicyCommandReplayPolicy(
+                bundle_path,
+                inference_freq=inference_freq,
+            )
+
         if strategy == 'sine_wave':
             inference_freq = requested_freq if requested_freq > 0 else 50
             return SineWavePolicy(
@@ -261,6 +312,12 @@ class PolicyRunner(Node):
             action = np.asarray(self._policy.get_action(self._latest_obs), dtype=np.float64)
             if self._panda_adapter is not None:
                 action = self._panda_adapter.to_joint_target(
+                    action,
+                    self._latest_obs,
+                    self._joint_names,
+                )
+            elif self._panda_absolute_adapter is not None:
+                action = self._panda_absolute_adapter.to_joint_target(
                     action,
                     self._latest_obs,
                     self._joint_names,
@@ -360,7 +417,11 @@ class PolicyRunner(Node):
                 value=(
                     self._panda_adapter.command_mode
                     if self._panda_adapter is not None
-                    else ''
+                    else (
+                        self._panda_absolute_adapter.command_mode
+                        if self._panda_absolute_adapter is not None
+                        else ''
+                    )
                 ),
             ),
             KeyValue(

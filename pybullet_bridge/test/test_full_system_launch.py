@@ -79,7 +79,10 @@ def test_full_system_launch_publishes_monitoring_pipeline() -> None:
 
         latest_risk = collector.risk_statuses[-1]
         assert latest_risk.level >= 0
-        assert len(latest_risk.attribution) == 5
+        assert {item.dimension for item in latest_risk.attribution} == {
+            'distribution_shift', 'tracking_error', 'planning_failure',
+            'dynamics_anomaly', 'comm_health', 'resource_pressure',
+        }
     finally:
         executor.shutdown()
         spin_thread.join(timeout=2.0)

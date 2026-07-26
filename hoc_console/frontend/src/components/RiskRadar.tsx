@@ -35,7 +35,7 @@ export const RiskRadar = memo(function RiskRadar() {
       tooltip: {},
       legend: {
         data: ['当前', '30s前'],
-        textStyle: { color: '#aaa' },
+        textStyle: { color: '#a4adb4' },
         bottom: 0,
       },
       radar: {
@@ -43,8 +43,10 @@ export const RiskRadar = memo(function RiskRadar() {
           name: DIMENSION_LABELS[dim] ?? dim,
           max: 1,
         })),
-        splitArea: { areaStyle: { color: ['#1f1f1f', '#141414'] } },
-        axisName: { color: '#ccc' },
+        splitArea: { areaStyle: { color: ['#30363c', '#292e33'] } },
+        splitLine: { lineStyle: { color: '#535b62' } },
+        axisLine: { lineStyle: { color: '#535b62' } },
+        axisName: { color: '#c6ccd0' },
       },
       series: [
         {
@@ -53,13 +55,13 @@ export const RiskRadar = memo(function RiskRadar() {
             {
               value: current,
               name: '当前',
-              areaStyle: { color: 'rgba(105, 177, 255, 0.35)' },
-              lineStyle: { color: '#69b1ff' },
+              areaStyle: { color: 'rgba(100, 133, 163, 0.30)' },
+              lineStyle: { color: '#6485a3' },
             },
             {
               value: previous,
               name: '30s前',
-              lineStyle: { type: 'dashed', color: '#8c8c8c' },
+              lineStyle: { type: 'dashed', color: '#929ba2' },
               areaStyle: { opacity: 0 },
             },
           ],
@@ -72,7 +74,7 @@ export const RiskRadar = memo(function RiskRadar() {
   return (
     <div className="panel panel--chart">
       <h3>五维风险雷达</h3>
-      <StableChart option={option} height={260} />
+      <StableChart option={option} height={360} />
       <p className="panel-caption">
         主因: {risk?.primary_driver ?? '—'} · {risk?.recommendation ?? '系统运行正常'}
       </p>

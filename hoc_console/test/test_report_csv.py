@@ -8,6 +8,9 @@ def test_render_csv_report_header_and_row():
         risk_timeline=[{'t': 1.0, 'level': 1, 'score': 0.3}],
         metrics_timeline=[{
             't': 1.0,
+            'metric_valid': True,
+            'validity': 'VALID',
+            'reason_code': 'none',
             'kl_mean': 0.12,
             'w1_mean': 0.05,
             'mmd_stat': 0.03,
@@ -18,3 +21,21 @@ def test_render_csv_report_header_and_row():
     assert lines[0].startswith('t,risk_level')
     assert '1.000' in lines[1]
     assert 'True' in lines[1]
+
+
+def test_invalid_metrics_export_empty_cells_and_reason() -> None:
+    csv_text = render_csv_report(
+        risk_timeline=[],
+        metrics_timeline=[{
+            't': 1.0,
+            'metric_valid': False,
+            'validity': 'UNAVAILABLE',
+            'reason_code': 'calibration_missing',
+            'kl_mean': 0.0,
+            'w1_mean': 0.0,
+            'mmd_stat': 0.0,
+        }],
+    )
+    row = csv_text.strip().splitlines()[1].split(',')
+    assert row[3:6] == ['', '', '']
+    assert 'calibration_missing' in row

@@ -2,30 +2,32 @@
 
 from __future__ import annotations
 
-import time
 from pathlib import Path
+import time
 
-import numpy as np
-import rclpy
 from ament_index_python.packages import get_package_share_directory
-from diagnostic_msgs.msg import DiagnosticArray
-from rcl_interfaces.msg import SetParametersResult
-from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from sensor_msgs.msg import JointState
-from std_srvs.srv import Trigger
-
 from bridge_monitor_msgs.msg import DistributionMetrics
-
-from dist_monitor.lerobot_loader import LeRobotTrajectory, load_lerobot_dataset
+from diagnostic_msgs.msg import DiagnosticArray
 from dist_monitor.boxplot_stats import boxplot_per_joint
 from dist_monitor.comm_health import CommHealthMonitor
-from dist_monitor.dynamics_anomaly import DynamicsAnomalyConfig, compute_dynamics_anomaly
+from dist_monitor.dynamics_anomaly import (
+    compute_dynamics_anomaly,
+    DynamicsAnomalyConfig,
+)
 from dist_monitor.joint_names import normalize_joint_names, reorder_joint_vector
-from dist_monitor.soft_limits import compute_soft_limit_proximity, load_joint_limits
-from dist_monitor.metrics_core import MetricsConfig, compute_distribution_metrics
+from dist_monitor.lerobot_loader import LeRobotTrajectory, load_lerobot_dataset
+from dist_monitor.metric_validity import evaluate_metric_validity
+from dist_monitor.metrics_core import compute_distribution_metrics, MetricsConfig
 from dist_monitor.sliding_window import SlidingWindow
+from dist_monitor.soft_limits import compute_soft_limit_proximity, load_joint_limits
 from dist_monitor.time_aligner import TimeAligner
+import numpy as np
+from rcl_interfaces.msg import SetParametersResult
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+from sensor_msgs.msg import JointState
+from std_srvs.srv import Trigger
 
 
 def _stamp_to_sec(msg) -> float:
@@ -73,6 +75,9 @@ class DistMonitorNode(Node):
         self.declare_parameter('min_samples', 50)
         self.declare_parameter('align_tolerance_sec', 0.02)
         self.declare_parameter('baseline_duration_sec', 30.0)
+        self.declare_parameter('calibration_id', '')
+        self.declare_parameter('source_stale_after_sec', 0.5)
+        self.declare_parameter('allow_lerobot_runtime_calibration', False)
         self.declare_parameter('real_source', 'topic')
         self.declare_parameter('lerobot_dataset_path', '')
         self.declare_parameter('comm_health.expected_sim_hz', 100.0)
@@ -103,6 +108,8 @@ class DistMonitorNode(Node):
         self._baseline_ready = False
         self._baseline_started_at: float | None = None
         self._baseline_buffer: list[np.ndarray] = []
+        self._last_sim_received_monotonic: float | None = None
+        self._last_real_received_monotonic: float | None = None
 
         self._lerobot_traj: LeRobotTrajectory | None = None
         self._lerobot_origin: float | None = None
@@ -200,7 +207,9 @@ class DistMonitorNode(Node):
         if msg.name:
             self._joint_names = normalize_joint_names(list(msg.name), robot=profile)
         t = _stamp_to_sec(msg.header.stamp)
-        self._comm_health.record('/bridge/sim/joint_states', time.monotonic())
+        received = time.monotonic()
+        self._last_sim_received_monotonic = received
+        self._comm_health.record('/bridge/sim/joint_states', received)
         self._sim_window.push(t, _extract_full_state(msg, self._joint_names or None))
 
         if self.get_parameter('real_source').value == 'lerobot' and self._lerobot_traj is not None:
@@ -212,12 +221,15 @@ class DistMonitorNode(Node):
                 full = self._lerobot_traj.lookup_nearest(rel_t, self._aligner.tolerance)
                 if full is not None:
                     self._real_window.push(t, full)
+                    self._last_real_received_monotonic = received
 
     def _on_real(self, msg: JointState) -> None:
         t = _stamp_to_sec(msg.header.stamp)
         if msg.name and self._joint_names:
             self._joint_names = normalize_joint_names(list(msg.name))
-        self._comm_health.record('/bridge/real/joint_states', time.monotonic())
+        received = time.monotonic()
+        self._last_real_received_monotonic = received
+        self._comm_health.record('/bridge/real/joint_states', received)
         self._real_window.push(
             t, _extract_full_state(msg, self._joint_names or None),
         )
@@ -253,6 +265,53 @@ class DistMonitorNode(Node):
             self.get_logger().info(
                 f'Baseline captured: {len(self._baseline_errors)} error samples')
 
+    def _sources_fresh(self, now_monotonic: float) -> bool:
+        if (
+            self._last_sim_received_monotonic is None
+            or self._last_real_received_monotonic is None
+        ):
+            return False
+        limit = float(self.get_parameter('source_stale_after_sec').value)
+        return (
+            now_monotonic - self._last_sim_received_monotonic <= limit
+            and now_monotonic - self._last_real_received_monotonic <= limit
+        )
+
+    def _set_metric_validity(
+        self,
+        metrics: DistributionMetrics,
+        *,
+        aligned_samples: int,
+        now_monotonic: float,
+    ) -> None:
+        reference_source = str(self.get_parameter('real_source').value)
+        decision = evaluate_metric_validity(
+            aligned_samples=aligned_samples,
+            min_samples=int(self.get_parameter('min_samples').value),
+            baseline_ready=self._baseline_ready,
+            calibration_id=str(self.get_parameter('calibration_id').value),
+            reference_source=reference_source,
+            sources_fresh=self._sources_fresh(now_monotonic),
+            sources_seen=(
+                self._last_sim_received_monotonic is not None
+                and self._last_real_received_monotonic is not None
+            ),
+            allow_lerobot_reference=bool(
+                self.get_parameter(
+                    'allow_lerobot_runtime_calibration'
+                ).value
+            ),
+        )
+        metrics.validity = decision.validity
+        metrics.reason_code = decision.reason_code
+        metrics.metric_valid = decision.metric_valid
+        metrics.baseline_ready = decision.baseline_ready
+        metrics.calibration_id = str(
+            self.get_parameter('calibration_id').value
+        )
+        metrics.reference_source = reference_source
+        metrics.aligned_sample_count = aligned_samples
+
     def _compute_and_publish(self) -> None:
         metrics = DistributionMetrics()
         metrics.header.stamp = self.get_clock().now().to_msg()
@@ -269,11 +328,20 @@ class DistMonitorNode(Node):
         metrics.dynamics_anomaly_score = 0.0
         metrics.soft_limit_score = 0.0
         metrics.soft_limit_triggered = False
+        metrics.comm_health_valid = self._sources_fresh(time.monotonic())
+        metrics.dynamics_valid = False
 
         min_samples = self.get_parameter('min_samples').value
-        aligned_sim, aligned_real = self._aligner.align_windows(self._sim_window, self._real_window)
+        aligned_sim, aligned_real = self._aligner.align_windows(
+            self._sim_window, self._real_window
+        )
         n = len(aligned_sim)
         if n < min_samples:
+            self._set_metric_validity(
+                metrics,
+                aligned_samples=n,
+                now_monotonic=time.monotonic(),
+            )
             self._metrics_pub.publish(metrics)
             return
 
@@ -283,6 +351,11 @@ class DistMonitorNode(Node):
         errors = sim_pos - real_pos
         now_sec = _stamp_to_sec(metrics.header.stamp)
         self._maybe_collect_baseline(errors, now_sec)
+        self._set_metric_validity(
+            metrics,
+            aligned_samples=n,
+            now_monotonic=time.monotonic(),
+        )
 
         (
             metrics.sim_position_min_per_joint,
@@ -315,9 +388,11 @@ class DistMonitorNode(Node):
         metrics.wasserstein_mean = result.w1_mean
         metrics.mmd_statistic = result.mmd_statistic
         metrics.mmd_p_value = result.mmd_p_value
-        metrics.shift_detected = result.shift_detected if self._baseline_ready else False
-        metrics.shift_detected_w1 = result.shift_detected_w1 if self._baseline_ready else False
-        metrics.detection_method = result.detection_method if self._baseline_ready else 'none'
+        metrics.shift_detected = result.shift_detected if metrics.metric_valid else False
+        metrics.shift_detected_w1 = result.shift_detected_w1 if metrics.metric_valid else False
+        metrics.detection_method = (
+            result.detection_method if metrics.metric_valid else 'unavailable'
+        )
 
         dyn = compute_dynamics_anomaly(
             aligned_sim,
@@ -328,6 +403,7 @@ class DistMonitorNode(Node):
         )
         metrics.dynamics_anomaly_score = dyn.score
         metrics.velocity_jump_per_joint = dyn.velocity_jump_per_joint
+        metrics.dynamics_valid = self._sources_fresh(time.monotonic())
 
         soft = compute_soft_limit_proximity(
             self._joint_names,
@@ -348,7 +424,9 @@ class DistMonitorNode(Node):
         self._error_pub.publish(err_msg)
 
     def _handle_reset_baseline(self, request, response):
-        aligned_sim, aligned_real = self._aligner.align_windows(self._sim_window, self._real_window)
+        aligned_sim, aligned_real = self._aligner.align_windows(
+            self._sim_window, self._real_window
+        )
         if len(aligned_sim) == 0:
             response.success = False
             response.message = 'No aligned samples available for baseline reset.'

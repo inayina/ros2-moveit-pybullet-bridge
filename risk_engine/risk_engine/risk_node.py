@@ -3,22 +3,25 @@
 from __future__ import annotations
 
 import json
+import time
 
+from bridge_monitor_msgs.msg import (
+    DistributionMetrics,
+    RiskAttribution,
+    RiskStatus,
+)
+from bridge_monitor_msgs.srv import AcknowledgeRisk
+from diagnostic_msgs.msg import DiagnosticArray
 import numpy as np
 import rclpy
-from diagnostic_msgs.msg import DiagnosticArray
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import JointState
-from std_msgs.msg import String
-from std_srvs.srv import Trigger
-
-from bridge_monitor_msgs.msg import DistributionMetrics, RiskAttribution, RiskStatus
-from bridge_monitor_msgs.srv import AcknowledgeRisk
-
 from risk_engine.aggregator import RECOMMENDATIONS, RiskAggregator, RiskWeights
 from risk_engine.move_group_cancel import MoveGroupCancelClient
 from risk_engine.planning_stats import PlanningStatsCollector
+from sensor_msgs.msg import JointState
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
 
 
 class RiskEngineNode(Node):
@@ -43,6 +46,7 @@ class RiskEngineNode(Node):
         self.declare_parameter('auto_e_stop_on_r3', True)
         self.declare_parameter('move_group_action', '/move_action')
         self.declare_parameter('cancel_move_group_on_e_stop', True)
+        self.declare_parameter('source_stale_after_sec', 1.0)
 
         weights = RiskWeights(
             distribution_shift=self.get_parameter('weights.distribution_shift').value,
@@ -73,11 +77,23 @@ class RiskEngineNode(Node):
         self._recorder_effective_hz = 0.0
         self._scene_age_s = 0.0
         self._recorder_recording = False
+        self._received_at: dict[str, float] = {}
+        self._policy_health_validity = 'UNAVAILABLE'
+        self._policy_health_reason = 'no_data'
+        self._policy_health_score = 0.0
 
         self.create_subscription(
-            DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
+            DistributionMetrics,
+            '/monitor/distribution_metrics',
+            self._on_metrics,
+            10,
+        )
         self.create_subscription(
-            JointState, '/monitor/tracking_error', self._on_tracking_error, qos_profile_sensor_data)
+            JointState,
+            '/monitor/tracking_error',
+            self._on_tracking_error,
+            qos_profile_sensor_data,
+        )
         self.create_subscription(
             String, '/manipulation/planning_result', self._on_planning_result, 10)
         self.create_subscription(
@@ -86,6 +102,12 @@ class RiskEngineNode(Node):
             DiagnosticArray, '/system/telemetry', self._on_system_telemetry, 10)
         self.create_subscription(
             DiagnosticArray, '/recorder/diagnostics', self._on_recorder_diagnostics, 10)
+        self.create_subscription(
+            DiagnosticArray,
+            '/policy/runtime_health',
+            self._on_policy_runtime_health,
+            10,
+        )
 
         self._status_pub = self.create_publisher(RiskStatus, '/risk/status', 10)
         self._alerts_pub = self.create_publisher(String, '/risk/alerts', 10)
@@ -127,10 +149,12 @@ class RiskEngineNode(Node):
 
     def _on_metrics(self, msg: DistributionMetrics) -> None:
         self._latest_metrics = msg
+        self._received_at['metrics'] = time.monotonic()
 
     def _on_tracking_error(self, msg: JointState) -> None:
         if msg.position:
             self._latest_tracking_rmse = float(np.sqrt(np.mean(np.square(msg.position))))
+            self._received_at['tracking'] = time.monotonic()
 
     def _on_bridge_system_state(self, msg: String) -> None:
         self._bridge_system_state = msg.data
@@ -149,6 +173,7 @@ class RiskEngineNode(Node):
                 self._host_memory_percent = float(values.get('memory_percent', 0.0))
             except ValueError:
                 return
+            self._received_at['resource'] = time.monotonic()
 
     def _on_recorder_diagnostics(self, msg: DiagnosticArray) -> None:
         for status in msg.status:
@@ -162,6 +187,116 @@ class RiskEngineNode(Node):
                     values.get('recording', 'False').lower() == 'true')
             except ValueError:
                 return
+            self._received_at['resource'] = time.monotonic()
+
+    def _on_policy_runtime_health(self, msg: DiagnosticArray) -> None:
+        for status in msg.status:
+            if status.name != 'policy_runtime/brain':
+                continue
+            values = self._diagnostic_values(status)
+            self._policy_health_validity = values.get(
+                'validity', 'UNAVAILABLE'
+            )
+            self._policy_health_reason = values.get('reason_code', 'no_data')
+            self._policy_health_score = {
+                'VALID': 0.0,
+                'WARMING_UP': 0.2,
+                'STALE': 0.8,
+                'UNAVAILABLE': 0.6,
+                'ERROR': 1.0,
+            }.get(self._policy_health_validity, 1.0)
+            self._received_at['policy_health'] = time.monotonic()
+
+    def _source_fresh(self, key: str) -> bool:
+        received = self._received_at.get(key)
+        if received is None:
+            return False
+        max_age = float(self.get_parameter('source_stale_after_sec').value)
+        return time.monotonic() - received <= max_age
+
+    def _source_status(self) -> dict[str, dict[str, object]]:
+        metrics = self._latest_metrics
+        metrics_fresh = self._source_fresh('metrics')
+
+        def state(
+            valid: bool,
+            provenance: str,
+            reason: str = 'none',
+            validity: str = 'VALID',
+        ) -> dict[str, object]:
+            rendered_validity = validity
+            if not valid and reason == 'source_stale':
+                rendered_validity = 'STALE'
+            elif not valid and validity == 'VALID':
+                rendered_validity = 'UNAVAILABLE'
+            return {
+                'valid': valid,
+                'validity': rendered_validity,
+                'reason_code': reason if not valid else 'none',
+                'provenance': provenance,
+            }
+
+        distribution_valid = bool(
+            metrics_fresh and metrics and metrics.metric_valid
+        )
+        distribution_reason = 'no_data'
+        distribution_validity = 'UNAVAILABLE'
+        if metrics:
+            distribution_reason = (
+                metrics.reason_code if metrics_fresh else 'source_stale'
+            )
+            distribution_validity = metrics.validity
+
+        comm_from_metrics = bool(
+            metrics_fresh and metrics and metrics.comm_health_valid
+        )
+        policy_fresh = self._source_fresh('policy_health')
+        comm_valid = comm_from_metrics or policy_fresh
+        comm_reason = 'none' if comm_valid else 'no_comm_health_source'
+        if not comm_valid and (
+            'metrics' in self._received_at
+            or 'policy_health' in self._received_at
+        ):
+            comm_reason = 'source_stale'
+
+        return {
+            'distribution_shift': state(
+                distribution_valid,
+                '/monitor/distribution_metrics',
+                distribution_reason,
+                distribution_validity,
+            ),
+            'tracking_error': state(
+                self._source_fresh('tracking'),
+                '/monitor/tracking_error',
+                'source_stale' if 'tracking' in self._received_at else 'no_data',
+            ),
+            'dynamics_anomaly': state(
+                bool(metrics_fresh and metrics and metrics.dynamics_valid),
+                '/monitor/distribution_metrics:dynamics',
+                (
+                    'source_stale'
+                    if metrics and not metrics_fresh
+                    else 'insufficient_aligned_samples'
+                ),
+                'WARMING_UP',
+            ),
+            'comm_health': state(
+                comm_valid,
+                '/monitor/comm_health+/policy/runtime_health',
+                comm_reason,
+            ),
+            'planning_failure': state(
+                self._planning_stats.sample_count > 0,
+                '/manipulation/planning_result',
+                'no_samples',
+            ),
+            'resource_pressure': state(
+                self._source_fresh('resource'),
+                '/system/telemetry+/recorder/diagnostics',
+                'source_stale' if 'resource' in self._received_at else 'no_data',
+            ),
+        }
 
     def _compute_raw_scores(self) -> dict[str, float]:
         scores = {
@@ -188,6 +323,11 @@ class RiskEngineNode(Node):
             else:
                 dyn_score = max(dyn_score, float(self._latest_metrics.soft_limit_score))
             scores['dynamics_anomaly'] = dyn_score
+
+        if self._source_fresh('policy_health'):
+            scores['comm_health'] = max(
+                scores['comm_health'], self._policy_health_score
+            )
 
         rmse_thresh = self.get_parameter('tracking_rmse_threshold').value
         if rmse_thresh > 0:
@@ -227,15 +367,38 @@ class RiskEngineNode(Node):
 
     def _publish_risk(self) -> None:
         raw_scores = self._compute_raw_scores()
-        result = self._aggregator.aggregate(raw_scores)
+        source_status = self._source_status()
+        result = self._aggregator.aggregate(raw_scores, source_status)
         safety_scores = dict(raw_scores)
         safety_scores['resource_pressure'] = 0.0
-        safety_result = self._aggregator.aggregate(safety_scores)
-        if raw_scores['resource_pressure'] >= 0.85 and result.level < 2:
-            result.level = 2
-            result.primary_driver = 'resource_pressure'
-            result.recommendation = RECOMMENDATIONS['resource_pressure']
-        if self._latest_metrics and self._latest_metrics.soft_limit_triggered and result.level < 2:
+        safety_status = dict(source_status)
+        safety_status['resource_pressure'] = {
+            'valid': False,
+            'reason_code': 'excluded_from_safety_estop',
+            'provenance': '/system/telemetry+/recorder/diagnostics',
+        }
+        safety_result = self._aggregator.aggregate(
+            safety_scores, safety_status
+        )
+        if (
+            source_status['resource_pressure']['valid']
+            and raw_scores['resource_pressure'] >= 0.85
+        ):
+            # Resource pressure is operational Hold/degrade evidence, never an
+            # automatic R3 safety E-stop source.
+            if result.primary_driver == 'resource_pressure':
+                result.level = 2
+                result.recommendation = RECOMMENDATIONS['resource_pressure']
+            elif result.level < 2:
+                result.level = 2
+                result.primary_driver = 'resource_pressure'
+                result.recommendation = RECOMMENDATIONS['resource_pressure']
+        if (
+            source_status['dynamics_anomaly']['valid']
+            and self._latest_metrics
+            and self._latest_metrics.soft_limit_triggered
+            and result.level < 2
+        ):
             # A soft-limit breach is a safety override: require degraded operation even
             # when the weighted aggregate score would otherwise stay below R2.
             result.level = 2
@@ -255,6 +418,11 @@ class RiskEngineNode(Node):
 
         status = RiskStatus()
         status.header.stamp = self.get_clock().now().to_msg()
+        status.validity = result.validity
+        status.reason_code = result.reason_code
+        status.has_valid_sources = bool(result.active_dimensions)
+        status.active_dimensions = result.active_dimensions
+        status.invalid_dimensions = result.invalid_dimensions
         status.level = result.level
         status.composite_score = result.composite_score
         status.primary_driver = result.primary_driver
@@ -269,6 +437,10 @@ class RiskEngineNode(Node):
             attr.weight = dim.weight
             attr.weighted_score = dim.weighted_score
             attr.is_primary_driver = dim.dimension == result.primary_driver
+            attr.source_valid = dim.source_valid
+            attr.validity = dim.validity
+            attr.reason_code = dim.reason_code
+            attr.provenance = dim.provenance
             status.attribution.append(attr)
 
         self._status_pub.publish(status)

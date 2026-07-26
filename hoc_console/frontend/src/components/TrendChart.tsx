@@ -16,31 +16,31 @@ export const TrendChart = memo(function TrendChart() {
       tooltip: { trigger: 'axis' },
       legend: {
         data: ['KL mean', 'W1 mean', 'MMD', '通信健康'],
-        textStyle: { color: '#aaa' },
+        textStyle: { color: '#a4adb4' },
         top: 0,
       },
       grid: { left: 48, right: 48, top: 36, bottom: 28 },
       dataZoom: [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, textStyle: { color: '#aaa' } },
+        { type: 'slider', xAxisIndex: 0, height: 16, bottom: 4, textStyle: { color: '#a4adb4' } },
       ],
       xAxis: {
         type: 'time',
-        axisLabel: { color: '#888' },
+        axisLabel: { color: '#9da6ad' },
         splitLine: { show: false },
       },
       yAxis: [
         {
           type: 'value',
           scale: true,
-          axisLabel: { color: '#aaa' },
-          splitLine: { lineStyle: { color: '#303030' } },
+          axisLabel: { color: '#a4adb4' },
+          splitLine: { lineStyle: { color: '#485057' } },
         },
         {
           type: 'value',
           min: 0,
           max: 1,
-          axisLabel: { color: '#ff7875' },
+          axisLabel: { color: '#a4adb4' },
           splitLine: { show: false },
         },
       ],
@@ -51,8 +51,8 @@ export const TrendChart = memo(function TrendChart() {
           smooth: true,
           showSymbol: false,
           data: klData,
-          lineStyle: { color: '#69b1ff' },
-          areaStyle: { color: 'rgba(105,177,255,0.15)' },
+          lineStyle: { color: '#5f7f9c' },
+          areaStyle: { color: 'rgba(95,127,156,0.15)' },
         },
         {
           name: 'W1 mean',
@@ -60,7 +60,7 @@ export const TrendChart = memo(function TrendChart() {
           smooth: true,
           showSymbol: false,
           data: w1Data,
-          lineStyle: { color: '#b37feb' },
+          lineStyle: { color: '#887a91' },
         },
         {
           name: 'MMD',
@@ -68,7 +68,7 @@ export const TrendChart = memo(function TrendChart() {
           smooth: true,
           showSymbol: false,
           data: mmdData,
-          lineStyle: { color: '#ffc53d' },
+          lineStyle: { color: '#a68a5d' },
         },
         {
           name: '通信健康',
@@ -77,7 +77,7 @@ export const TrendChart = memo(function TrendChart() {
           smooth: true,
           showSymbol: false,
           data: commData,
-          lineStyle: { color: '#ff7875', type: 'dashed' },
+          lineStyle: { color: '#9a6f6f', type: 'dashed' },
         },
       ],
     };

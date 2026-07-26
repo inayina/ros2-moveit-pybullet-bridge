@@ -1,4 +1,4 @@
-import { ConfigProvider, Layout, Space, Button, theme, message } from 'antd';
+import { ConfigProvider, Layout, Space, Button, Tabs, theme, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { useEffect, useRef } from 'react';
 import { AlertTimeline } from './components/AlertTimeline';
@@ -9,7 +9,7 @@ import { ExperimentControl } from './components/ExperimentControl';
 import { GraspStatusPanel } from './components/GraspStatusPanel';
 import { RobotCameraPanel } from './components/RobotCameraPanel';
 import { R3Modal } from './components/R3Modal';
-import { RiskBanner } from './components/RiskBanner';
+import { RuntimeOverview } from './components/RuntimeOverview';
 import { RiskRadar } from './components/RiskRadar';
 import { ResourcePanel } from './components/ResourcePanel';
 import { TrendChart } from './components/TrendChart';
@@ -60,36 +60,78 @@ function App() {
       locale={zhCN}
       theme={{
         algorithm: theme.darkAlgorithm,
-        token: { colorPrimary: '#1677ff', borderRadius: 8 },
+        token: {
+          colorPrimary: '#6485a3',
+          colorSuccess: '#7f9185',
+          colorWarning: '#c28a2c',
+          colorError: '#b84f4f',
+          colorBgBase: '#202428',
+          colorBgContainer: '#2a2f34',
+          colorBorder: '#4a5158',
+          colorText: '#e1e5e8',
+          colorTextSecondary: '#a4adb4',
+          borderRadius: 6,
+        },
       }}
     >
       <Layout className="app-shell">
         <div ref={dashboardRef} className="dashboard-root">
-          <RiskBanner />
+          <RuntimeOverview />
           <Content className="dashboard-content">
-            <CanonicalRunPanel />
-            <Space className="toolbar" wrap>
-              <EStopButton onEStop={() => sendCommand('e_stop')} />
-              <Button onClick={() => sendCommand('pause')}>暂停</Button>
-              <Button onClick={handleResume}>恢复</Button>
-            </Space>
-            <div className="dashboard-grid dashboard-grid--main">
-              <div className="dashboard-stack">
-                <RobotCameraPanel />
-                <GraspStatusPanel />
-              </div>
-              <div className="dashboard-stack">
-                <div className="dashboard-grid dashboard-grid--3">
-                  <RiskRadar />
-                  <DistributionPanel />
-                  <TrackingChart />
-                </div>
-                <TrendChart />
-                <ResourcePanel />
-              </div>
-            </div>
-            <ExperimentControl sendCommand={sendCommand} dashboardRef={dashboardRef} />
-            <AlertTimeline />
+            <Tabs
+              className="hoc-tabs"
+              defaultActiveKey="overview"
+              tabBarExtraContent={(
+                <Space className="toolbar">
+                  <EStopButton onEStop={() => sendCommand('e_stop')} />
+                  <Button onClick={() => sendCommand('pause')}>暂停</Button>
+                  <Button onClick={handleResume}>恢复</Button>
+                </Space>
+              )}
+              items={[
+                {
+                  key: 'overview',
+                  label: 'Runtime Overview',
+                  children: (
+                    <div className="dashboard-grid dashboard-grid--3 overview-grid">
+                      <RiskRadar />
+                      <DistributionPanel />
+                      <TrackingChart />
+                    </div>
+                  ),
+                },
+                {
+                  key: 'diagnostics',
+                  label: 'Diagnostics',
+                  children: (
+                    <div className="dashboard-grid diagnostics-grid">
+                      <div className="dashboard-stack">
+                        <RobotCameraPanel />
+                        <GraspStatusPanel />
+                      </div>
+                      <div className="dashboard-stack">
+                        <TrendChart />
+                        <ResourcePanel />
+                        <AlertTimeline />
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'historical',
+                  label: 'Historical / Evidence',
+                  children: (
+                    <div className="historical-tab">
+                      <section className="historical-evidence">
+                        <h2>Historical Evidence</h2>
+                        <CanonicalRunPanel />
+                      </section>
+                      <ExperimentControl sendCommand={sendCommand} dashboardRef={dashboardRef} />
+                    </div>
+                  ),
+                },
+              ]}
+            />
           </Content>
         </div>
         <R3Modal sendCommand={sendCommand} />

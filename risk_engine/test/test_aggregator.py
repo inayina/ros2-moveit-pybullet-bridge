@@ -1,10 +1,12 @@
 """Unit tests for risk aggregation logic."""
 
+import pytest
+
 from risk_engine.aggregator import (
     AggregatedRisk,
+    clip01,
     RiskAggregator,
     RiskWeights,
-    clip01,
     score_to_level,
 )
 
@@ -70,3 +72,48 @@ def test_resource_pressure_is_exposed_as_sixth_dimension():
     assert result.primary_driver == 'resource_pressure'
     assert result.composite_score == 0.10
     assert len(result.dimensions) == 6
+
+
+def test_invalid_sources_are_excluded_and_weights_are_renormalized():
+    status = {
+        name: {'valid': False}
+        for name in (
+            'distribution_shift', 'dynamics_anomaly', 'comm_health',
+            'planning_failure', 'resource_pressure',
+        )
+    }
+    status['distribution_shift'].update({
+        'validity': 'UNAVAILABLE',
+        'reason_code': 'calibration_missing',
+        'provenance': '/monitor/distribution_metrics',
+    })
+    status['tracking_error'] = {
+        'valid': True,
+        'provenance': '/monitor/tracking_error',
+    }
+    result = RiskAggregator().aggregate(
+        {'distribution_shift': 1.0, 'tracking_error': 0.5}, status
+    )
+    assert result.composite_score == pytest.approx(0.5)
+    assert result.primary_driver == 'tracking_error'
+    assert result.validity == 'DEGRADED'
+    distribution = next(
+        item for item in result.dimensions
+        if item.dimension == 'distribution_shift'
+    )
+    assert distribution.weight == 0.0
+    assert distribution.reason_code == 'calibration_missing'
+
+
+def test_no_valid_sources_is_unavailable_not_green() -> None:
+    status = {
+        name: {'valid': False}
+        for name in (
+            'distribution_shift', 'tracking_error', 'dynamics_anomaly',
+            'comm_health', 'planning_failure', 'resource_pressure',
+        )
+    }
+    result = RiskAggregator().aggregate({}, status)
+    assert result.validity == 'UNAVAILABLE'
+    assert result.reason_code == 'no_valid_risk_sources'
+    assert result.primary_driver == ''

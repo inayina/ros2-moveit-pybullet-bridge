@@ -32,20 +32,20 @@ export function ResourcePanel() {
     <section className="panel panel--resources">
       <div className="panel-title-row">
         <h3>录制与资源遥测</h3>
-        <Tag color={cpu >= 85 ? 'red' : 'green'}>{cpu.toFixed(1)}% CPU</Tag>
+        <Tag color={cpu >= 85 ? 'red' : undefined}>{cpu.toFixed(1)}% CPU</Tag>
       </div>
       <div className="resource-bars">
         <div><span>系统 CPU</span><Progress percent={cpu} size="small" /></div>
         <div><span>系统内存</span><Progress percent={memory} size="small" /></div>
       </div>
       <Space wrap size={[6, 6]}>
-        <Tag color={effectiveHz >= 8 ? 'green' : 'orange'}>
+        <Tag color={effectiveHz >= 8 ? undefined : 'orange'}>
           Recorder {effectiveHz.toFixed(1)} Hz
         </Tag>
-        <Tag color={sceneAge >= 0 && sceneAge <= 0.5 ? 'green' : 'orange'}>
+        <Tag color={sceneAge >= 0 && sceneAge <= 0.5 ? undefined : 'orange'}>
           Scene age {sceneAge >= 0 ? sceneAge.toFixed(2) + ' s' : 'unseen'}
         </Tag>
-        <Tag color={streams.includes('scene') ? 'green' : 'default'}>Scene enabled</Tag>
+        <Tag color={streams.includes('scene') ? undefined : 'default'}>Scene enabled</Tag>
         <Tag>Wrist disabled</Tag>
         <Tag>Tactile disabled</Tag>
       </Space>

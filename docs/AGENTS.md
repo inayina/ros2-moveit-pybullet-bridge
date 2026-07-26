@@ -21,10 +21,12 @@ Canonical 总览：中游仓 `robot-arm-episode-data-lab/AGENTS.md` V2.1。
 
 | 项 | 值 |
 |----|-----|
-| **实现** | `learning/policy_runner.py`、`learning/panda_action_adapter.py`、`learning/jsonl_action_replay_policy.py` |
-| **策略** | `panda_jsonl_replay`（Panda 主线） |
-| **输入** | `ee_delta_gripper[7]` JSONL |
+| **实现** | `learning/policy_runner.py`、delta/absolute 独立 adapter、`jsonl_action_replay_policy.py`、`policy_command_replay_policy.py` |
+| **策略** | `panda_jsonl_replay`；M5 `panda_policy_command_replay`（离线证据） |
+| **输入** | `ee_delta_gripper[7]` JSONL，或带五轨关联的 native absolute EEF8 trace bundle |
 | **输出** | `/bridge/command` → PyBullet 关节控制 |
+
+M5 bundle replay 必须保留 `is_closed_loop=false`、`claims_task_success=false`。M6 已完成 mock-policy 真实 ROS/DDS wiring，但未启动 PyBullet/Isaac、未切 SmolVLA authoritative，也不证明 task success。
 
 闭环验收：
 
@@ -42,9 +44,11 @@ python3 scripts/benchmark_system.py \
 
 | 项 | 值 |
 |----|-----|
-| **实现** | `dist_monitor/monitor_node.py`、`risk_engine` |
-| **职责** | 分布漂移（KL/W1/MMD）、推理超时 Hold、E-stop 联动 |
-| **话题** | `/monitor/distribution_metrics`、`/risk/status` |
+| **实现** | `dist_monitor/monitor_node.py`、`risk_engine`（在线 `risk_node` + 离线 `offline_readiness.py`）、`hoc_console/runtime_lanes.py` |
+| **职责** | validity-first 分布漂移（KL/W1/MMD）、valid-source Risk 聚合、Risk→Safety 决策桥、Brain/Execution/Safety/Task GT 四通道展示；portfolio 用 offline readiness 对照 |
+| **话题** | `/monitor/distribution_metrics`、`/risk/status`、`/policy/safety_decision`、`/policy/runtime_hold` |
+| **离线入口** | `scripts/run_offline_risk_readiness.py` → JSON；经中游 `--risk-readiness` 挂 `appendix.risk_readiness` |
+| **硬边界** | `use_as_task_go_no_go=false`；M4 monitoring launch 默认 `safety_dry_run:=true`；M6 仅在专用 bounded mock wiring 中使用非 dry-run；不得覆盖上游/Isaac 任务真值或改写 `failure_lane`；authoritative cutover 仍须另行显式批准 |
 
 ---
 

@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'risk_node = risk_engine.risk_node:main',
+            'risk_to_safety_bridge = risk_engine.risk_to_safety_bridge:main',
         ],
     },
 )

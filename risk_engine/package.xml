@@ -16,6 +16,7 @@
   <depend>diagnostic_msgs</depend>
   <depend>bridge_monitor_msgs</depend>
   <depend>moveit_msgs</depend>
+  <depend>teleop_interfaces</depend>
 
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>

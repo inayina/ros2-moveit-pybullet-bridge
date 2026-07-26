@@ -18,9 +18,9 @@
 | `docs/assets/m2-moveit-pipeline.svg` | 下游 | Legacy/design | MoveIt legacy pipeline | script 待确认 | legacy docs | old MoveIt design | current Panda replay benchmark | move_to_legacy |
 | `docs/assets/m3-dual-source.gif` | 下游 | Legacy/synthetic demo | synthetic/old dual-source demo | script 待确认 | old docs note | visual idea only | current runtime evidence | archive |
 | `docs/assets/m4-monitor-metrics.png` | 下游 | Mainline/support | monitor metrics | plotting script 待确认 | distribution metrics output | metrics UI/plot example | canonical Panda numbers unless source linked | relabel |
-| `docs/assets/m5-hoc-console.svg` | 下游 | support/design | HOC console docs | script 待确认 | docs | HOC concept/UI | Panda replay success | relabel |
-| `docs/assets/m5-hoc-dashboard.png` | 下游 | support/screenshot | HOC dashboard screenshot | manual capture | dashboard run | dashboard UI exists | core Panda handoff validation | relabel |
-| `docs/assets/m5-hoc-dashboard.svg` | 下游 | support/design | HOC dashboard diagram | script 待确认 | docs | dashboard design | runtime evidence | relabel |
+| `docs/assets/m5-hoc-console.svg` | 下游 | Historical/design | 四泳道改版前 HOC console docs | script 待确认 | legacy docs | 历史 HOC concept/UI | 当前四泳道 HOC、Policy Runtime 或 M6 wiring | move_to_legacy |
+| `docs/assets/m5-hoc-dashboard.png` | 下游 | Historical/screenshot | M3 四泳道改版前 HOC dashboard screenshot | manual capture | legacy MLP / five-risk dashboard run | 历史 dashboard UI 与演进过程 | 当前四泳道 HOC、Policy Runtime、安全回灌或 M6 wiring | move_to_legacy |
+| `docs/assets/m5-hoc-dashboard.svg` | 下游 | Historical/design | 四泳道改版前 HOC dashboard diagram | script 待确认 | legacy docs | 历史 dashboard design | 当前 runtime evidence | move_to_legacy |
 | `docs/assets/m6-pick-and-lift.gif` | 下游 | Legacy/demo | KUKA/pick-lift historical demo | script 待确认 | legacy sim | historical pick/lift demo | Panda downstream grasp validation | move_to_legacy |
 | `docs/assets/panda_domain_randomization_distribution.png` | 下游 | Mainline/support | Panda domain randomization/distribution plot | plotting script 待确认 | benchmark/distribution JSON needed | distribution visualization | generalized Sim2Real success | relabel |
 | `docs/assets/panda_fault_injection_safety_response.png` | 下游 | Mainline/data plot | fault injection benchmark | plotting script 待确认 | fault benchmark JSON needed | fault response if source exists | certified safety | regenerate |
@@ -43,6 +43,7 @@
 | `docs/assets/three_repo_canonical_dataflow.svg` | 下游 | Mainline/design | phase-2 canonical facts | manual SVG from midstream canonical source | midstream `THREE_REPO_CANONICAL_FACTS.md` | 三仓职责边界与数据流 | run evidence or real robot capability | keep |
 
 | `docs/assets/three_repo_canonical_run_evidence.svg` | 下游 | Mainline/evidence summary | phase-2 canonical facts and JSON artifacts | manual SVG from midstream canonical source | canonical manifests, metrics, handoff, latest benchmark JSON | README 级运行证据摘要 | original artifacts or real robot capability | keep |
+| `docs/assets/hoc-runtime-four-lane-dashboard.png` | 下游 | Mainline/frontend screenshot | 2026-07-26 current HOC frontend | `hoc_console/frontend/e2e/portfolio-screenshot.spec.ts` + mock WebSocket | deterministic RUN→E_STOP→HOLD history；Final Decision、原因链、四泳道 state timeline 与连续诊断布局 | M6 live wiring、SmolVLA task performance、authoritative cutover、Sim2Real | keep |
 
 ## Notes
 

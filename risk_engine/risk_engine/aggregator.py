@@ -39,6 +39,10 @@ class DimensionScore:
     dimension: str
     raw_score: float
     weight: float
+    source_valid: bool = True
+    validity: str = 'VALID'
+    reason_code: str = 'none'
+    provenance: str = 'legacy'
 
     @property
     def weighted_score(self) -> float:
@@ -52,6 +56,10 @@ class AggregatedRisk:
     dimensions: list[DimensionScore] = field(default_factory=list)
     primary_driver: str = ''
     recommendation: str = ''
+    validity: str = 'VALID'
+    reason_code: str = 'none'
+    active_dimensions: list[str] = field(default_factory=list)
+    invalid_dimensions: list[str] = field(default_factory=list)
 
 
 def clip01(value: float) -> float:
@@ -79,15 +87,57 @@ class RiskAggregator:
         self.weights = weights or RiskWeights()
         self.level_thresholds = level_thresholds
 
-    def aggregate(self, raw_scores: dict[str, float]) -> AggregatedRisk:
+    def aggregate(
+        self,
+        raw_scores: dict[str, float],
+        source_status: dict[str, dict[str, object]] | None = None,
+    ) -> AggregatedRisk:
+        status = source_status or {}
+        valid_names = [
+            name
+            for name in DIMENSIONS
+            if bool(status.get(name, {}).get('valid', True))
+        ]
+        valid_weight = sum(getattr(self.weights, name) for name in valid_names)
         dims: list[DimensionScore] = []
         for name in DIMENSIONS:
-            w = getattr(self.weights, name)
+            source = status.get(name, {})
+            valid = bool(source.get('valid', True))
+            configured_weight = getattr(self.weights, name)
+            w = (
+                configured_weight / valid_weight
+                if valid and valid_weight > 0.0
+                else 0.0
+            )
             raw = clip01(raw_scores.get(name, 0.0))
-            dims.append(DimensionScore(dimension=name, raw_score=raw, weight=w))
+            dims.append(DimensionScore(
+                dimension=name,
+                raw_score=raw,
+                weight=w,
+                source_valid=valid,
+                validity=str(source.get(
+                    'validity', 'VALID' if valid else 'UNAVAILABLE'
+                )),
+                reason_code=str(source.get(
+                    'reason_code', 'none' if valid else 'source_unavailable'
+                )),
+                provenance=str(source.get('provenance', 'legacy')),
+            ))
 
         composite = sum(d.weighted_score for d in dims)
-        primary = max(dims, key=lambda d: d.weighted_score)
+        active = [d for d in dims if d.source_valid]
+        invalid = [d.dimension for d in dims if not d.source_valid]
+        if not active:
+            return AggregatedRisk(
+                level=0,
+                composite_score=0.0,
+                dimensions=dims,
+                validity='UNAVAILABLE',
+                reason_code='no_valid_risk_sources',
+                active_dimensions=[],
+                invalid_dimensions=invalid,
+            )
+        primary = max(active, key=lambda d: d.weighted_score)
         level = score_to_level(composite, self.level_thresholds)
 
         return AggregatedRisk(
@@ -96,4 +146,8 @@ class RiskAggregator:
             dimensions=dims,
             primary_driver=primary.dimension,
             recommendation=RECOMMENDATIONS.get(primary.dimension, ''),
+            validity='VALID' if not invalid else 'DEGRADED',
+            reason_code='none' if not invalid else 'partial_sources_unavailable',
+            active_dimensions=[d.dimension for d in active],
+            invalid_dimensions=invalid,
         )

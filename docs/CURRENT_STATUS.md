@@ -1,20 +1,27 @@
 # Current Status
 
-Last audited: 2026-07-14.
+Last audited: 2026-07-26.
 
 ## Portfolio Mainline
 
-`ros2-moveit-pybullet-bridge` is the downstream execution and monitoring
-repository for the three-repo Panda manipulation pipeline.
+`ros2-moveit-pybullet-bridge` is the downstream **execution-validation** surface of
+the three-repo Panda loop (Sim2Sim readiness — not task go/no-go).
 
 Current mainline:
 
 1. Load Panda `bridge_handoff` artifacts from `robot-arm-episode-data-lab`.
-2. Replay `ee_delta_gripper[7]` actions through `panda_jsonl_replay`.
+2. Replay `ee_delta_gripper[7]` (or midstream-exported) actions via `panda_jsonl_replay`.
 3. Adapt actions into Panda joint targets with `PandaActionAdapter`.
-4. Execute or observe the replay in PyBullet.
-5. Monitor tracking error, distribution shift, risk level, system state, and HOC
-   dashboard outputs.
+4. Execute or observe the replay in PyBullet (`benchmark_system.py --launch-stack`
+   brings up bridge + `dist_monitor` + `risk_engine`).
+5. Produce offline RiskAggregator readiness JSON
+   (`scripts/run_offline_risk_readiness.py`) for midstream
+   `unified_eval_report` `appendix.risk_readiness`
+   (`use_as_task_go_no_go=false`, `overrides_failure_lane=false`).
+6. Strictly load a versioned `panda_policy_trace_bundle_v1` and replay native
+   absolute EEF8 commands through `PolicyCommandReplayPolicy` plus its
+   independent adapter. This M5 route is offline evidence only
+   (`is_closed_loop=false`, `claims_task_success=false`).
 
 ## Supported Evidence
 
@@ -22,14 +29,24 @@ Current mainline:
 - Panda JSONL handoff loader and action adapter.
 - PyBullet execution bridge with HOLD/PAUSE/E_STOP states.
 - Distribution metrics: KL, Wasserstein-1, MMD.
-- Risk engine aggregation and HOC dashboard bridge.
+- Online risk_engine on the monitoring launch path.
+- Offline risk readiness smoke hung on the midstream unified envelope
+  (SmolVLA v3 1-ep PolicyRunner + risk appendix).
+- HOC command-sequence correlation across Brain, Execution, Safety, and Task GT,
+  with fail-closed five-track trace-bundle export.
+- Strict PolicyCommand trace loading: invalid hashes, action schema, sequence,
+  parent links, or task-success claims are rejected before replay.
+- M6 bounded ROS/DDS wiring smoke with a mock PolicyBackend: command QoS,
+  R2 actual HOLD, R3 TriggerEstop/E_STOP, four-lane HOC correlation, strict
+  trace reload, timeout, and clean process exit all passed.
 - Legacy MoveIt / FollowJointTrajectory path for iiwa7 regression.
 
 ## Partial Or Future Work
 
-- Full ROS benchmark against the latest real midstream `bridge_handoff_panda`.
-- Downstream physical object-grasp validation scene.
-- Online ACT action chunk runtime.
+- Full multi-episode / fault-injection risk campaign on a single canonical handoff run.
+- Downstream physical object-grasp validation scene (explicitly out of task go/no-go scope).
+- Online ACT/VLA action-chunk runtime as a closed-loop success claim.
+- SmolVLA authoritative online cutover or any PyBullet/Isaac policy wiring run.
 - Real Panda hardware source.
 - Full Sim2Real claims.
 

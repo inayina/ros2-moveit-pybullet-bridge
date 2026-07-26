@@ -18,9 +18,18 @@ export interface RiskAttribution {
   weighted_score: number;
   weight: number;
   is_primary_driver: boolean;
+  source_valid?: boolean;
+  validity?: string;
+  reason_code?: string;
+  provenance?: string;
 }
 
 export interface RiskStatusPayload {
+  validity?: string;
+  reason_code?: string;
+  has_valid_sources?: boolean;
+  active_dimensions?: string[];
+  invalid_dimensions?: string[];
   level: number;
   level_name: string;
   composite_score: number;
@@ -32,6 +41,15 @@ export interface RiskStatusPayload {
 }
 
 export interface DistributionMetricsPayload {
+  validity?: string;
+  reason_code?: string;
+  metric_valid?: boolean;
+  baseline_ready?: boolean;
+  calibration_id?: string;
+  reference_source?: string;
+  aligned_sample_count?: number;
+  comm_health_valid?: boolean;
+  dynamics_valid?: boolean;
   joint_names: string[];
   kl_divergence_per_joint: number[];
   kl_divergence_mean: number;
@@ -72,6 +90,43 @@ export interface DataFrame {
   topic: string;
   timestamp?: RosTimestamp;
   payload: RiskStatusPayload | DistributionMetricsPayload | Record<string, unknown>;
+}
+
+export type RuntimeValidity =
+  | 'VALID'
+  | 'DEGRADED'
+  | 'WARMING_UP'
+  | 'STALE'
+  | 'UNAVAILABLE'
+  | 'ERROR';
+
+export interface RuntimeLanePayload {
+  lane: 'brain' | 'execution' | 'safety' | 'task_gt';
+  validity: RuntimeValidity | string;
+  reason_code: string;
+  age_ms?: number | null;
+  trace_run_id?: string;
+  episode_id?: string;
+  event_id?: string;
+  parent_event_id?: string;
+  [key: string]: unknown;
+}
+
+export interface RuntimeFramePayload {
+  lanes: {
+    brain: RuntimeLanePayload;
+    execution: RuntimeLanePayload;
+    safety: RuntimeLanePayload;
+    task_gt: RuntimeLanePayload;
+  };
+  correlation: {
+    trace_run_ids: string[];
+    trace_consistent: boolean;
+    execution_event_id?: string | null;
+    execution_parent_event_id?: string | null;
+    task_event_id?: string | null;
+    task_parent_event_id?: string | null;
+  };
 }
 
 export interface LegacyFrame {

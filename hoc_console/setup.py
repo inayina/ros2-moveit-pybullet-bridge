@@ -24,6 +24,7 @@ setup(
     entry_points={
         'console_scripts': [
             'hoc_server = hoc_console.hoc_server:main',
+            'm6_wiring_probe = hoc_console.m6_wiring_probe:main',
         ],
     },
 )

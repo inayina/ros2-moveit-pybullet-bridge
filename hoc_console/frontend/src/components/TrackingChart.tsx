@@ -16,13 +16,13 @@ export const TrackingChart = memo(function TrackingChart() {
       xAxis: {
         type: 'category',
         data: joints.length ? joints : ['J1', 'J2', 'J3'],
-        axisLabel: { color: '#aaa', rotate: joints.length > 4 ? 30 : 0 },
+        axisLabel: { color: '#a4adb4', rotate: joints.length > 4 ? 30 : 0 },
       },
       yAxis: {
         type: 'value',
         name: '关节误差 (rad)',
-        axisLabel: { color: '#aaa' },
-        splitLine: { lineStyle: { color: '#303030' } },
+        axisLabel: { color: '#a4adb4' },
+        splitLine: { lineStyle: { color: '#485057' } },
       },
       series: [
         {
@@ -30,8 +30,8 @@ export const TrackingChart = memo(function TrackingChart() {
           type: 'line',
           data: errors.length ? errors : joints.map(() => 0),
           smooth: true,
-          lineStyle: { color: '#b37feb' },
-          areaStyle: { color: 'rgba(179,127,235,0.15)' },
+          lineStyle: { color: '#7d8994' },
+          areaStyle: { color: 'rgba(125,137,148,0.16)' },
         },
       ],
     };
@@ -47,7 +47,7 @@ export const TrackingChart = memo(function TrackingChart() {
   return (
     <div className="panel panel--chart">
       <h3>关节跟踪误差</h3>
-      <StableChart option={option} height={200} />
+      <StableChart option={option} height={340} />
       <p className="panel-caption">RMSE: {rmse.toFixed(4)} rad</p>
     </div>
   );

@@ -10,6 +10,11 @@ const AXES = [
 
 function riskPayload(level: number, score: number) {
   return {
+    validity: 'VALID',
+    reason_code: 'none',
+    has_valid_sources: true,
+    active_dimensions: AXES,
+    invalid_dimensions: [],
     level,
     level_name: `R${level}`,
     composite_score: score,
@@ -31,6 +36,15 @@ function metricsPayload(tick: number) {
   const joints = ['panda_joint1', 'panda_joint2', 'panda_joint3'];
   const wave = Math.sin(tick * 0.2) * 0.02;
   return {
+    validity: 'VALID',
+    reason_code: 'none',
+    metric_valid: true,
+    baseline_ready: true,
+    calibration_id: 'mock_same_scene',
+    reference_source: 'topic',
+    aligned_sample_count: 118 + tick,
+    comm_health_valid: true,
+    dynamics_valid: true,
     joint_names: joints,
     kl_divergence_per_joint: joints.map((_, i) => 0.04 + wave + i * 0.01),
     kl_divergence_mean: 0.05 + wave,
@@ -79,6 +93,7 @@ export async function installMockWebSocket(page: Page) {
       static OPEN = 1;
       static CLOSING = 2;
       static CLOSED = 3;
+      static instances: MockWebSocket[] = [];
 
       readyState = MockWebSocket.CONNECTING;
       onopen: ((ev: Event) => void) | null = null;
@@ -90,6 +105,19 @@ export async function installMockWebSocket(page: Page) {
       private tick = 0;
 
       constructor(_url: string) {
+        MockWebSocket.instances.push(this);
+        (window as typeof window & {
+          __hocMockSend?: (payload: Record<string, unknown>) => void;
+          __hocMockPause?: () => void;
+        }).__hocMockSend = (payload) => this.sendJson(payload);
+        (window as typeof window & {
+          __hocMockPause?: () => void;
+        }).__hocMockPause = () => {
+          MockWebSocket.instances.forEach((socket) => {
+            if (socket.timer !== null) window.clearInterval(socket.timer);
+            socket.timer = null;
+          });
+        };
         window.setTimeout(() => {
           this.readyState = MockWebSocket.OPEN;
           this.onopen?.(new Event('open'));
@@ -117,6 +145,14 @@ export async function installMockWebSocket(page: Page) {
       private push() {
         this.tick += 1;
         const risk = {
+          validity: 'VALID',
+          reason_code: 'none',
+          has_valid_sources: true,
+          active_dimensions: [
+            'distribution_shift', 'tracking_error', 'dynamics_anomaly',
+            'comm_health', 'planning_failure',
+          ],
+          invalid_dimensions: [],
           level: this.tick % 40 < 35 ? 0 : 2,
           level_name: this.tick % 40 < 35 ? 'R0' : 'R2',
           composite_score: 0.2 + (this.tick % 10) * 0.01,
@@ -139,6 +175,15 @@ export async function installMockWebSocket(page: Page) {
           })),
         };
         const metrics = {
+          validity: 'VALID',
+          reason_code: 'none',
+          metric_valid: true,
+          baseline_ready: true,
+          calibration_id: 'mock_same_scene',
+          reference_source: 'topic',
+          aligned_sample_count: 118,
+          comm_health_valid: true,
+          dynamics_valid: true,
           joint_names: ['panda_joint1', 'panda_joint2', 'panda_joint3'],
           kl_divergence_per_joint: [0.04, 0.05, 0.06],
           kl_divergence_mean: 0.05,
@@ -181,6 +226,27 @@ export async function installMockWebSocket(page: Page) {
           topic: '/monitor/distribution_metrics',
           timestamp: { sec: this.tick, nanosec: 0 },
           payload: metrics,
+        });
+        this.sendJson({
+          type: 'runtime_frame',
+          payload: {
+            lanes: {
+              brain: {
+                lane: 'brain', validity: 'VALID', reason_code: 'none',
+                lifecycle_state: 'ACTIVE', queue_depth: 4, age_ms: 20,
+              },
+              execution: {
+                lane: 'execution', validity: 'VALID', reason_code: 'none',
+                decision: 'EXECUTED', command_sequence: this.tick, age_ms: 15,
+              },
+              safety: { lane: 'safety', age_ms: 10, ...risk },
+              task_gt: {
+                lane: 'task_gt', validity: 'VALID', reason_code: 'none',
+                task_status: 'RUNNING', phase: 'reach', age_ms: 30,
+              },
+            },
+            correlation: { trace_run_ids: ['mock'], trace_consistent: true },
+          },
         });
         this.sendJson({
           type: 'data',

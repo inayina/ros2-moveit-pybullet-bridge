@@ -1,5 +1,17 @@
 std_msgs/Header header
 
+# M3 validity-first envelope. Numeric fields below remain for wire
+# compatibility but MUST NOT be interpreted when their validity is false.
+string validity
+string reason_code
+bool metric_valid
+bool baseline_ready
+string calibration_id
+string reference_source
+uint32 aligned_sample_count
+bool comm_health_valid
+bool dynamics_valid
+
 string[] joint_names
 float64[] kl_divergence_per_joint
 float64 kl_divergence_mean

@@ -6,6 +6,7 @@ import type {
   ExperimentProgressPayload,
   GraspStatusPayload,
   RiskStatusPayload,
+  RuntimeFramePayload,
   TrackingErrorPayload,
   WsFrame,
 } from '../types/messages';
@@ -18,6 +19,9 @@ const SUBSCRIBE_TOPICS = [
   '/bridge/sim/grasp_status',
   '/system/telemetry',
   '/recorder/diagnostics',
+  '/policy/runtime_health',
+  '/policy/execution_report',
+  '/task/evaluation_status',
 ];
 const BACKOFF_MS = [1000, 2000, 4000, 8000, 16000, 30000];
 
@@ -81,6 +85,15 @@ function isDiagnosticPayload(payload: unknown): payload is DiagnosticArrayPayloa
   );
 }
 
+function isRuntimeFrame(payload: unknown): payload is RuntimeFramePayload {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'lanes' in payload &&
+    'correlation' in payload
+  );
+}
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
@@ -100,6 +113,7 @@ export function useWebSocket() {
   const setSystemState = useDashboardStore((s) => s.setSystemState);
   const ingestSystemTelemetry = useDashboardStore((s) => s.ingestSystemTelemetry);
   const ingestRecorderDiagnostics = useDashboardStore((s) => s.ingestRecorderDiagnostics);
+  const ingestRuntimeFrame = useDashboardStore((s) => s.ingestRuntimeFrame);
 
   const handleFrame = useCallback(
     (frame: WsFrame) => {
@@ -170,6 +184,13 @@ export function useWebSocket() {
       } else if (frame.type === 'alert_event' && 'payload' in frame && isAlertPayload(frame.payload)) {
         setConnected(true);
         ingestAlert(frame.payload);
+      } else if (
+        frame.type === 'runtime_frame' &&
+        'payload' in frame &&
+        isRuntimeFrame(frame.payload)
+      ) {
+        setConnected(true);
+        ingestRuntimeFrame(frame.payload);
       } else if (frame.type === 'recording_status' && 'recording' in frame) {
         setConnected(true);
         setRecording(Boolean(frame.recording), String(frame.bag_path ?? ''));
@@ -209,7 +230,7 @@ export function useWebSocket() {
         }
       }
     },
-    [ingestAlert, ingestExperimentProgress, ingestGrasp, ingestMetrics, ingestRecorderDiagnostics, ingestRisk, ingestSystemTelemetry, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
+    [ingestAlert, ingestExperimentProgress, ingestGrasp, ingestMetrics, ingestRecorderDiagnostics, ingestRisk, ingestRuntimeFrame, ingestSystemTelemetry, ingestTracking, setCameraFrame, setConnected, setRecording, setSystemState],
   );
 
   const connect = useCallback(() => {

@@ -5,16 +5,15 @@ from __future__ import annotations
 import threading
 import time
 
+from bridge_monitor_msgs.msg import DistributionMetrics, RiskStatus
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 import pytest
 import rclpy
-from bridge_monitor_msgs.msg import DistributionMetrics, RiskStatus
 from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from sensor_msgs.msg import JointState
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-
 from risk_engine.risk_node import RiskEngineNode
+from sensor_msgs.msg import JointState
 
 
 class _MonitorFeed(Node):
@@ -33,6 +32,13 @@ class _MonitorFeed(Node):
     def publish_shifted_metrics(self) -> None:
         metrics = DistributionMetrics()
         metrics.header.stamp = self.get_clock().now().to_msg()
+        metrics.validity = 'VALID'
+        metrics.reason_code = 'none'
+        metrics.metric_valid = True
+        metrics.baseline_ready = True
+        metrics.calibration_id = 'test_same_scene'
+        metrics.comm_health_valid = True
+        metrics.dynamics_valid = True
         metrics.kl_divergence_mean = 0.25
         metrics.mmd_statistic = 0.08
         metrics.mmd_p_value = 0.01
@@ -117,6 +123,8 @@ def test_risk_node_publishes_status(risk_node):
     assert latest.level >= 0
     assert latest.composite_score > 0.0
     assert latest.primary_driver
+    assert latest.has_valid_sources is True
+    assert latest.validity in ('VALID', 'DEGRADED')
     assert len(latest.attribution) == 6
     comm_attr = next(a for a in latest.attribution if a.dimension == 'comm_health')
     assert comm_attr.raw_score > 0.5
@@ -124,6 +132,7 @@ def test_risk_node_publishes_status(risk_node):
     assert dyn_attr.raw_score > 0.5
     plan_attr = next(a for a in latest.attribution if a.dimension == 'planning_failure')
     assert plan_attr.raw_score >= 1.0
+    assert plan_attr.source_valid is True
 
 
 def test_resource_pressure_caps_at_r2_without_auto_estop(risk_node):

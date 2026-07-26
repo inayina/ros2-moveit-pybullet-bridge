@@ -4,24 +4,16 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import json
-import os
-import subprocess
-import threading
-import time
 from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
+import os
 from pathlib import Path
+import subprocess
+import threading
+import time
 from typing import Any
-
-import rclpy
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
-from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
-from std_srvs.srv import SetBool, Trigger
-from diagnostic_msgs.msg import DiagnosticArray
 
 from bridge_monitor_msgs.action import ExecuteScenario, Pick, Place
 from bridge_monitor_msgs.msg import (
@@ -31,23 +23,59 @@ from bridge_monitor_msgs.msg import (
     GraspStatus,
     RiskStatus,
 )
+from bridge_monitor_msgs.srv import (
+    AcknowledgeRisk,
+    ExportExperiment,
+    InjectShift,
+    SetRandomization,
+)
+from diagnostic_msgs.msg import DiagnosticArray
 from geometry_msgs.msg import Point, Pose, PoseStamped, Quaternion
-from rclpy.action import ActionClient
-from bridge_monitor_msgs.srv import AcknowledgeRisk, ExportExperiment, InjectShift, SetRandomization
-from sensor_msgs.msg import CompressedImage, JointState
-
 from hoc_console.experiment_runner import ExperimentRunner
-from hoc_console.http_static import register_camera_routes, resolve_frontend_dist, start_static_server
+from hoc_console.http_static import (
+    register_camera_routes,
+    resolve_frontend_dist,
+    start_static_server,
+)
 from hoc_console.report_csv import render_csv_report
 from hoc_console.report_html import render_html_report
 from hoc_console.ros_bridge import (
-    distribution_metrics_to_dict,
     diagnostic_array_to_dict,
+    distribution_metrics_to_dict,
+    execution_report_to_dict,
     grasp_status_to_dict,
+    policy_health_to_dict,
+    policy_command_to_dict,
     risk_status_to_dict,
+    safety_decision_to_dict,
+    task_evaluation_to_dict,
     tracking_error_to_dict,
 )
+from hoc_console.runtime_lanes import RuntimeLaneStore
+from hoc_console.runtime_trace_report import (
+    build_runtime_trace_report,
+    export_policy_trace_bundle,
+)
 from hoc_console.ws_hub import WsHub
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.executors import MultiThreadedExecutor
+from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import CompressedImage, JointState
+from std_msgs.msg import String
+from std_srvs.srv import SetBool, Trigger
+
+try:
+    from teleop_interfaces.msg import (
+        PolicyCommand,
+        PolicyExecutionReport,
+        TaskEvaluationStatus,
+    )
+except ImportError:  # Optional until the upstream interface overlay is sourced.
+    PolicyExecutionReport = None
+    PolicyCommand = None
+    TaskEvaluationStatus = None
 
 
 @dataclass
@@ -77,25 +105,42 @@ class SessionHistory:
     system_telemetry_timeline: deque = field(default_factory=lambda: deque(maxlen=3600))
     recorder_diagnostics_timeline: deque = field(default_factory=lambda: deque(maxlen=3600))
     max_host_cpu_percent: float = 0.0
+    runtime_timelines: dict[str, deque] = field(default_factory=lambda: {
+        lane: deque(maxlen=3600)
+        for lane in ('brain', 'execution', 'safety', 'task_gt')
+    })
 
     def record_risk(self, payload: dict[str, Any]) -> None:
         t = time.time() - self.start_time
-        self.risk_timeline.append({'t': t, 'level': payload['level'], 'score': payload['composite_score']})
+        self.risk_timeline.append({
+            't': t,
+            'level': payload['level'],
+            'score': payload['composite_score'],
+        })
         self.max_risk_level = max(self.max_risk_level, payload['level'])
         self.max_composite_score = max(self.max_composite_score, payload['composite_score'])
 
     def record_metrics(self, payload: dict[str, Any]) -> None:
         t = time.time() - self.start_time
-        kl = payload.get('kl_divergence_mean', 0.0)
-        w1 = payload.get('wasserstein_mean', 0.0)
-        mmd = payload.get('mmd_statistic', 0.0)
+        valid = bool(payload.get('metric_valid', False))
+        kl = payload.get('kl_divergence_mean') if valid else None
+        w1 = payload.get('wasserstein_mean') if valid else None
+        mmd = payload.get('mmd_statistic') if valid else None
         self.metrics_timeline.append({
             't': t,
             'kl_mean': kl,
             'w1_mean': w1,
             'mmd_stat': mmd,
-            'shift_detected': payload.get('shift_detected', False),
+            'metric_valid': valid,
+            'validity': payload.get('validity', 'UNAVAILABLE'),
+            'reason_code': payload.get('reason_code', 'no_data'),
+            'calibration_id': payload.get('calibration_id', ''),
+            'shift_detected': (
+                payload.get('shift_detected', False) if valid else None
+            ),
         })
+        if not valid:
+            return
         self.metrics_count += 1
         self.kl_sum += kl
         self.kl_max = max(self.kl_max, kl)
@@ -107,25 +152,38 @@ class SessionHistory:
         if payload.get('shift_detected'):
             self.shift_detected_count += 1
 
+    def record_runtime(self, lane: str, payload: dict[str, Any]) -> None:
+        self.runtime_timelines[lane].append({
+            't': time.time() - self.start_time,
+            **payload,
+        })
+
     def summary(self) -> dict[str, Any]:
-        mean_kl = self.kl_sum / self.metrics_count if self.metrics_count else 0.0
-        mean_w1 = self.w1_sum / self.metrics_count if self.metrics_count else 0.0
-        mean_mmd = self.mmd_sum / self.metrics_count if self.metrics_count else 0.0
-        ratio = self.shift_detected_count / self.shift_total if self.shift_total else 0.0
+        mean_kl = self.kl_sum / self.metrics_count if self.metrics_count else None
+        mean_w1 = self.w1_sum / self.metrics_count if self.metrics_count else None
+        mean_mmd = self.mmd_sum / self.metrics_count if self.metrics_count else None
+        ratio = (
+            self.shift_detected_count / self.shift_total
+            if self.shift_total else None
+        )
         return {
             'max_risk_level': self.max_risk_level,
             'max_composite_score': self.max_composite_score,
             'shift_detected_count': self.shift_detected_count,
             'shift_detected_ratio': ratio,
             'mean_kl': mean_kl,
-            'max_kl': self.kl_max,
+            'max_kl': self.kl_max if self.metrics_count else None,
             'mean_w1': mean_w1,
-            'max_w1': self.w1_max,
+            'max_w1': self.w1_max if self.metrics_count else None,
             'mean_mmd': mean_mmd,
-            'max_mmd': self.mmd_max,
+            'max_mmd': self.mmd_max if self.metrics_count else None,
             'max_host_cpu_percent': self.max_host_cpu_percent,
             'system_telemetry_samples': len(self.system_telemetry_timeline),
             'recorder_diagnostic_samples': len(self.recorder_diagnostics_timeline),
+            'runtime_lane_samples': {
+                lane: len(samples)
+                for lane, samples in self.runtime_timelines.items()
+            },
         }
 
     def record_diagnostic(self, topic: str, payload: dict[str, Any]) -> None:
@@ -154,11 +212,15 @@ class HocServerNode(Node):
         self.declare_parameter('serve_frontend', True)
         self.declare_parameter('frontend_dist_dir', '')
         self.declare_parameter('camera_http_port', 8766)
+        self.declare_parameter('runtime_lane_stale_after_sec', 1.0)
 
         self._ws_hub = WsHub()
         self._loop: asyncio.AbstractEventLoop | None = None
         self._system_state = 'RUNNING'
         self._latest_risk: RiskStatus | None = None
+        self._latest_safety_decision: dict[str, Any] = {}
+        self._latest_execution_context: dict[str, Any] = {}
+        self._policy_commands: deque = deque(maxlen=3600)
         self._latest_metrics: DistributionMetrics | None = None
         self._latest_tracking = None
         self._latest_grasp: GraspStatus | None = None
@@ -173,11 +235,25 @@ class HocServerNode(Node):
         self._experiment_metadata: dict[str, Any] = {}
         self._manipulation_lock = threading.Lock()
         self._manipulation_active = False
+        self._runtime_lanes = RuntimeLaneStore(
+            stale_after_sec=float(
+                self.get_parameter('runtime_lane_stale_after_sec').value
+            )
+        )
 
         self.create_subscription(RiskStatus, '/risk/status', self._on_risk, 10)
         self.create_subscription(
-            DistributionMetrics, '/monitor/distribution_metrics', self._on_metrics, 10)
-        self.create_subscription(JointState, '/monitor/tracking_error', self._on_tracking, qos_profile_sensor_data)
+            DistributionMetrics,
+            '/monitor/distribution_metrics',
+            self._on_metrics,
+            10,
+        )
+        self.create_subscription(
+            JointState,
+            '/monitor/tracking_error',
+            self._on_tracking,
+            qos_profile_sensor_data,
+        )
         self.create_subscription(
             GraspStatus,
             '/bridge/sim/grasp_status',
@@ -185,7 +261,11 @@ class HocServerNode(Node):
             qos_profile_sensor_data,
         )
         self.create_subscription(
-            CompressedImage, '/bridge/camera/image_compressed', self._on_camera, qos_profile_sensor_data)
+            CompressedImage,
+            '/bridge/camera/image_compressed',
+            self._on_camera,
+            qos_profile_sensor_data,
+        )
         self.create_subscription(String, '/risk/alerts', self._on_alert, 10)
         self.create_subscription(
             ExperimentMetadata, '/bridge/experiment_metadata', self._on_experiment_metadata, 10)
@@ -194,6 +274,39 @@ class HocServerNode(Node):
             DiagnosticArray, '/system/telemetry', self._on_system_telemetry, 10)
         self.create_subscription(
             DiagnosticArray, '/recorder/diagnostics', self._on_recorder_diagnostics, 10)
+        self.create_subscription(
+            DiagnosticArray,
+            '/policy/runtime_health',
+            self._on_policy_health,
+            10,
+        )
+        self.create_subscription(
+            DiagnosticArray,
+            '/policy/safety_decision',
+            self._on_safety_decision,
+            10,
+        )
+        if PolicyExecutionReport is not None:
+            self.create_subscription(
+                PolicyExecutionReport,
+                '/policy/execution_report',
+                self._on_execution_report,
+                10,
+            )
+        if PolicyCommand is not None:
+            self.create_subscription(
+                PolicyCommand,
+                '/policy/command',
+                self._on_policy_command,
+                10,
+            )
+        if TaskEvaluationStatus is not None:
+            self.create_subscription(
+                TaskEvaluationStatus,
+                '/task/evaluation_status',
+                self._on_task_gt,
+                10,
+            )
 
         self._e_stop_client = self.create_client(Trigger, '/risk/force_e_stop')
         self._ack_client = self.create_client(AcknowledgeRisk, '/risk/acknowledge')
@@ -334,11 +447,104 @@ class HocServerNode(Node):
 
     def _on_risk(self, msg: RiskStatus) -> None:
         self._latest_risk = msg
-        self._history.record_risk(risk_status_to_dict(msg))
+        payload = risk_status_to_dict(msg)
+        payload.update(self._latest_safety_decision)
+        payload.update({'lane': 'safety'})
+        self._attach_execution_context(payload, 'risk_timeline_event')
+        self._history.record_risk(payload)
+        self._runtime_lanes.update('safety', payload)
+        self._history.record_runtime('safety', payload)
+
+    def _on_safety_decision(self, msg: DiagnosticArray) -> None:
+        self._latest_safety_decision = safety_decision_to_dict(msg)
+        payload = (
+            risk_status_to_dict(self._latest_risk)
+            if self._latest_risk is not None
+            else {
+                'validity': 'UNAVAILABLE',
+                'reason_code': 'risk_status_missing',
+                'has_valid_sources': False,
+            }
+        )
+        payload.update(self._latest_safety_decision)
+        payload['lane'] = 'safety'
+        self._attach_execution_context(payload, 'risk_timeline_event')
+        self._runtime_lanes.update('safety', payload)
+        self._history.record_runtime('safety', payload)
 
     def _on_metrics(self, msg: DistributionMetrics) -> None:
         self._latest_metrics = msg
         self._history.record_metrics(distribution_metrics_to_dict(msg))
+
+    def _on_policy_health(self, msg: DiagnosticArray) -> None:
+        payload = policy_health_to_dict(msg)
+        self._attach_execution_context(payload, 'policy_health_timeline_event')
+        self._runtime_lanes.update('brain', payload)
+        self._history.record_runtime('brain', payload)
+
+    def _on_execution_report(self, msg) -> None:
+        payload = execution_report_to_dict(msg)
+        self._latest_execution_context = {
+            key: payload[key]
+            for key in (
+                'contract_version', 'trace_run_id', 'episode_id',
+                'command_sequence', 'event_id',
+            )
+        }
+        if self._runtime_lanes.update('execution', payload):
+            self._history.record_runtime('execution', payload)
+        else:
+            self.get_logger().warn(
+                'Dropped regressed /policy/execution_report sequence'
+            )
+
+    def _on_policy_command(self, msg) -> None:
+        payload = policy_command_to_dict(msg)
+        if self._policy_commands:
+            previous = self._policy_commands[-1]
+            if (
+                previous['episode_id'] == payload['episode_id']
+                and payload['command_sequence'] <= previous['command_sequence']
+            ):
+                self.get_logger().warn('Dropped regressed /policy/command sequence')
+                return
+        self._policy_commands.append(payload)
+
+    def _on_task_gt(self, msg) -> None:
+        payload = task_evaluation_to_dict(msg)
+        self._attach_execution_context(payload, 'task_gt_timeline_event')
+        self._runtime_lanes.update('task_gt', payload)
+        self._history.record_runtime('task_gt', payload)
+
+    def _attach_execution_context(
+        self, payload: dict[str, Any], artifact_type: str
+    ) -> None:
+        context = self._latest_execution_context
+        payload['artifact_type'] = artifact_type
+        payload['claims_task_success'] = False
+        if not context:
+            return
+        trace_matches = (
+            not payload.get('trace_run_id')
+            or payload.get('trace_run_id') == context['trace_run_id']
+        )
+        episode_matches = (
+            not payload.get('episode_id')
+            or payload.get('episode_id') == context['episode_id']
+        )
+        if not trace_matches or not episode_matches:
+            return
+        payload.setdefault('contract_version', context['contract_version'])
+        payload.setdefault('trace_run_id', context['trace_run_id'])
+        payload.setdefault('episode_id', context['episode_id'])
+        payload.setdefault('command_sequence', context['command_sequence'])
+        payload.setdefault('parent_event_id', context['event_id'])
+        payload.setdefault(
+            'event_id',
+            f'{artifact_type}:{context["episode_id"]}:'
+            f'{context["command_sequence"]}',
+        )
+        payload['correlation_source'] = 'latest_execution_report'
 
     def _on_tracking(self, msg: JointState) -> None:
         self._latest_tracking = msg
@@ -445,6 +651,21 @@ class HocServerNode(Node):
                     diagnostic_array_to_dict(self._latest_recorder_diagnostics)),
                 loop,
             )
+        runtime = self._runtime_lanes.snapshot()
+        topic_by_lane = {
+            'brain': 'policy_health',
+            'execution': 'execution_report',
+            'safety': 'risk_status',
+            'task_gt': 'task_gt',
+        }
+        for lane, payload in runtime['lanes'].items():
+            asyncio.run_coroutine_threadsafe(
+                self._ws_hub.broadcast(topic_by_lane[lane], payload),
+                loop,
+            )
+        asyncio.run_coroutine_threadsafe(
+            self._ws_hub.broadcast('runtime_frame', runtime), loop
+        )
 
     async def _handle_ws_message(self, websocket, raw: str) -> None:
         try:
@@ -837,6 +1058,35 @@ class HocServerNode(Node):
 
         experiment_id = request.experiment_id or f'exp_{datetime.now().strftime("%Y%m%d_%H%M%S")}'
         fmt = (request.format or 'html').lower()
+        runtime_timelines = {
+            lane: list(samples)
+            for lane, samples in self._history.runtime_timelines.items()
+        }
+        runtime_trace_report = build_runtime_trace_report(
+            list(self._policy_commands), runtime_timelines
+        )
+        if fmt in ('trace_bundle', 'bundle'):
+            out_path = request.output_path
+            if not out_path:
+                out_path = str(
+                    report_dir / f'{experiment_id}_policy_trace_bundle'
+                )
+            out_path = os.path.expanduser(out_path)
+            try:
+                export_policy_trace_bundle(
+                    out_path,
+                    list(self._policy_commands),
+                    runtime_timelines,
+                )
+            except (OSError, ValueError) as exc:
+                response.success = False
+                response.file_path = ''
+                response.message = f'Policy trace export refused: {exc}'
+                return
+            response.success = True
+            response.file_path = str(Path(out_path) / 'manifest.json')
+            response.message = f'Policy trace bundle exported to {out_path}'
+            return
         if fmt == 'csv':
             ext = 'csv'
         elif fmt in ('html', 'pdf'):
@@ -869,6 +1119,11 @@ class HocServerNode(Node):
                     self._history.system_telemetry_timeline),
                 'recorder_diagnostics_timeline': list(
                     self._history.recorder_diagnostics_timeline),
+                'policy_commands': list(self._policy_commands),
+                'runtime_timelines': runtime_timelines,
+                'runtime_trace_report': runtime_trace_report,
+                'is_closed_loop': False,
+                'claims_task_success': False,
                 'recommendation': recommendation,
             }
             Path(out_path).write_text(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -893,6 +1148,7 @@ class HocServerNode(Node):
                 ),
                 screenshot_b64=screenshot_b64,
                 recommendation=recommendation,
+                runtime_trace_report=runtime_trace_report,
             )
             Path(out_path).write_text(html, encoding='utf-8')
 

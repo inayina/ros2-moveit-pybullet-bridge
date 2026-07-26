@@ -1013,13 +1013,296 @@
   2. 在 `build_flags` 中使用 `-L.pio/libdeps/esp32-s3-devkitc-1/micro_ros_arduino/src/esp32` 指定了静态库的搜索路径 [platformio.ini: L36](file:///home/ina/Documents/PlatformIO/Projects/robot-state-monitor-v1/firmware/esp32_microros_bridge/platformio.ini#L36)。
   3. 使用 `-lmicroros` 指令显式静态链接了预编译的静态库文件 `libmicroros.a` [platformio.ini: L37](file:///home/ina/Documents/PlatformIO/Projects/robot-state-monitor-v1/firmware/esp32_microros_bridge/platformio.ini#L37)。这保证了 ESP32 固件在编译生成 `.bin` 烧录文件时，只打包当前使用到的 micro-ROS 节点、订阅器与发布器代码。
 
+---
 
+## 二十四、 机器人“大脑—小脑”策略执行链与旧下游框架接线 FAQ
 
+### Q1：当前 SmolVLA 路线是否已经完整接入下游 PolicyRunner / Risk Engine 框架？为什么说它们现在是两条并行链？
 
+**核心原理解析 / 常用命令**
 
+“模型能在仿真中在线发动作”和“模型已经接入统一的小脑执行框架”不是同一件事。完整的大脑—小脑链至少要统一四类契约：
 
+1. **Observation 契约**：相机、关节、末端位姿、夹爪状态及时间戳必须进入同一个在线策略接口。
+2. **Action 契约**：必须明确绝对末端动作、相对末端动作还是关节目标；不能靠离线转换掩盖运行时语义差异。
+3. **Safety / Health 契约**：推理超时、分布漂移、Hold、degraded mode 和 E-stop 必须能反馈到真正控制执行路径。
+4. **Lifecycle 契约**：reset、episode boundary、action chunk queue、watchdog 与状态报告必须由同一个运行时协议管理。
 
+现场核对 ROS 图时可使用：
 
+```bash
+ros2 node info /smolvla_policy_inference
+ros2 node info /policy_runner
+ros2 topic info /teleop/cmd_pose -v
+ros2 topic info /bridge/command -v
+ros2 topic info /risk/status -v
+ros2 topic echo /policy/inference_status --once
+ros2 topic echo /system_health --once
+```
 
+如果 SmolVLA 发布的是 `/teleop/cmd_pose`，而下游 PolicyRunner 发布的是 `/bridge/command`，且 `/risk/status` 只被 PyBullet bridge 消费，就说明它们共享评测产物但尚未形成同一条在线控制链。
 
+**对应项目代码事实**
 
+- **已实现：上游直连式在线闭环。** `IsaacSmolVLAPolicyInferenceNode` 订阅 encoder、gripper、EE pose 和 scene RGB，组装 `state[15]`，执行 SmolVLA 推理与 absolute-EEF 安全限幅，再发布 `/teleop/cmd_pose` 和 `/teleop/gripper_cmd`。见 [smolvla_policy_inference_node.py: L207](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L207) 与 [smolvla_policy_inference_node.py: L391](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L391)。这证明高层策略已接到上游执行控制路径，但不证明已接入下游旧框架。
+- **已实现：下游 replay / monitor 链。** `PolicyRunner` 当前策略类型是 `replay`、`panda_jsonl_replay` 或 `sine_wave`；Panda 主线加载 handoff 中的 `ee_delta_gripper[7]`，经 `PandaActionAdapter` 转成关节目标，并发布 `/bridge/command`。见 [policy_runner.py: L176](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/policy_runner.py#L176)、[panda_action_adapter.py: L43](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py#L43)。
+- **已实现：下游内部 Risk 闭环。** PyBullet bridge 订阅 `/risk/status`，在 E-stop 时清空轨迹并停止物理执行，在 degraded mode 下缩放轨迹速度。见 [bridge_node.py: L105](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/bridge_node.py#L105) 与 [bridge_node.py: L249](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/bridge_node.py#L249)。
+- **已实现但仅离线复用：SmolVLA → 下游。** 中游把 SmolVLA 的 open-loop `absolute_eef_gripper[8]` 序列转换为 `ee_delta_gripper[7]` handoff，再做 `panda_jsonl_replay` smoke；产物明确 `is_closed_loop=false`。见 [export_smolvla_openloop_to_pybullet_handoff.py: L58](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/export_smolvla_openloop_to_pybullet_handoff.py#L58) 与 [export_smolvla_openloop_to_pybullet_handoff.py: L166](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/export_smolvla_openloop_to_pybullet_handoff.py#L166)。
+- **已实现：模型无关 Policy Runtime 与 Safety/HOC 接线。** M0–M5 已冻结并实现 `PolicyCommand`、health、execution report、Task GT、native chunk10/K5 Scheduler、absolute EEF8 adapter、Risk→Safety、四泳道 HOC 和五轨 trace replay。M6 进一步用 mock PolicyBackend 经真实 ROS 2/DDS 验证 command 1/2/3 对应 `EXECUTED/HELD/ESTOPPED`，HOC `issues=[]`。见 [POLICY_RUNTIME_M6_WIRING_RESULTS.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/POLICY_RUNTIME_M6_WIRING_RESULTS.md)。
+- **尚未实现：SmolVLA authoritative 在线切流与 online async double buffer。** 上游已有受门禁的 `legacy|shadow|authoritative` 代码路径，但默认仍为 `legacy`；M6 没有加载模型、启动 Isaac/PyBullet 或改变执行权威。offline 验证过的 async double buffer 也尚未接入在线节点。因此可以说“统一 runtime 合同和 mock wiring 已完成”，不能说“SmolVLA 已被下游小脑接管”或“在线抓取闭环已完成”。
+
+**面试回答模板**
+
+> “我先把原来分离的上游策略链和下游 replay/risk 链抽象成模型无关 Policy Runtime：M0–M5 已统一 command、health、native chunk10/K5、执行裁决、Safety feedback、四泳道 HOC 和 trace replay；M6 用 mock policy 通过真实 ROS/DDS 跑出了 EXECUTED、HELD、ESTOPPED 三种状态。当前剩余的是部署切流，不是合同缺失：SmolVLA authoritative 默认仍关闭，online async double buffer 也没接，所以这个结果证明 runtime wiring 和安全反馈，不证明 VLA 在线抓取成功。”
+
+---
+
+## 二十五、下游 KL 分布漂移在 VLA 路线中的定位 FAQ
+
+### Q1：下游以前做的 KL divergence 现在还有用吗？能不能用它判断 SmolVLA 好不好？
+
+**核心原理解析 / 常用命令**
+
+有用，但用途必须收窄。当前 KL 比较的是健康基线下的逐关节双源跟踪误差分布 (P) 与当前误差分布 (Q)：
+
+```text
+aligned source A joint position - aligned source B joint position
+  → per-joint residual window
+  → histogram + smoothing
+  → KL(P_baseline || Q_current)
+```
+
+因此它适合回答“执行域残差是否漂移”，例如动力学、负载、摩擦、控制跟踪或双仿真域变化；它不能判断图像理解、抓取动作方向、闭爪时机或任务成功。KL 还具有非对称、依赖直方图分箱、对基线和样本量敏感的特点，所以工程上应与 W1、MMD、tracking RMSE 一起看。
+
+常用核对命令：
+
+```bash
+ros2 topic echo /monitor/distribution_metrics --once
+ros2 param get /dist_monitor min_samples
+ros2 param get /dist_monitor baseline_duration_sec
+ros2 param get /dist_monitor kl_threshold_mean
+ros2 service call /monitor/reset_baseline std_srvs/srv/Trigger '{}'
+```
+
+只有两路关节定义一致、时间对齐、健康 baseline 已就绪、样本数达标且阈值经过同场景 Panda 标定时，KL 才能进入 risk。条件不满足时应标记 `unavailable`，不能把默认 `0.0` 解释为“没有漂移”。
+
+**对应项目代码事实**
+
+- **已实现：KL 算法。** [kl_divergence.py: L31](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/kl_divergence.py#L31) 实现离散 `KL(P || Q)`；[kl_divergence.py: L38](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/kl_divergence.py#L38) 对每个关节使用共享 bin range 计算 KL。
+- **已实现：实际输入语义。** [metrics_core.py: L49](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/metrics_core.py#L49) 对齐两路 `[position, velocity]`，并在 [metrics_core.py: L73](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/metrics_core.py#L73) 用 `sim_pos - real_pos` 形成误差分布。它不是 `state[15] + RGB` 的 VLA observation KL。
+- **已实现：baseline 和 risk 聚合。** [monitor_node.py: L241](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/monitor_node.py#L241) 采集健康 baseline；[risk_node.py: L166](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/risk_node.py#L166) 将 KL/W1/MMD 归一化后组成 `distribution_shift`；[aggregator.py: L27](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/aggregator.py#L27) 给这一维分配 0.30 权重。
+- **已实现：有效性优先。** [DistributionMetrics.msg: L3](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/bridge_monitor_msgs/msg/DistributionMetrics.msg#L3) 已增加 `validity`、`reason_code`、`baseline_ready`、`metric_valid`、`calibration_id` 与对齐样本数；[metric_validity.py: L16](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/dist_monitor/dist_monitor/metric_validity.py#L16) 将未接线、样本不足、stale、baseline warming 和 calibration 缺失显式判为不可用。
+- **当前权威 S4 不含 KL。** 下游 offline readiness 明确把 risk 当 companion，且 `use_as_task_go_no_go=false`；[offline_readiness.py: L1](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/offline_readiness.py#L1) 禁止它覆盖 ContinuousTaskEvaluator。Recovery v3 的 Isaac companion 报告也没有 KL/W1/MMD 输入，所以当前项目证据不足，无法确认 SmolVLA 在线执行域 KL 已完成有效标定。
+- **已实现但尚未完成在线标定：** [risk_node.py: L217](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/risk_node.py#L217) 只把 valid sources 送入聚合器；[aggregator.py: L90](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/aggregator.py#L90) 对有效权重重归一化并保留 provenance。若没有同场景 Panda calibration，KL 保持 `UNAVAILABLE`，因此当前项目证据仍不足以确认 SmolVLA 在线执行域 KL 已有效标定。
+
+**面试回答模板**
+
+> “KL 我保留了，但不会拿它证明 VLA 会抓。它监控的是双源关节执行残差相对健康基线的分布漂移，属于小脑和系统健康层。现在 baseline-ready、metric-valid 和 calibration 合同已经落地，无效来源不会进入 Risk，也不会在 HOC 画成绿色零；但 SmolVLA 在线同场景 calibration 仍未完成，所以任务结论继续由 Isaac task GT 给出。”
+
+---
+
+## 二十六、大脑—小脑风险指标与 HOC 四泳道展示 FAQ
+
+### Q1：为什么当前 HOC 不能直观说明问题发生在大脑、小脑、安全层还是任务层？应该怎样重构指标？
+
+**核心原理解析 / 常用命令**
+
+不能把所有东西压成一个“风险分”。大脑与小脑应输出可解释的健康信号，Safety Supervisor 才拥有唯一 R0–R3 与 Run/Hold/E-stop 决策；reach/grasp/lift/place 则由 Task GT 独立判定。最清晰的 HOC 是四个固定泳道：
+
+| 泳道 | 回答的问题 | 典型指标 |
+|---|---|---|
+| Brain / Policy | 模型有没有拿到有效输入并按时产出合法动作？ | observation age、inference p95、deadline miss、queue underrun、action schema/finite |
+| Cerebellum / Execution | 命令有没有被正确、安全地执行？ | sequence/TTL、executed/held/rejected、raw→bounded、clip、tracking RMSE、soft limit |
+| Safety Supervisor | 系统最终允许继续、保持还是急停？为什么？ | R0–R3、primary driver、source validity、RUN/HOLD/E_STOP |
+| Task GT | 物理任务做到哪一步？ | reach、grasp、lift、place、object displacement、GT source |
+
+顶部只能有一个最终裁决，并展示原因链，例如 `HOLD ← queue underrun ← inference deadline miss`。每个指标必须带 `VALID / WARMING_UP / STALE / UNAVAILABLE`，缺消息不能显示绿色零值。
+
+现场检查可用：
+
+```bash
+ros2 topic info /policy/runtime_health -v
+ros2 topic info /policy/execution_report -v
+ros2 topic info /risk/status -v
+ros2 topic info /monitor/distribution_metrics -v
+ros2 topic hz /risk/status
+ros2 topic echo /risk/status --once
+```
+
+如果前两条 topic 不存在，M3 HOC 会把对应泳道显示为 `UNAVAILABLE`，不会拿旧下游综合风险补造 Brain 或 Execution 状态。
+
+**对应项目代码事实**
+
+- **已实现：四通道后端。** [hoc_server.py: L224](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/hoc_server.py#L224) 建立 runtime lane store，并从 [hoc_server.py: L266](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/hoc_server.py#L266) 起订阅 policy health、execution report、RiskStatus 与 TaskEvaluationStatus；[runtime_lanes.py: L23](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/runtime_lanes.py#L23) 保存独立状态、拒绝倒退 sequence，并计算 stale 与 trace consistency。
+- **已实现：唯一顶部裁决与四泳道。** [RuntimeOverview.tsx: L32](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/frontend/src/components/RuntimeOverview.tsx#L32) 固定展示 Brain、Execution、Safety、Task GT，并从 Safety lane 映射 `RUN/HOLD/E-STOP/NO DATA`；[App.tsx: L68](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/frontend/src/App.tsx#L68) 已把静态 canonical run 下沉到 Historical Evidence。
+- **已实现：无效数值不画绿零。** [DistributionPanel.tsx: L142](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/frontend/src/components/DistributionPanel.tsx#L142) 对 invalid 指标显示原因与 calibration，并清空趋势数据；CSV/HTML report 同样传播 validity。
+- **已实现：live Task GT producer。** 上游 [task_gt_live.py: L60](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/synth_data_gen/synth_data_gen/task_gt_live.py#L60) 只映射 ContinuousTaskEvaluator 的既有状态，不重新判断物理成功；[isaac_continuous_gt_recorder.py: L40](file:///home/ina/dev/ros2-arm-teleoperation-suite/scripts/isaac_continuous_gt_recorder.py#L40) 在 canonical Isaac/MuJoCo 运行中发布 `/task/evaluation_status`。等待 privileged object pose 时发布 `UNAVAILABLE`，结束发布 `PASS/FAIL`，并固定 `risk_may_override=false`、`claims_task_success=false`。
+- **M6 后的边界：** Risk→Safety 已在 mock-policy 真实 ROS/DDS wiring 中验证 R2 Hold 与 R3 E-stop；受门禁的 authoritative 代码路径已存在，但 SmolVLA 默认仍为 `legacy`，没有执行在线切流。未启动 continuous evaluator 的运行仍应在 Task GT 泳道显示 `UNAVAILABLE`。
+
+**面试回答模板**
+
+> “M3 把监控层拆成 Brain、Execution、Safety、Task GT 四泳道，ContinuousTaskEvaluator 有来源时发布子目标和最终 PASS/FAIL，没来源就显示 UNAVAILABLE，Risk 永远不能覆盖 GT。后续 M4–M6 已把 Risk→Hold/E-stop 和真实 ROS/DDS wiring 接通，并用 mock policy 做了三命令关联；SmolVLA authoritative 仍未切流，因此我把它讲成安全可观测 runtime，而不是策略任务成功。”
+
+---
+
+## 二十七、SmolVLA Action Chunk 与大脑—小脑 Scheduler 边界 FAQ
+
+### Q1：M1 为什么曾发布 singleton envelope？M2 如何改成 native action chunk？
+
+**核心原理解析 / 常用命令**
+
+M2 已在 shadow runtime 解决 native chunk 暴露，但不能只把函数名从 `select_action()` 换成 `predict_action_chunk()` 就算完成 authoritative runtime：
+
+1. `select_action()` 是环境执行便利接口，内部缓存模型产生的 chunk，每次弹出一个动作。
+2. `predict_action_chunk()` 才是大脑原生输出接口，返回完整 `[batch, chunk, action_dim]`。
+3. 大脑产生 chunk 后，应由独立 Scheduler 以控制频率消费前 K 步，并记录 chunk index、observation sequence、TTL、丢弃旧动作和 queue underrun。
+4. 如果每个 inference tick 都重新预测 chunk、却只取第 0 步，会退化为 first-action repetition；如果循环调用 `select_action()` 拼 chunk，又会消费模型内部队列并混淆观测身份。这两种做法都不正确。M2 直接取得完整 chunk，并由独立 Scheduler 消费 K 步。
+
+项目合同是 `chunk_size=10`、`execute_k=5`、`10 Hz`、`replan_period=0.5 s`。已有离线 GPU benchmark 表明单次 chunk 推理约 160–180 ms，大于 100 ms 控制周期、但小于 500 ms replan 窗口。M2 已实现同步 shadow chunk10/K5 消费；执行当前 K 时异步预取下一 chunk 的 online double buffer 仍未接线。
+
+核对命令：
+
+```bash
+rg -n "predict_action_chunk|select_action|_queues" ~/dev/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py
+rg -n "def predict_chunk|predict_action_chunk" ~/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/scene_smolvla_runtime.py
+ros2 topic echo /policy/command --once
+ros2 topic echo /policy/runtime_health --once
+ros2 topic echo /policy/execution_report --once
+```
+
+**对应项目代码事实**
+
+- **已实现：LeRobot 原生 chunk API。** [modeling_smolvla.py: L313](file:///home/ina/dev/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py#L313) 已实现 `predict_action_chunk()`；[modeling_smolvla.py: L325](file:///home/ina/dev/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py#L325) 的 `select_action()` 只在 queue 为空时生成 chunk，然后在 [modeling_smolvla.py: L350](file:///home/ina/dev/lerobot/src/lerobot/policies/smolvla/modeling_smolvla.py#L350) 每次 `popleft()` 一个动作。因此“SmolVLA API 只能返回单步”并不准确。
+- **已实现：M2 native chunk wrapper。** [scene_smolvla_runtime.py: L249](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/scene_smolvla_runtime.py#L249) 的 `predict_chunk()` 调用 LeRobot `predict_action_chunk()` 并对整块后处理；[policy_runtime.py: L461](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L461) 将完整 chunk10 封装为 `ActionChunkEnvelope`，执行窗口为 K=5。M1 singleton 只保留为历史阶段说明。
+- **已实现：完整 chunk 推理已有离线参考。** [bench_smolvla_s4_queue_runtime.py: L159](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/bench_smolvla_s4_queue_runtime.py#L159) 调用 `predict_action_chunk()` 并对后处理器做整块/逐步兼容处理；离线结果记录在 [QUEUE_RUNTIME_BENCH_RESULTS.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/QUEUE_RUNTIME_BENCH_RESULTS.md)。
+- **已实现：运行合同。** [s4_runtime_contract.json: L4](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/s4_runtime_contract.json#L4) 冻结 chunk 10，[s4_runtime_contract.json: L13](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/s4_runtime_contract.json#L13) 冻结 K=5。
+- **已实现：M2 同步 shadow Scheduler 与小脑 parity。** [policy_runtime.py: L283](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L283) 的 Scheduler 负责 sequence、TTL、queue 与 K-step 消费；[policy_execution_adapter.py: L61](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_execution_adapter.py#L61) 支持 absolute EEF8 / delta EEF7 的校验、转换、限幅、Hold/E-stop 并生成 shadow report。已有 S4 telemetry 的 750 个动作逐步 parity 与 ROS mock report 往返测试通过。
+- **当前边界：authoritative 可选路径已实现但未在线切流；async double buffer 未接线。** M2 当时强制 `dry_run=true`，其中 `EXECUTED` 只是 would-execute；M4 后 [smolvla_policy_inference_node.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py) 已提供受门禁的 `authoritative` 可选路径和 Safety feedback consumer，默认仍为 `legacy`。M6 只用 mock policy 验证 wiring，没有加载 SmolVLA。online async double buffer 仍未实现。
+
+### FAQ：Risk 如何安全地回灌 Policy Runtime，又如何避免两个“小脑”同时发命令？
+
+**核心原理解析 / 常用命令**
+
+- 将风险“判断”和安全“执行”分开：R0/R1→RUN，R2/数据失效→HOLD，R3→E-stop。R2 恢复需要连续健康样本去抖；R3 锁存且不自动复位。
+- 默认先运行 `safety_dry_run:=true`，HOC 对照 `proposed_decision` 与 `actual_decision`。不一致本身就是故障信号，而不是用 proposed 冒充实际动作。
+- authoritative 切流采用 fail-closed 门禁：`execution_adapter_mode=authoritative` 必须配合 `dry_run=false`，并在首条目标前确认 `/teleop/cmd_pose`、`/teleop/gripper_cmd` 各只有一个 publisher。
+- R2 Hold 清空 active/prefetch queue，但不能重置 command sequence；恢复后必须从新 observation 重新规划，避免执行风险发生前积压的旧动作。
+- 常用只读检查：`ros2 topic echo /policy/safety_decision`、`ros2 topic info -v /teleop/cmd_pose`、`ros2 topic info -v /teleop/gripper_cmd`、`ros2 topic echo /policy/execution_report`。
+
+**对应项目代码事实**
+
+- 已实现 Risk 状态机与 ROS bridge：[safety_bridge.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/safety_bridge.py)、[risk_to_safety_bridge.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/risk_engine/risk_engine/risk_to_safety_bridge.py)。bridge 默认 dry-run，R3 服务不可用时会在后续 risk 消息重试，同一 latch 成功发出后抑制重复请求。
+- 已实现 queue clear 与单调序号：[policy_runtime.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py)。
+- 已实现 shadow/authoritative 共用裁决与 publisher-count 门禁：[policy_execution_adapter.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_execution_adapter.py)。
+- 已实现上游 Hold/E-stop consumer 和 authoritative 可选发布路径：[smolvla_policy_inference_node.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py)。
+- 已实现 HOC proposed/actual 展示：[ros_bridge.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/ros_bridge.py)、[RuntimeOverview.tsx](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/frontend/src/components/RuntimeOverview.tsx)。
+- 证据边界：M4 的 CPU/ROS mock 与构建已验证；后续 M6 又完成 mock-policy 真实 ROS/DDS wiring。仍未确认 SmolVLA authoritative 在线切流、Isaac/PyBullet 策略 rollout、任务成功、Sim2Real 或真机。
+
+**面试回答模板**
+
+> “M2 解决了旧 wrapper 只暴露单步的问题：Brain Backend 原样输出 chunk10，独立 Scheduler 按 10 Hz 消费 K=5，小脑 adapter 再做 TTL、sequence、限幅和 Hold/E-stop；750 个历史动作 parity 已通过。M4–M6 又接通 Safety feedback，并用 mock policy 验证真实 ROS/DDS 的 EXECUTED、HELD、ESTOPPED。尚未完成的是 SmolVLA authoritative 在线切流和 online async double buffer，所以我不会把 wiring Pass 讲成真实策略闭环成功。”
+
+---
+
+## 二十八、ROS 2 包级测试与离线 XML Schema 排障 FAQ
+
+### Q1：`colcon test` 的 xmllint 因远程 XSD 失败，以及源码断言过期时，应该如何判断和修复？
+
+**核心原理解析 / 常用命令**
+
+要区分三层问题：测试环境是否能取得校验资源、被测清单是否真的符合 schema、测试断言是否仍描述当前实现。不能因为第一层网络失败就断言 XML 正确，也不能为了全绿直接关闭 xmllint。
+
+本项目采用以下处理：把 ROS 官方 `package_format3.xsd` 固定在接口包内，`package.xml` 用相对路径引用；随后 xmllint 暴露并修正了 `test_depend` 必须位于 `member_of_group` 之前的真实 format-3 顺序错误。Isaac 夹爪实现已经从硬位置瞬移改为 PD `apply_action`，因此同步更新源码合同测试，明确要求旧 `set_joint_positions` 不再出现。
+
+```bash
+cd ~/dev/ros2-arm-teleoperation-suite
+xmllint --noout \
+  --schema src/teleop_interfaces/schema/package_format3.xsd \
+  src/teleop_interfaces/package.xml
+colcon build --symlink-install \
+  --packages-select teleop_interfaces isaac_sim_adapter
+source install/setup.bash
+colcon test --packages-select teleop_interfaces isaac_sim_adapter
+colcon test-result --test-result-base build/teleop_interfaces --verbose
+colcon test-result --test-result-base build/isaac_sim_adapter --verbose
+```
+
+注意：若直接对整个 `build/` 执行 `colcon test-result`，它会汇总其他包残留的历史 XML，可能把旧失败误报成本轮失败。收口时应按本轮包目录汇总。
+
+**对应项目代码事实**
+
+- **已实现：离线完整 schema 校验。** [package.xml: L2](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_interfaces/package.xml#L2) 使用本地 format-3 XSD；[schema/README.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_interfaces/schema/README.md) 记录 ROS 官方来源和 SHA-256。没有关闭 xmllint。
+- **已修复：package format-3 元素顺序。** [package.xml: L20](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_interfaces/package.xml#L20) 先声明 test dependencies，[package.xml: L23](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_interfaces/package.xml#L23) 再声明 `member_of_group`，当前 XSD 验证通过。
+- **已修复：Isaac backend 断言与物理语义一致。** [isaac_panda_backend.py: L601](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/scripts/isaac_panda_backend.py#L601) 说明硬位置设置可能穿透方块，[isaac_panda_backend.py: L605](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/scripts/isaac_panda_backend.py#L605) 使用 gripper PD action；[test_isaac_sim_adapter.py: L137](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_isaac_sim_adapter.py#L137) 同时验证新调用存在、旧调用不存在。
+- **已验证：目标包完整通过。** `teleop_interfaces` 汇总为 5 tests、0 failures；`isaac_sim_adapter` 为 59 tests、0 failures。该结论只覆盖这两个目标包，不声称整个历史工作区所有包均已清零。
+
+**面试回答模板**
+
+> “我不会把 xmllint 的网络失败简单归类为无关噪声。先把官方 XSD 固定到仓库，消除环境变量后，校验器进一步发现 package.xml 的真实元素顺序错误；修正后才获得可信的全绿。另一个失败是源码合同测试落后于物理实现：夹爪已改用 PD apply_action，旧断言还要求瞬移接口。我更新的是测试合同而不是回退实现。最后按目标包目录读取 test-result，避免把 build 中其他历史 XML 混入本轮结论。”
+
+---
+
+## 二十九、PolicyCommand Trace Replay 与 HOC 证据闭环 FAQ
+
+### Q1：为什么不直接把 absolute EEF8 塞进旧 delta replay？如何证明一条告警对应哪条策略动作？
+
+**核心原理解析 / 常用命令**
+
+absolute EEF pose 与 delta EEF action 是不同控制语义，不能靠维度相近、切片或隐式转换混用。M5 因而保留旧 delta adapter，并新增独立 absolute adapter；回放输入也不再只有动作数组，而是一份带 SHA-256 的五轨 bundle：PolicyCommand、Brain health、Execution report、Risk、Task GT。`trace_run_id + episode_id + command_sequence + parent_event_id` 将同一步串起来；命令必须恰有一条 execution report，缺失、孤儿、回退或 hash 篡改都在运动前拒绝。
+
+HOC 只在关联完整时导出 bundle，并显式写入 `is_closed_loop=false`、`claims_task_success=false`。因此 M5 能证明“这条离线命令怎样被适配、怎样被安全与任务轨道解释”，不能证明在线闭环抓取成功。
+
+```bash
+# 静态检查实现与合同
+rg -n "panda_policy_trace_bundle_v1|command_sequence|claims_task_success" \
+  ~/robot-sim-lab/robot-arm-episode-data-lab/evaluation \
+  ~/ros2_ws/src/ros2-moveit-pybullet-bridge/{pybullet_bridge,hoc_console}
+
+# 安装态包级验收（不启动仿真）
+colcon test --packages-select pybullet_bridge hoc_console
+colcon test-result --test-result-base build/pybullet_bridge --verbose
+colcon test-result --test-result-base build/hoc_console --verbose
+```
+
+**对应项目代码事实**
+
+- **已实现：canonical bundle 合同。** [policy_trace_bundle.schema.json](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evaluation/schemas/policy_trace_bundle.schema.json) 与 [panda_policy_trace_bundle_v1.lock.json](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/policy_runtime/panda_policy_trace_bundle_v1.lock.json) 固定五个 JSONL、hash、sequence correlation 与两项 false claim。
+- **已实现：严格 loader 与 replay policy。** [policy_trace_bundle.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/policy_trace_bundle.py) 在 replay 前验证完整性和关联；[policy_command_replay_policy.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/policy_command_replay_policy.py) 只消费验证后的 native absolute EEF8 command。
+- **已实现：动作语义隔离。** [panda_absolute_eef_replay_adapter.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/panda_absolute_eef_replay_adapter.py) 独立处理 workspace、四元数、夹爪与 IK；没有修改旧 [panda_action_adapter.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/panda_action_adapter.py) 的 delta 合同。
+- **已实现：HOC command correlation 与 fail-closed export。** [runtime_trace_report.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/runtime_trace_report.py) 聚合四泳道并写五轨 bundle；[report_html.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/report_html.py) 展示逐 command 的 execution、Safety proposed/actual 与 Task GT。
+- **证据边界更新：** M5 是离线 replay；后续 M6 已完成 mock-policy 真实 ROS/DDS wiring并验证实际 Hold/E-stop 接线，但仍没有启动 PyBullet/Isaac 或切换 SmolVLA authoritative，也没有任务成功结论。
+
+**面试回答模板**
+
+> “我没有把 VLA 的 absolute EEF8 强塞进旧 delta replay，而是做了独立 adapter 和可校验的 trace bundle。每条 PolicyCommand 通过 trace、episode、sequence 和 parent link 关联到 execution、risk、GT，HOC 关联不完整就拒绝导出，下游 hash 或 schema 不对也拒绝 replay。这样能做跨仓动作级审计，但 M5 仍明确是 `is_closed_loop=false`，不冒充在线抓取成功。”
+
+---
+
+## 三十、M6 ROS Wiring、QoS 发现与跨 Topic 关联 FAQ
+
+### Q1：怎样验证大脑—小脑—Safety—HOC 真正接线，又不把 wiring smoke 冒充任务成功？
+
+**核心原理解析 / 常用命令**
+
+M6 使用 mock PolicyBackend 产生确定性的三个 command，但 command、health、execution、risk、Hold、TriggerEstop、Task GT 和 HOC 全部通过真实 ROS 2/DDS topic/service 在独立进程间传递。状态序列固定为 RUN→R2 HOLD→R3 E_STOP，最后要求 HOC 对每个 command 都关联 Brain/Execution/Safety/Task GT，并把五轨 bundle 交给 M5 strict loader 重验。
+
+这里必须处理两个分布式系统细节：第一，DDS endpoint discovery 不保证暴露所有本地 QoS 细节，例如 Fast DDS 把 KEEP_LAST depth 回报为 0/unknown，所以同时保留 configured 与 discovered 两份证据；第二，不同 topic 之间没有全局到达顺序，health 必须显式携带 `command_sequence + trace_run_id + episode_id`，不能依赖“最近收到的 execution report”猜关联。
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source <workspace-install>/setup.bash
+timeout 55s ./scripts/run_policy_runtime_m6_wiring_smoke.sh /tmp/m6_evidence
+jq '.status,.checks,.scope' /tmp/m6_evidence/m6_wiring_smoke.json
+```
+
+**对应项目代码事实**
+
+- **已实现：有界多进程入口。** [policy_runtime_m6_wiring.launch.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/launch/policy_runtime_m6_wiring.launch.py) 启动 HOC、非 dry-run Safety bridge 与 probe；[run_policy_runtime_m6_wiring_smoke.sh](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/scripts/run_policy_runtime_m6_wiring_smoke.sh) 提供 55 秒 timeout 和进程清理。
+- **已实现：QoS 与安全状态验收。** [m6_wiring_probe.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/m6_wiring_probe.py) 验证 Reliable/Volatile/Manual-by-topic、150 ms deadline、250 ms lifespan、R2 Hold、R3 TriggerEstop 和 HOC export。
+- **已修复：health 显式身份传播。** [policy_runtime_ros.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime_ros.py) 现在发布 trace/episode；[ros_bridge.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/hoc_console/hoc_console/ros_bridge.py) 使用 `last_command_sequence` 和显式 trace，而非只猜最近 execution。
+- **已验证：** 最终 run 的 command 1/2/3 分别得到 EXECUTED/HELD/ESTOPPED；HOC `issues=[]`；严格 loader 读回三个 sequence；三个节点干净退出。摘要见 [POLICY_RUNTIME_M6_WIRING_RESULTS.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/POLICY_RUNTIME_M6_WIRING_RESULTS.md)。
+- **证据边界：** Task GT 如实为 UNAVAILABLE；未启动模型、PyBullet/Isaac 或真机，未切换 SmolVLA authoritative，不能声称策略闭环、抓取成功或 Sim2Real。
+
+**面试回答模板**
+
+> “我用 mock PolicyBackend 隔离策略质量，只验证真实 DDS wiring。三条命令依次覆盖 RUN、R2 Hold 和 R3 E-stop，Safety bridge 实际发布 Hold 并调用 TriggerEstop，HOC 再按 command sequence 回溯四泳道。M6 还暴露了跨 topic 抢跑问题，所以我把 trace、episode、sequence 放进 health 显式传播。这个 Pass 证明运行时接线与安全反馈，不证明模型抓取成功。”

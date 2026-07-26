@@ -1,5 +1,6 @@
 """Node tests for PolicyRunner command path, health, and fault injection."""
 
+import hashlib
 import json
 import os
 import time
@@ -126,6 +127,63 @@ def _write_panda_handoff_bundle(path) -> None:
     )
 
 
+def _write_policy_trace_bundle(path) -> None:
+    path.mkdir()
+    common = {
+        'contract_version': 'panda_policy_runtime_v1',
+        'trace_run_id': 'runner_trace', 'episode_id': 'runner_episode',
+        'command_sequence': 7, 'claims_task_success': False,
+    }
+    command = {
+        **common, 'artifact_type': 'policy_command',
+        'event_id': 'command:7', 'parent_event_id': 'observation:3',
+        'action_schema_version': 'panda_absolute_eef_gripper_v0',
+        'action': [0.42, 0.0, 0.31, 0.0, 1.0, 0.0, 0.0, 0.7],
+    }
+    rows = {
+        'policy_commands': [command],
+        'policy_health_timeline': [{
+            **common, 'artifact_type': 'policy_health_timeline_event',
+            'event_id': 'health:7', 'parent_event_id': 'execution:7',
+        }],
+        'execution_reports': [{
+            **common, 'artifact_type': 'policy_execution_report',
+            'event_id': 'execution:7', 'parent_event_id': 'command:7',
+        }],
+        'risk_timeline': [{
+            **common, 'artifact_type': 'risk_timeline_event',
+            'event_id': 'risk:7', 'parent_event_id': 'execution:7',
+        }],
+        'task_gt_timeline': [{
+            **common, 'artifact_type': 'task_gt_timeline_event',
+            'event_id': 'gt:7', 'parent_event_id': 'execution:7',
+        }],
+    }
+    files = {}
+    for key, values in rows.items():
+        file_path = path / f'{key}.jsonl'
+        file_path.write_text(json.dumps(values[0]) + '\n', encoding='utf-8')
+        files[key] = {
+            'path': file_path.name,
+            'sha256': hashlib.sha256(file_path.read_bytes()).hexdigest(),
+            'record_count': 1,
+        }
+    manifest = {
+        'bundle_format': 'panda_policy_trace_bundle_v1',
+        'contract_version': 'panda_policy_runtime_v1',
+        'trace_run_id': 'runner_trace', 'episode_id': 'runner_episode',
+        'is_closed_loop': False, 'claims_task_success': False,
+        'files': files, 'sequence_bounds': {'first': 7, 'last': 7},
+        'correlation': {
+            'command_count': 1, 'execution_report_count': 1,
+            'orphan_execution_report_count': 0,
+            'missing_execution_report_count': 0,
+            'sequence_regression_count': 0, 'trace_consistent': True,
+        },
+    }
+    (path / 'manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+
+
 def test_policy_runner_publishes_joint_trajectory_from_joint_state(tmp_path):
     _init_rclpy(tmp_path / 'ros-log')
     runner = PolicyRunner()
@@ -187,6 +245,46 @@ def test_policy_runner_panda_jsonl_replay_hold_publishes_joint_trajectory(tmp_pa
         assert command.joint_names == ['joint1', 'joint2']
         assert len(command.points) == 1
         assert command.points[0].positions == pytest.approx([0.2, -0.1])
+    finally:
+        executor.shutdown()
+        observer.destroy_node()
+        publisher.destroy_node()
+        runner.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+def test_policy_runner_policy_command_replay_hold_publishes_trace_action(
+    tmp_path,
+):
+    bundle = tmp_path / 'policy_trace_bundle'
+    _write_policy_trace_bundle(bundle)
+    _init_rclpy(
+        tmp_path / 'ros-log',
+        [
+            '-p', 'strategy_type:=panda_policy_command_replay',
+            '-p', f'policy_trace_bundle_path:={bundle}',
+            '-p', 'panda_absolute_command_mode:=hold',
+        ],
+    )
+    runner = PolicyRunner()
+    publisher = _JointStatePublisher()
+    observer = _CommandObserver()
+    executor = SingleThreadedExecutor()
+    for node in (runner, publisher, observer):
+        executor.add_node(node)
+
+    try:
+        deadline = time.time() + 3.0
+        while time.time() < deadline and not observer.commands:
+            publisher.publish_state()
+            executor.spin_once(timeout_sec=0.05)
+        assert observer.commands
+        assert observer.commands[-1].points[0].positions == pytest.approx(
+            [0.2, -0.1]
+        )
+        assert runner.policy.trace_run_id == 'runner_trace'
+        assert runner.policy.is_closed_loop is False
     finally:
         executor.shutdown()
         observer.destroy_node()

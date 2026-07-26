@@ -11,6 +11,7 @@ import type {
   TrackingErrorPayload,
   TrendDirection,
   ResourceHistoryPoint,
+  RuntimeFramePayload,
 } from '../types/messages';
 import { shouldThrottle } from '../utils/throttle';
 
@@ -39,6 +40,8 @@ interface DashboardState {
   systemTelemetry: DiagnosticArrayPayload | null;
   recorderDiagnostics: DiagnosticArrayPayload | null;
   resourceHistory: ResourceHistoryPoint[];
+  runtimeFrame: RuntimeFramePayload | null;
+  runtimeHistory: Array<{ t: number; frame: RuntimeFramePayload }>;
   setConnected: (connected: boolean) => void;
   ingestRisk: (payload: RiskStatusPayload) => void;
   ingestMetrics: (payload: DistributionMetricsPayload) => void;
@@ -53,6 +56,7 @@ interface DashboardState {
   setSystemState: (state: string) => void;
   ingestSystemTelemetry: (payload: DiagnosticArrayPayload) => void;
   ingestRecorderDiagnostics: (payload: DiagnosticArrayPayload) => void;
+  ingestRuntimeFrame: (payload: RuntimeFramePayload) => void;
 }
 
 function computeTrend(history: RiskHistoryPoint[]): TrendDirection {
@@ -88,6 +92,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   systemTelemetry: null,
   recorderDiagnostics: null,
   resourceHistory: [],
+  runtimeFrame: null,
+  runtimeHistory: [],
 
   setConnected: (connected) => set({ connected }),
 
@@ -119,6 +125,10 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   ingestMetrics: (payload) => {
     if (shouldThrottle('metrics', METRICS_THROTTLE_MS)) {
+      return;
+    }
+    if (payload.metric_valid !== true) {
+      set({ metrics: payload, lastMessageAt: Date.now() });
       return;
     }
     const t = Date.now() / 1000;
@@ -190,5 +200,13 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
   ingestRecorderDiagnostics: (recorderDiagnostics) => {
     set({ recorderDiagnostics, lastMessageAt: Date.now() });
+  },
+
+  ingestRuntimeFrame: (runtimeFrame) => {
+    const t = Date.now() / 1000;
+    const runtimeHistory = [...get().runtimeHistory, { t, frame: runtimeFrame }]
+      .filter((point) => point.t >= t - HISTORY_SECONDS)
+      .slice(-1200);
+    set({ runtimeFrame, runtimeHistory, lastMessageAt: Date.now() });
   },
 }));

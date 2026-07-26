@@ -59,6 +59,9 @@ class TimeseriesRow:
     kl_mean: Optional[float] = None
     w1_mean: Optional[float] = None
     mmd: Optional[float] = None
+    distribution_validity: str = 'UNAVAILABLE'
+    distribution_reason_code: str = 'no_data'
+    calibration_id: str = ''
 
 
 @dataclass
@@ -153,6 +156,7 @@ class BenchmarkCollector(Node):
     def record_sample(self, episode: int, process: Optional[psutil.Process]) -> None:
         cpu, rss = self.sample_resources(process)
         metrics = self._latest_metrics
+        metric_valid = bool(metrics and metrics.metric_valid)
         self.timeseries.append(
             TimeseriesRow(
                 episode=episode,
@@ -161,9 +165,16 @@ class BenchmarkCollector(Node):
                 cpu_percent=cpu,
                 rss_mb=rss,
                 inference_latency_ms=self._latest_inference_latency_ms,
-                kl_mean=metrics.kl_divergence_mean if metrics else None,
-                w1_mean=metrics.wasserstein_mean if metrics else None,
-                mmd=metrics.mmd_statistic if metrics else None,
+                kl_mean=metrics.kl_divergence_mean if metric_valid else None,
+                w1_mean=metrics.wasserstein_mean if metric_valid else None,
+                mmd=metrics.mmd_statistic if metric_valid else None,
+                distribution_validity=(
+                    metrics.validity if metrics else 'UNAVAILABLE'
+                ),
+                distribution_reason_code=(
+                    metrics.reason_code if metrics else 'no_data'
+                ),
+                calibration_id=metrics.calibration_id if metrics else '',
             )
         )
 
@@ -319,6 +330,9 @@ def _write_timeseries_csv(path: Path, rows: list[TimeseriesRow]) -> None:
             'kl_mean',
             'w1_mean',
             'mmd',
+            'distribution_validity',
+            'distribution_reason_code',
+            'calibration_id',
         ])
         for row in rows:
             writer.writerow([
@@ -331,6 +345,9 @@ def _write_timeseries_csv(path: Path, rows: list[TimeseriesRow]) -> None:
                 '' if row.kl_mean is None else f'{row.kl_mean:.6f}',
                 '' if row.w1_mean is None else f'{row.w1_mean:.6f}',
                 '' if row.mmd is None else f'{row.mmd:.6f}',
+                row.distribution_validity,
+                row.distribution_reason_code,
+                row.calibration_id,
             ])
 
 

@@ -23,19 +23,34 @@ def render_csv_report(
         'w1_mean',
         'mmd_stat',
         'shift_detected',
+        'metric_valid',
+        'validity',
+        'reason_code',
+        'calibration_id',
     ])
 
     risks = list(risk_timeline)
+
+    def metric_value(payload: dict[str, Any], key: str) -> str:
+        if not payload.get('metric_valid', False):
+            return ''
+        value = payload.get(key)
+        return '' if value is None else f'{float(value):.4f}'
+
     for idx, metrics in enumerate(metrics_timeline):
         risk = risks[idx] if idx < len(risks) else (risks[-1] if risks else {})
         writer.writerow([
             f"{float(metrics.get('t', 0.0)):.3f}",
             int(risk.get('level', 0)),
             f"{float(risk.get('score', 0.0)):.4f}",
-            f"{float(metrics.get('kl_mean', 0.0)):.4f}",
-            f"{float(metrics.get('w1_mean', 0.0)):.4f}",
-            f"{float(metrics.get('mmd_stat', 0.0)):.4f}",
-            bool(metrics.get('shift_detected', False)),
+            metric_value(metrics, 'kl_mean'),
+            metric_value(metrics, 'w1_mean'),
+            metric_value(metrics, 'mmd_stat'),
+            metrics.get('shift_detected'),
+            bool(metrics.get('metric_valid', False)),
+            metrics.get('validity', 'UNAVAILABLE'),
+            metrics.get('reason_code', 'no_data'),
+            metrics.get('calibration_id', ''),
         ])
 
     return buf.getvalue()
