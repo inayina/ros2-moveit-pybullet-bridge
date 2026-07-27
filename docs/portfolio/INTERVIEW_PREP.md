@@ -11,10 +11,13 @@
 - [四、 现场总线与硬件级安全 (CANopen)](#四-现场总线与硬件级安全-canopen)
 - [五、 ROS 2 通信与 DDS 性能优化](#五-ros-2-通信与-dds-性能优化)
 - [六、 节点编排与错峰启动 (ROS 2 Launch)](#六-节点编排与错峰启动-ros-2-launch)
+- [六-B、 进程调度甘特图（启动错峰 + 稳态多频）](#六-b-进程调度甘特图启动错峰--稳态多频)
+- [六-C、 实时优先级调度甘特图（SCHED_FIFO / 防反转）](#六-c-实时优先级调度甘特图sched_fifo--防反转)
 - [七、 调试诊断工具箱与 STAR 排障实战案例](#七-调试诊断工具箱与-star-排障实战案例)
 - [八、 ROS 2 环境配置与功能包架构体系 (Environment & Packages)](#八-ros-2-环境配置与功能包架构体系-environment--packages)
 - [九、 ROS 2 进阶机制与控制系统底盘 (Executors, Interfaces & Motors)](#九-ros-2-进阶机制与控制系统底盘-executors-interfaces--motors)
 - [十、 现代 C++ 与实时系统底层优化 (Modern C++ & Real-time Systems)](#十-现代-c-与实时系统底层优化-modern-c--real-time-systems)
+- [三十一、 VLA / 数据治理与分层验证高频追问（2026-07-27）](#三十一-vla--数据治理与分层验证高频追问2026-07-27)
 
 
 ---
@@ -244,6 +247,187 @@
   - 6 秒：启动 MoveIt 伺服层（`motion`）
   - 12 秒：最后加载 `ros2_control` 控制循环
   通过合理的时间延迟（Staggered Bring-up），保证依赖链下游的节点在启动时，其上游服务必定已经就绪，极大地提高了整个复杂系统的启动成功率。
+
+---
+
+## 六-B、 进程调度甘特图（启动错峰 + 稳态多频）
+
+> 证据：[full_system.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/full_system.launch.py)、[ARCHITECTURE_V2.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURE_V2.md)、[control_rate_sim.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_sim.yaml)。  
+> **注意**：这是**节点 bring-up / 控制环周期**调度，不是 Linux CFS 进程优先级甘特图；也不是下游开发路线图里的项目甘特（见 [13-three-repo-integration-development-plan.md §3.1](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/design/13-three-repo-integration-development-plan.md)）。
+
+### Q1：上游全系统启动的进程调度甘特图是怎样的？
+
+**核心原理解析**
+
+`teleop_bringup/full_system.launch.py` 用 `TimerAction` 做错峰启动，避免并发拉起造成 CPU 尖峰，并保证依赖链就绪后再起下游层：
+
+```mermaid
+gantt
+    title 上游 full_system 错峰启动（TimerAction，单位：秒）
+    dateFormat  X
+    axisFormat %s s
+    section t=0 立即
+    description (URDF/TF)           :a0, 0, 2
+    simulation (MuJoCo)             :a1, 0, 2
+    section t=2s
+    fieldbus (仅 use_sim:=false)    :b0, 2, 2
+    recording (可选)                :b1, 2, 2
+    grasp_monitor (可选)            :b2, 2, 2
+    section t=4s
+    safety_monitor + diagnostics    :c0, 4, 2
+    section t=6s
+    motion (MoveIt Servo)           :d0, 6, 6
+    section t=12s
+    ros2_control (CM + impedance)   :e0, 12, 4
+```
+
+| t (s) | 拉起层 | 为何放这里 |
+|---|---|---|
+| 0 | `description` + `simulation` | 先有 URDF/TF 与 MuJoCo `/sim/*` 背板 |
+| 2 | `fieldbus` / `recording` / `grasp_monitor` | 总线或录制依赖仿真已起；`use_sim:=true` 时 fieldbus 可不写 `/sim/*` |
+| 4 | `safety` | 安全闸门先于运动层 |
+| 6 | `motion`（Servo） | 订阅 `/safe_master_pose`，需 safety 已发布 |
+| 12 | `ros2_control` | 最后起 500 Hz 控制环，避免硬件/背板未就绪时 spawner 空转超时 |
+
+**对应项目代码事实**
+
+- **已实现：** [full_system.launch.py L232–238](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/full_system.launch.py#L232-L238) 的 `TimerAction(period=2/4/6/12)`。
+- **文档：** [ARCHITECTURE_V2.md §启动顺序](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURE_V2.md)（逻辑依赖与 Timer 时间戳一致）。
+
+**面试一句话**
+
+> 「不是一把梭并发启动，而是 0→2→4→6→12 秒错峰：先仿真与描述，再安全，再 Servo，最后才上 500 Hz 的 ros2_control。」
+
+### Q2：稳态运行时「多频控制环」调度长什么样？
+
+**核心原理解析**
+
+启动完成后，仿真主线是**多速率周期表**（不是单线程 FIFO 甘特，而是按频率分层）：
+
+```mermaid
+gantt
+    title 仿真主线稳态多频调度（1 秒窗口示意）
+    dateFormat  X
+    axisFormat %L
+    section 1000 Hz
+    MuJoCo physics step             :crit, p0, 0, 1000
+    section 500 Hz
+    controller_manager / impedance  :active, p1, 0, 1000
+    /sim/encoder_state · effort DDS :active, p2, 0, 1000
+    section 100 Hz
+    EE / FT / object 观测           :p3, 0, 1000
+    section 10 Hz (VLA S4 合同)
+    policy tick · execute_K 窗口    :p4, 0, 1000
+```
+
+| 环 | 频率 | 职责 |
+|---|---|---|
+| MuJoCo physics | **1000 Hz** | 物理积分 |
+| `controller_manager` / 阻抗 / encoder 背板 | **500 Hz**（`control_rate_sim.yaml`） | 仿真控制主线；真机路径设计为 **1 kHz**（`control_rate_real.yaml`） |
+| EE/FT/object 等观测 | **~100 Hz** | 录制与评测观测 |
+| SmolVLA S4 runtime | **10 Hz**，chunk10 / K5 / replan 0.5 s | 策略调度合同；**不等于**已在线 authoritative 切流 |
+
+**对应项目代码事实**
+
+- **已实现：** [control_rate_sim.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_sim.yaml)（500 Hz）；[control_rate_real.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_real.yaml)（1000 Hz）。
+- **已实现合同：** [s4_runtime_contract.yaml](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/smolvla_s3/s4_runtime_contract.yaml)（10 Hz / chunk10 / K5）。
+- **文档声明：** ARCHITECTURE_V2 明确「1 kHz」多为历史验收口径，仿真主线以 500 Hz 为准。
+
+**面试一句话**
+
+> 「物理 1 kHz、控制 500 Hz、观测约 100 Hz、VLA 合同 10 Hz——分层降频，避免策略环去抢实时阻抗环。」
+
+---
+
+## 六-C、 实时优先级调度甘特图（SCHED_FIFO / 防反转）
+
+> 用于面试口述「我如何在实时系统里做优先级调度」。  
+> **口径必须分清**：仿真路径**刻意不用**高 FIFO（防 DDS 优先级反转）；真机路径才启用 FIFO 优先级阶梯。PREEMPT_RT / `chrt -f 80` 属 [SIM2REAL_DEPLOYMENT_GUIDE.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/portfolio/SIM2REAL_DEPLOYMENT_GUIDE.md) 的真机就绪度 SOP，**不等于本机仿真已跑通硬实时**。
+
+### Q1：优先级阶梯是怎样设计的？画一张抢占甘特怎么讲？
+
+**核心原理解析**
+
+| 角色 | 调度策略（设计意图） | 优先级 | 证据 |
+|---|---|---|---|
+| `controller_manager` 控制环 | 真机 **SCHED_FIFO**；仿真 **priority=0**（best-effort） | 真机 **50** / 仿真 **0** | [ros2_control.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py) `controller_thread_priority` |
+| MoveIt Servo 运动层 | 真机 FIFO；仿真用 `prlimit --rtprio=0:0` 禁止抢 RT | 真机 **40** / 仿真 **0** | [servo.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py) |
+| controller **spawner** | CFS + **nice 19** + idle I/O | 低于一切控制线程 | `prefix="nice -n 19 ionice -c 3"` |
+| 相机 / recorder / VLA 10 Hz | 普通 best-effort | 最低竞争层 | 频率分层 + Best Effort QoS |
+| **逻辑最高优先** | 控制环内 E-Stop 分支 | 先于阻抗解算 | [cartesian_impedance_controller.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp) `estop_active_` |
+
+**真机路径：FIFO 抢占甘特（示意 4 ms 窗口）**
+
+```mermaid
+gantt
+    title 真机路径优先级调度（SCHED_FIFO：CM=50 > Servo=40 > CFS）
+    dateFormat  X
+    axisFormat %L ms
+    section FIFO prio 50 · controller_manager
+    update() 阻抗解算 / 力矩下发     :crit, c1, 0, 1
+    update()                          :crit, c2, 2, 1
+    update()                          :crit, c3, 4, 1
+    section FIFO prio 40 · MoveIt Servo
+    Servo 轨迹步（可被 CM 抢占）      :active, s1, 0, 2
+    Servo 被抢占后恢复                :active, s2, 2, 2
+    section CFS · spawner / recorder
+    spawner nice19（几乎让路）        :r1, 0, 4
+    recorder / 图像回调               :r2, 1, 3
+```
+
+讲法：同一核上，**prio 50 的控制周期一到就打断 prio 40 的 Servo**；spawner/recorder 走 CFS 且 nice 到最闲，不跟实时环抢 CPU。
+
+**仿真路径：为什么关掉 FIFO？（防优先级反转）**
+
+```mermaid
+gantt
+    title 仿真路径刻意 Best-Effort（避免 FIFO 控制环被 DDS 非 RT 工人卡住）
+    dateFormat  X
+    axisFormat %L ms
+    section CM thread_priority=0
+    控制环与 DDS 同属 best-effort     :c1, 0, 4
+    section Servo prlimit rtprio=0
+    禁止 FIFO 尝试抬升优先级          :s1, 0, 4
+    section MuJoCo / DDS workers
+    仿真与中间件工人可推进            :m1, 0, 4
+```
+
+代码注释写明：仿真路径控制环要跨 DDS 写 `/sim/*`，若控制线程是 FIFO，可能**堵在非 RT 的 middleware worker 后面**形成 priority-inversion stall；因此仿真默认 `thread_priority=0`，真机直连 CAN 才开 FIFO 50/40。
+
+**非 RT → RT 数据面（配合优先级，避免锁反转）**
+
+```text
+teleop / Servo 回调 (非 RT)
+        │  writeFromNonRT()
+        ▼
+ realtime_tools::RealtimeBuffer   ← 无阻塞 mutex，双缓冲 + 原子交换
+        │  readFromRT()
+        ▼
+ controller update() (RT / 高优先)
+        │  若 estop_active_ → 立刻零力矩（逻辑最高优先）
+        ▼
+ effort / joint command
+```
+
+**对应项目代码事实**
+
+- **已实现：真机/仿真分叉的 FIFO 优先级。** [ros2_control.launch.py L57–103](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py#L57-L103)；[servo.launch.py L58–116](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py#L58-L116)。
+- **已实现：spawner 降权。** `nice -n 19 ionice -c 3`。
+- **已实现：RealtimeBuffer + E-Stop 优先。** [cartesian_impedance_controller.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp) / `update()`。
+- **已实现契约测试：** [test_sim_backend_launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py) 断言 `controller_thread_priority` / `servo_thread_priority` 接线存在。
+- **设计规划 / 真机 SOP（勿写成仿真已验证）：** `ulimit -r`、`chrt -f 80`、PREEMPT_RT / `cyclictest` — [SIM2REAL_DEPLOYMENT_GUIDE.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/portfolio/SIM2REAL_DEPLOYMENT_GUIDE.md)、[ros2_env_and_packages_guide.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ros2_env_and_packages_guide.md)。
+
+**面试一句话**
+
+> 「真机上我把控制环设成 FIFO 50、Servo 40，spawner nice 到 19，让控制周期能抢占运动层；仿真里反而关掉 FIFO，因为控制环要过 DDS，硬抬优先级会和中间件工人形成优先级反转。数据面用 RealtimeBuffer，急停在 update 里逻辑最高优先。」
+
+### Q2：这和「错峰启动甘特 / 多频甘特」怎么分工讲？
+
+| 图 | 回答什么 | 不回答什么 |
+|---|---|---|
+| §六-B 错峰启动 | 进程**何时**起来 | 谁抢谁的 CPU |
+| §六-B 多频 | 各环**跑多快** | OS 调度策略 |
+| **§六-C 本图** | **谁优先、谁被抢占、为何仿真关 FIFO** | 任务成功率 / Sim2Real 已完成 |
 
 ---
 
@@ -1306,3 +1490,672 @@ jq '.status,.checks,.scope' /tmp/m6_evidence/m6_wiring_smoke.json
 **面试回答模板**
 
 > “我用 mock PolicyBackend 隔离策略质量，只验证真实 DDS wiring。三条命令依次覆盖 RUN、R2 Hold 和 R3 E-stop，Safety bridge 实际发布 Hold 并调用 TriggerEstop，HOC 再按 command sequence 回溯四泳道。M6 还暴露了跨 topic 抢跑问题，所以我把 trace、episode、sequence 放进 health 显式传播。这个 Pass 证明运行时接线与安全反馈，不证明模型抓取成功。”
+
+---
+
+## 三十一、 VLA / 数据治理与分层验证高频追问（2026-07-27）
+
+> 口径对齐中游 [BOUNDARY_FREEZE.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/BOUNDARY_FREEZE.md)、[FINAL_PROJECT_SUMMARY.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/FINAL_PROJECT_SUMMARY.md)、[FUTURE_WORK_ROADMAP.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/FUTURE_WORK_ROADMAP.md)。  
+> **诚实边界**：Not task success / Not Sim2Real / Not real robot。
+
+### Q1：`state[15]` 和 `action[8]` 分别是什么？
+
+**核心原理解析**
+
+SmolVLA Recovery v3 把策略输入/输出做成**显式契约**，避免 preprocessor 静默丢字段：
+
+| 张量 | 布局 | 语义 |
+|---|---|---|
+| `observation.state[15]` | `joint_position[7]` + `ee_pose_xyzw[7]` + `measured_gripper[1]` | 策略可见本体状态；**禁止**把仿真特权 `object_pose` / 未标定 `ft` 塞进 policy state |
+| `action[8]` | `absolute_eef_gripper_v0`：目标 EE 位姿 xyz+xyzw（7）+ gripper cmd（1） | VLA 执行语义是**绝对末端位姿 + 夹爪**，不是 ACT 的 `ee_delta_gripper[7]` |
+
+历史踩坑（v1/v2）：checkpoint 声明 `state[6]`，release 关节是 `[7]`，`ee_pose`/`gripper` 被丢掉——训练时策略根本看不到末端与夹爪。Recovery 用 `state[15]` + checkpoint config audit 堵住这类静默漂移。
+
+**对应项目代码事实**
+
+- **已实现：** [state15.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/smolvla_s3/state15.py) 冻结 `STATE15_LAYOUT` 与 `EXCLUDE_FROM_POLICY_STATE`。
+- **已实现：** [s4_runtime_contract.yaml](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/smolvla_s3/s4_runtime_contract.yaml) 写死 `state_dim: 15`、`action_dim: 8`、`policy_action_semantics: absolute_eef_gripper_v0`。
+- **已实现：** ACT 路径仍用 `ee_delta_gripper[7]`（[panda.yaml](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/robot_schemas/panda.yaml)）；VLA 与 ACT **不得静默互相切片**。
+
+**面试一句话**
+
+> 「`state[15]` 是关节 7 + 末端位姿 7 + 实测夹爪 1；`action[8]` 是绝对 EE 目标 7 + 夹爪命令 1。我们把特权位姿排除在 policy state 之外，并用 checkpoint audit 防止维度静默漂移。」
+
+---
+
+### Q2：`chunk_size=10`、`execute_K=5` 为什么这样设计？
+
+**核心原理解析**
+
+在 10 Hz 控制下：
+
+- `chunk_size=10`：模型一次预测 **1.0 s** 的动作序列（Action Chunking，降低开环复合误差与非马尔可夫抖动）。
+- `execute_K=5`（`n_action_steps`）：每个重规划周期只**消费前 0.5 s**，其余作冗余；对应 `replan_period_s=0.5`。
+- **解耦**：训练侧可以学 chunk=10，部署侧 K=5，避免「训练 chunk 必须等于在线消费长度」的假耦合。
+
+这样设计是为了在固定墙钟（~160 ms 量级推理）下留出重规划余量：sync 实测有 deadline miss，async double-buffer 可把 miss 压到冷启动量级——但**上游在线节点仍未接线**，不得写成已在线异步调度。
+
+**对应项目代码事实**
+
+- **已实现合同：** [runtime_s4.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/smolvla_s3/runtime_s4.py)、[s4_runtime_contract.json](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/smolvla_s3/s4_runtime_contract.json)；上游保留字节相同副本并启动 assert。
+- **已实现审计：** checkpoint audit 同时核验 `chunk_size` 与 `n_action_steps`，禁止把二者静默写成同一个数。
+- **已验证（offline）：** queue bench sync miss 20% → async 0.67%；见 [QUEUE_RUNTIME_BENCH_RESULTS.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/QUEUE_RUNTIME_BENCH_RESULTS.md)。
+- **未实现：** `async_double_buffer_online_wired=false`。
+
+**面试一句话**
+
+> 「chunk10 是模型看 1 秒，K5 是只执行半秒就重规划；两者故意解耦，给推理延迟留缓冲，但不等于已经在线异步部署。」
+
+---
+
+### Q3：`canonical first-action` 与 `queued diagnostic` 有什么区别？
+
+**核心原理解析**
+
+| 模式 | 做法 | 能证明什么 | 能不能判 Gate Pass |
+|---|---|---|---|
+| **`canonical_first_action`** | 每条专家观测**独立 reset**；只取 chunk 的**第一个**动作；全帧 `stride=1` | 专家状态分布上的 first-action 离线拟合 | **唯一** canonical Pass 路径 |
+| **`queued_diagnostic`** | 消费 action-chunk 队列（K5） | 队列调度 / 时序诊断 | **永不具备** canonical Pass 资格 |
+
+Recovery v3 的 open-loop **Pass**（EE ≈0.0253 m、grip BA ≈0.9943）全部来自 canonical；queued 结果即使好看也只能标 diagnostic / gate-ineligible。禁止把两种数字混写。
+
+**对应项目代码事实**
+
+- **已实现：** [recovery_decisions.yaml](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/smolvla_s3/recovery_decisions.yaml) → `queued_diagnostic_gate_eligible=false`。
+- **已实现：** evaluator 分开记录；契约测试见中游 `tests/test_portfolio_docs_consistency.py::test_queued_diagnostic_never_claims_canonical_pass`。
+- **文档：** [FINAL_PROJECT_SUMMARY.md §4.3](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/FINAL_PROJECT_SUMMARY.md)。
+
+**面试一句话**
+
+> 「Canonical 是每帧专家观测上只评第一个动作，才有资格过 Gate；Queued 是跑队列诊断，永远不能拿来宣称 Pass。」
+
+---
+
+### Q4：release 的 non-overwrite 与 immutable 有何差异？
+
+**核心原理解析**
+
+| 术语 | 含义 | 典型实现 | 指纹 |
+|---|---|---|---|
+| **non-overwrite release** | 拒写非空输出目录；固定当次拷贝 + inspection | [prepare_dataset_release.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/prepare_dataset_release.py) | 通常**无** `release_content_sha256` / split 指纹 |
+| **immutable release** | 含 split、逐文件 SHA、content fingerprint 的不可变数据根 | [prepare_smolvla_s3_release.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/prepare_smolvla_s3_release.py) | `immutable: true`、`release_content_sha256`、`splits.json` |
+
+对外：没列指纹就别说「不可变」；要说防静默漂移就指向 **权威合同 + SHA 锁定镜像**（immutable release + checkpoint audit + gate lock）。
+
+**对应项目代码事实**
+
+- **已冻结术语：** [BOUNDARY_FREEZE.md §3](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/BOUNDARY_FREEZE.md)。
+- **已实现：** SmolVLA v3 phaseaware50 release 带 content SHA；通用 `prepare_dataset_release` 仍是 non-overwrite。
+
+**面试一句话**
+
+> 「Non-overwrite 只保证目录不被覆盖；immutable 才带 split 和内容指纹。简历里说 SHA 锁定，必须指后者。」
+
+---
+
+### Q5：如何证明 S4 失败不是物理链、接口或相机问题？
+
+**核心原理解析 / 排除链（由低到高）**
+
+权威 S4 是**修光后** [s4_gate.json](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/smolvla_s4_bounded5_relight_20260724T151711Z/s4_gate.json)：interface **5/5**，lift **0/5** → Hold。
+
+| 假设 | 如何排除 | 证据 |
+|---|---|---|
+| 物理链坏了 | scripted oracle 同链 lift **5/5** | [oracle_gate.json](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/e3p5_isaac_scripted_oracle_5x_lift_v2b_20260720/oracle_gate.json) |
+| 接口/限幅/急停 | interface 5/5；150/150 未限幅、无 E-stop；checkpoint audit Pass | S4 gate + audit |
+| `state[15]` 编码错 | 训练 vs 在线遥测：home 关节 L2≈0.006、四元数 L2≈6.8e-6 | H3 排除（归因文档） |
+| 相机失明 | 首轮 JPEG≈0.3（近黑，**Superseded**）；修光后 JPEG≈154，**仍** lift 0/5 | relight 权威 run |
+| 倾向结论 | 闭环 BC / 协变量偏移（H2）；训练域 MuJoCo 1-seed 也几乎不闭爪 | **尚未**完全证明为唯一根因 |
+
+**对应项目代码事实**
+
+- **已实现归因：** [BADCASE_ATTRIBUTION_SUMMARY.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/BADCASE_ATTRIBUTION_SUMMARY.md)、[SMOLVLA_S4_LIFT0_OFFLINE_ATTRIBUTION.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/SMOLVLA_S4_LIFT0_OFFLINE_ATTRIBUTION.md)。
+- **统计边界：** 0/5 的 Wilson 95% CI 上界仍可到 ~0.435，Hold 是流程决策，不是「永远为 0」的证明；见 FINAL_PROJECT_SUMMARY §4.0。
+
+**面试一句话**
+
+> 「Oracle 5/5 排除物理链，interface 5/5 排除接线，修光后仍 0/5 排除相机失明；剩下倾向闭环行为问题，但 1-seed MuJoCo 对照还不够叫唯一根因。」
+
+---
+
+### Q6：为什么下游 PolicyRunner 不属于在线 Policy Runtime？
+
+**核心原理解析**
+
+三仓边界冻结后：
+
+- **在线 Policy Runtime**（上游）：inference → scheduler（chunk/K）→ execution adapter（TTL/限幅/Hold）→ task GT。
+- **下游 PolicyRunner**：**replay harness**——消费中游 handoff JSONL / trace bundle，在 PyBullet 做开环重放与接口 smoke。
+
+因此：`is_closed_loop=false`、`claims_task_success=false` 是默认诚实标签。它验证「动作包可加载、可跟踪、风险可聚合」，**不**替代上游在线大脑，也**不**用 risk R-level 改判 lift/place。
+
+**对应项目代码事实**
+
+- **已冻结命名：** [BOUNDARY_FREEZE.md §2](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/BOUNDARY_FREEZE.md)；下游 [docs/AGENTS.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/AGENTS.md) Replay Agent。
+- **已实现：** [panda_handoff.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/learning/panda_handoff.py) + `benchmark_system.py --strategy panda_jsonl_replay`。
+- **配套而非产品线：** Risk / HOC 是验证配套，不与数据链并列成第三条产品。
+
+**面试一句话**
+
+> 「PolicyRunner 是开环重放夹具，不是在线策略运行时；在线 chunk/Hold/GT 在上游，下游只证明 handoff 可执行与可观测。」
+
+---
+
+### Q7：如果继续推进，最小实验是什么，停止条件是什么？
+
+**核心原理解析**
+
+按 [FUTURE_WORK_ROADMAP.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/FUTURE_WORK_ROADMAP.md)：P0 已收口；**默认停止**——不扩种子、不重训、不新增采集。若人工批准继续，最小有价值实验是**不重训、不扩 Isaac seed** 的诊断：
+
+| 优先 | 最小实验 | 停止 / Pass-Hold 条件 |
+|---|---|---|
+| **最小推荐** | **P1-2** 闭环分布偏移量化（只用现有 S4 telemetry `observations.jsonl`） | 产出「在线 state vs 训练 state」距离曲线；**不**因此自动重训或扩种子 |
+| 次选 | **P1-3** 完成 MuJoCo 训练域 5-seed 对照（补齐现 early_stopped 1-seed） | 完整训练域 `s4_gate.json`；仍 **≤5 seeds**；不扩 Isaac |
+| 明确禁止（无新批准） | 第三次 data-fix、>5 Isaac seeds、改 `eval_gate_v3`、LingBot 6B、真机 | `max_data_fix_retries: 1` 已用尽；lift 0/5 下禁止扩种子（P2-2 触发条件含「至少一次真实 lift>0」） |
+
+**硬停止条件（任何推进都适用）**
+
+1. 无显式人工批准 → 不启动。  
+2. 结果不能升级为任务成功 / Sim2Real / 真机。  
+3. 不得因 open-loop Pass、interface 5/5、`ran_isaac=true` 自动进下一阶段。  
+4. Gate SHA（`eval_gate_v3.lock.json`）未再批准前不得改阈值，且禁止追溯改判历史 Hold。
+
+**对应项目代码事实**
+
+- **已登记不执行：** FUTURE_WORK_ROADMAP §0 执行闸门、§2 P1、§3 P2。
+- **已完成的诊断例外：** P1-0A/0B 扰动、P1-1 offline async queue bench——均不改 Gate、不宣称任务成功。
+
+**面试一句话**
+
+> 「默认停。若再动，最小是用现有遥测量化闭环分布偏移；停止条件是：不扩种子、不重训、不改冻结 Gate，任何结论都不能写成任务成功。」
+
+---
+
+## 三十二、非确定性时延、FIFO 分叉、总线与安全链 FAQ（2026-07-27）
+
+### Q1：你如何从内核、内存、调度和架构四层降低机器人控制的非确定性时延？
+
+**核心原理解析 / 常用命令**
+
+非确定性时延不是一个单一参数问题，应按来源拆成四层：
+
+1. **内核层**：PREEMPT_RT 缩短不可抢占区；通过 `CAP_SYS_NICE` / `ulimit -r` 允许实时调度，用 CPU isolation / affinity 隔离控制核，并用 `cyclictest` 在目标负载下看 Max / P99，而不是只看平均值。
+2. **内存层**：实时循环避免阻塞锁、日志、DDS publish 与不可预测分配；非实时回调经 `RealtimeBuffer` 或 atomic latest-value 交接，固定尺寸控制矩阵尽量在栈上计算。实体目标机还应验证 page fault，并在确认内存上界后评估 `mlockall`。
+3. **调度层**：真机直连总线时建立 `controller_manager > MoveIt Servo > recorder/spawner` 的优先级阶梯；仿真跨 DDS 时不能机械照搬 FIFO，否则高优先级控制线程可能等待普通 middleware worker，形成优先级反转。
+4. **架构层**：把 middleware publish 移出 `SystemInterface::write()`；setpoint 使用 latest-value / KeepLast(1)；miss 后跳到下一个周期而不是 burst catch-up；物理、控制、Servo、观测与策略采用分层频率。
+
+```bash
+# 目标机内核与实时权限
+uname -a
+cat /sys/kernel/realtime
+ulimit -r
+
+# 调度策略、线程与上下文切换
+chrt -p <PID>
+ps -Leo pid,tid,cls,rtprio,pri,psr,comm
+pidstat -wt -p <PID> 1
+
+# 目标机实时长尾（必须带实际 CPU / I/O 负载复测）
+sudo cyclictest --priority=80 --interval=1000 --threads=1 --loops=100000 --histogram=200
+
+# ROS / 总线分层定位
+ros2 topic hz /joint_states
+ros2 topic delay /joint_states
+candump -tz can0
+ip -details -statistics link show can0
+```
+
+**对应项目代码事实**
+
+- **已实现：RT / non-RT 状态交接。** 阻抗控制器使用 `RealtimeBuffer` 与 atomic 状态，并在 `update()` 开头优先处理 E-Stop：[cartesian_impedance_controller.hpp L93](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp#L93)、[cartesian_impedance_controller.cpp L253](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp#L253)。
+- **已实现：DDS 与控制写路径隔离。** 仿真 `write()` 只更新 atomic latest-value，独立 publisher 使用 KeepLast(1)，middleware stall 后不突发追帧：[canopen_system.cpp L407](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L407)、[canopen_system.cpp L488](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L488)。
+- **已实现：调度分叉。** 仿真 `controller_manager=0` / Servo=0，真机配置路径保留 FIFO 50/40；仿真 Servo 额外用 `prlimit --rtprio=0:0`：[ros2_control.launch.py L57](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py#L57)、[servo.launch.py L58](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py#L58)。
+- **已实现契约测试。** [test_sim_backend_launch.py L47](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py#L47) 固定真机/仿真优先级、500/1000 Hz profile、DDS publish 隔离和 encoder 分频。
+- **真机 SOP / Hardware Pending。** PREEMPT_RT、CPU isolation、`mlockall`、实体 Panda 的 page-fault / WCET / jitter 尚无现场验收产物；准入状态见 [REAL_MACHINE_READINESS.md L43](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/REAL_MACHINE_READINESS.md#L43)。因此只能说“代码层降低非确定性并定义真机验收”，不能说“已证明实体硬实时”。
+- **剩余内存审计边界。** 当前代码使用 RT-oriented buffer 与固定维度 Eigen，但没有完整 heap-allocation trace / WCET 报告；不应对外宣称“零分配、零抖动”。
+
+**面试一句话**
+
+> 「我把 jitter 拆成内核抢占、内存阻塞、线程调度和 middleware 架构四层处理：真机建立 FIFO 阶梯，仿真因 DDS 依赖反而禁用 FIFO；控制写路径只交接 latest-value，DDS 在独立线程发布。当前代码与仿真契约已验证，实体 PREEMPT_RT 和 WCET 仍是 Hardware Pending。」
+
+### Q2：为什么奈奎斯特满足了，控制频率仍可能抖？
+
+**核心原理解析 / 常用命令**
+
+奈奎斯特条件只说明采样率应至少高于目标信号最高有效频率的两倍，用于避免采样混叠；它不保证线程会准时唤醒，也不消除 DDS 阻塞、page fault、锁竞争或非整数周期形成的拍频。
+
+本项目的频率链是：MuJoCo physics **1000 Hz** → controller / encoder / effort 背板 **500 Hz** → MoveIt Servo **125 Hz** → EE/FT/object 观测约 **100 Hz** → policy **10 Hz**。125 Hz 离散目标流可表达的最高频率不超过 62.5 Hz；500 Hz 控制环对每个目标周期更新 4 次，对 100 Hz observation 是 5:1。整数比减少相位滑移，调度 jitter 则单独通过 FIFO 分叉、publisher 隔离和不 burst catch-up 处理。
+
+**对应项目代码事实**
+
+- **已实现配置：** [control_rate_sim.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_sim.yaml) 为 500 Hz，[control_rate_real.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_real.yaml) 为 1000 Hz。
+- **已实现分频：** [mujoco_sim_node.py L305](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/mujoco_sim/mujoco_sim/mujoco_sim_node.py#L305) 从 physics tick 派生 encoder 与 observation decimation。
+- **证据边界：** 该结构降低多速率混叠/拍频风险，但不是数学意义上“消灭所有 jitter”；目标机仍需同时测量 deadline miss、调度延迟和端到端 command→feedback latency。
+
+**面试一句话**
+
+> 「奈奎斯特解决采样混叠，整数频率比减少拍频；Linux 唤醒、DDS 阻塞和锁竞争属于另一类时间非确定性，必须用调度和架构手段单独解决。」
+
+### Q3：EMCY、watchdog、DS402 Quick Stop 与物理 E-Stop 的责任边界是什么？
+
+**核心原理解析**
+
+- **EMCY**：驱动器主动上报内部故障码，回答“哪个轴因什么驱动故障报警”。
+- **Heartbeat / watchdog**：监测命令或状态是否 stale，回答“链路是否仍然活着”。
+- **DS402 Quick Stop**：通过控制字要求驱动器受控减速/去力矩，是总线协议内的软件安全动作。
+- **物理 E-Stop**：安全回路/安全 PLC 直接切断使能或动力，不能由 ROS topic、EMCY 或 Quick Stop 替代。
+
+**对应项目代码事实**
+
+- **已实现虚拟驱动：** DS402 状态机、heartbeat、EMCY 生成与 fault injection 位于 [driver_node.py L35](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/virtual_servo_driver/virtual_servo_driver/driver_node.py#L35)；状态机的 Quick Stop / Fault Reset 测试见 [test_ds402_state_machine.py L17](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/virtual_servo_driver/test/test_ds402_state_machine.py#L17)。
+- **已实现 ROS watchdog：** teleop heartbeat 与 joint-state freshness 触发锁存 E-Stop：[safety_monitor_node.cpp L65](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/src/safety_monitor_node.cpp#L65)、[test_safety_monitor.cpp L95](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/test/test_safety_monitor.cpp#L95)。
+- **已实现 CAN 路径安全动作：** `/safety/estop` 在 CAN 分支发送 `0x6040=0x0002` Quick Stop：[canopen_system.cpp L261](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L261)、[canopen_system.cpp L332](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L332)。
+- **文档声明，代码未确认：** 实体驱动 EMCY 的 master-side 消费、Bus-Off 恢复和物理双通道急停尚未闭环；当前 `can_rx_loop()` 只解码 TPDO1/2。真实硬件准入仍为 Hardware No-Go。
+
+**面试一句话**
+
+> 「EMCY 报驱动故障，watchdog 报链路 stale，Quick Stop 是总线内受控停机，物理 E-Stop 才是独立安全回路。项目已在虚拟驱动和 CAN 代码路径验证前三者的部分闭环，但实体 EMCY 消费与物理急停仍需现场验收。」
+
+### Q4：整个机器人运行时如何分配 CPU/GPU、组织传感器链，并控制临界区？
+
+**先定义系统范围**
+
+面试时应先说明，这不是把三个仓库的所有进程同时拉起：
+
+- **上游仓是在线主系统**：仿真或真机 backend、`ros2_control`、MoveIt Servo、安全监控、传感器话题、采集器和获准的 policy runtime。
+- **中游仓主要是离线系统**：数据适配、release、训练、open-loop 与 handoff。训练进程不应与机器人控制主循环争抢同一台机器的 CPU/GPU；上线的是冻结后的模型产物，不是训练任务。
+- **下游仓是独立验证系统**：PyBullet replay、risk、monitor 和实验性 sensor fusion。它用于 Sim2Sim/风险诊断，不是默认嵌入上游 `full_system.launch.py` 的常驻生产节点。
+
+bounded Isaac S4 是一个明确例外场景：外部 Isaac 进程、上游 ROS 控制栈、SmolVLA policy node、GT recorder 和可选视频记录器同时运行；中游训练仍不在场。
+
+```text
+Online upstream runtime
+
+CPU hard/firm-deadline lane
+  MoveIt Servo 125 Hz
+        ↓ joint target
+  controller_manager 500 Hz(sim) / 1 kHz(real)
+        ↓ torque
+  SystemInterface ── SocketCAN/RPDO/TPDO(real)
+        │
+        └── atomic latest torque → DDS publisher 500 Hz(sim)
+
+CPU simulation/sensor lane
+  MuJoCo physics 1 kHz ── encoder 500 Hz ── EE/FT/object 100 Hz
+  or external Isaac + 5-thread ROS adapter (effort forwarding 250 Hz)
+  camera bridge 10 Hz / recorder / safety monitor 250 Hz
+
+GPU lane, only when enabled
+  Isaac renderer/simulator and/or SmolVLA forward
+        ↓ completed action/target only
+  CPU command timer republishes latest bounded target
+
+Offline/alternative lanes
+  midstream training/open-loop GPU jobs       downstream PyBullet/risk/fusion CPU jobs
+  (not part of the torque loop)               (separate validation runtime)
+```
+
+#### 1. CPU 如何分层，哪些工作不能互相阻塞？
+
+| 运行层 | 当前承担者 | 频率/触发 | CPU 调度含义 |
+|---|---|---|---|
+| 物理/驱动 | MuJoCo Python process；或外部 Isaac；或 SocketCAN RX thread | MuJoCo physics 1 kHz；CAN 按帧到达 | 仿真是高 CPU 负载但不是硬实时；真机 CAN 收发才属于设备截止期路径 |
+| 力矩控制 | `controller_manager` + C++ impedance controller | sim 500 Hz / real 1 kHz | 真机路径保留 FIFO 50；仿真因 DDS 依赖使用普通调度 |
+| 运动生成 | MoveIt Servo C++ | 125 Hz | 真机路径 FIFO 40，低于 controller manager；仿真 priority 0 |
+| 安全 | C++ safety monitor | 4 ms timer，即 250 Hz | 使用 MultiThreadedExecutor，但未显式拆 callback group，默认组实际串行；监测 heartbeat、joint state、workspace、velocity 和 E-Stop |
+| 仿真 DDS 背板 | `CanopenSystem` spin thread + publish thread | effort 500 Hz | DDS publish 与 `controller_manager::write()` 分离，middleware stall 不进入力矩计算临界路径 |
+| Isaac ROS 边界 | Python adapter | 5-thread executor；effort forward 250 Hz | control/reset/sensor/camera/status callback group 分开，reset wait 不占 control group |
+| 视觉 | 独立 camera bridge process | 当前 full-system 默认 10 Hz | 渲染和图像组包不在 MuJoCo 1 kHz physics callback，也不在 controller process |
+| 采集 | recorder + telemetry 独立 process | 相机触发约 10 Hz；telemetry 1 Hz | 采集掉帧或 episode 写盘不应阻塞控制进程；代价是 recorder 自身会暂停处理 |
+| 策略 | 单独 policy process | inference 10 Hz，command 50 Hz | GPU forward 不进入 500 Hz/1 kHz torque loop；只交付完成后的 bounded target |
+
+系统避免 CPU 阻塞的核心不是“给所有进程加实时优先级”，而是：
+
+1. **截止期隔离**：控制、Servo、安全、仿真、视觉、采集和推理拆成独立 process/thread/callback group。
+2. **频率分层**：1 kHz physics → 500 Hz encoder/control → 250 Hz safety/Isaac forwarding → 125 Hz Servo → 100 Hz state/FT → 10 Hz camera/policy。慢任务不被放进快循环。
+3. **latest-value 而非 backlog**：力矩、传感器快照和 policy target 更重视新鲜度；miss 后不 burst catch-up。
+4. **仿真/真机调度分叉**：真实 SocketCAN 链建立 FIFO 50/40 阶梯；仿真跨 DDS worker，强开 FIFO 反而可能产生优先级反转。
+5. **低优先级辅助任务**：controller spawner、heartbeat helper 等使用 `nice`/`ionice`；这些只降低辅助任务竞争，不替代真正的 CPU affinity/WCET 验证。
+
+#### 2. GPU 在大系统中的真实角色和争用边界
+
+GPU 不参与阻抗控制、MoveIt Servo、watchdog、CANopen 或 recorder schema 逻辑。它只可能出现在：
+
+- **Isaac SimulationApp / 渲染**：当前 backend 配置 `multi_gpu=false`、`max_gpu_count=1`；Isaac `World` 的数组 backend 明确选择 `numpy`/`cpu`，但 SimulationApp 的渲染与底层仿真仍可能使用同一块 GPU。
+- **SmolVLA/ACT policy forward**：模型显式加载到 `cuda`，CPU 做 ROS message、图像整理和 pre/post-process，GPU 做 forward，结果再同步拷回 CPU。
+- **MuJoCo camera renderer**：physics 本身是 CPU 路径；`mujoco.Renderer` 是否使用独立 GPU/OpenGL 资源取决于运行环境。项目没有按 GPU ID 为多个 camera bridge 做资源隔离。
+- **离线训练/open-loop**：这是中游独立 GPU workload，不属于在线 torque loop，正常部署原则是不与在线控制共享资源。
+
+当前已做到的是**把 GPU 结果放在低频策略边界，控制侧只消费已完成结果**；当前未做到的是 GPU 资源调度本身：
+
+- 没有 MIG、第二块 GPU、MPS quota 或 per-process GPU priority；
+- 没有自定义 CUDA stream priority、显式 async H2D 或在线 prefetch stream；
+- bounded Isaac S4 中 Isaac 与 policy 可能争用同一块 GPU；
+- `/system/telemetry` 已在原有 CPU/RSS/affinity 状态中统一加入 per-process GPU utilization、VRAM、encoder/decoder 指标，并补充外部 Isaac backend 与 SmolVLA policy pattern；采样在后台线程执行，避免 `nvidia-smi pmon` 阻塞 ROS timer；
+- policy forward 没有可取消的 GPU watchdog。若 forward 卡死，多线程 executor 可能仍重发上一个 target/heartbeat，因此“GPU 卡住一定自动急停”当前项目证据不足。
+
+所以面试时不能说“我完成了 CPU/GPU 零争用调度”，更准确的说法是：
+
+> 我把 GPU 从力矩闭环中架构隔离，并用多速率 latest-target 交接降低阻塞传播；同时把 CPU/RSS 与 per-process GPU utilization/VRAM 放到同一 `/system/telemetry` 时间轴。GPU 共享和 inference watchdog 仍是下一阶段的运行时硬化项。
+
+#### 3. CPU 占用与内存压力如何监测，是否已经绑核？
+
+`system_telemetry` 以 1 Hz 发布：host total/per-core CPU、memory used/percent，以及 MuJoCo、Isaac adapter/backend、policy、camera、recorder、`ros2_control`、Servo、safety 的 per-process CPU、RSS、affinity。后台 GPU sampler 使用 `nvidia-smi` 采集 PID 级 VRAM 与 SM/memory/encoder/decoder utilization，再按同一 PID 合并进逻辑进程状态；它还把“CPU 总占用超过阈值”与“recorder effective Hz 下降”连续关联，只有达到证据 streak 后才允许可选 affinity 规则生效。
+
+这体现的是 **measure before pin**：
+
+- `enable_affinity=false` 是默认值，因此当前不能声称所有在线进程已经固定绑核；
+- 只有高 CPU 与采集速率下降同时出现，才将其判成 capture pressure，避免见到高 CPU 就盲目改 affinity；
+- 该 telemetry 是低频诊断面，不是 WCET profiler，也不能看到 4 ms/2 ms deadline 内的瞬时长尾；
+- GPU provider 不可用时发布 WARN 和错误原因，不伪造 0；当前本机无可通信 NVIDIA driver，因此实现和 parser/aggregation 单测已验证，但真实 GPU live sample 仍需在 Isaac/训练主机复验。
+
+```bash
+# 大系统 CPU/RSS/线程/调度观测
+ros2 topic echo /system/telemetry
+ps -eLo pid,tid,psr,cls,rtprio,pri,pcpu,pmem,comm --sort=-pcpu
+pidstat -u -r -w -p ALL 1
+mpstat -P ALL 1
+
+# 分进程 GPU utilization、显存、copy/encoder/decoder 负载
+nvidia-smi pmon -s um
+nvidia-smi dmon -s pucvmet
+nvidia-smi --query-compute-apps=pid,process_name,used_gpu_memory --format=csv
+
+# 将 DDS/传感器/控制频率与资源尖峰对齐
+ros2 topic hz /sim/encoder_state
+ros2 topic hz /ft_sensor
+ros2 topic hz /camera/color/image_raw
+ros2 topic hz /joint_target
+ros2 topic delay /teleop/cmd_pose
+```
+
+#### 4. 传感器“驱动—对齐—融合—消费”到底分哪几层？
+
+**A. 传感器/驱动来源**
+
+- 仿真主线：MuJoCo 在 1 kHz physics process 内生成 encoder、EE、FT、object pose；encoder 500 Hz，EE/FT/object 默认 100 Hz。相机由独立 bridge 根据最新 joint/gripper/object/EE 状态重新同步场景并以 10 Hz 渲染。
+- Isaac 主线：外部 Isaac 发布 raw joint/object/EE/FT/camera；5-thread adapter 统一话题、frame 与 camera timestamp，并通过 latest-effort watchdog 转发控制命令。
+- 真机路径：`CanopenSystem` SocketCAN RX thread 解析 TPDO position/velocity/torque，控制循环写 RPDO+SYNC。物理相机、物理 FT、Bus-Off/EMCY master consumption 和完整实机标定仍是 Hardware Pending，不能把仿真 topic 当作已完成的实体 sensor driver。
+
+**B. 在线控制融合——已进入控制主线**
+
+阻抗控制器在每个 update 中读取 joint position/velocity 做 FK/Jacobian，同时读取 FT `RealtimeBuffer`，按接触力阈值降低平移刚度。这是“状态+力传感器影响控制”的真实融合，但不是视觉融合，也没有复杂 estimator。
+
+安全监控器则融合 heartbeat freshness、joint state freshness、joint limit、velocity、workspace 与 E-Stop latch，输出 safe pose/twist 或 hold/estop。这是安全决策融合。
+
+**C. 采集时间对齐——已进入数据主线**
+
+recorder 没有为每种 modality 保存长队列，而是每类只保留一份 latest sample。scene camera 是 trigger；若 joint/EE/FT/object/camera 缺失、超过 `sync_slop` 或图像 stamp 被重复使用，就拒绝该 frame。这样内存是 O(模态数)，不会为了“凑齐旧帧”形成不断增长的同步队列。
+
+需要注意：`sync_queue_size` 参数为了 API 兼容仍存在，但代码已经显式忽略它；当前不是 `ApproximateTimeSynchronizer(queue=30)`。
+
+**D. 下游实验性 sensor fusion——不属于 Panda 主线结论**
+
+下游节点使用 `ApproximateTimeSynchronizer(queue_size=10, slop=0.1s)` 同步 PyBullet joint state、camera 和 FT。它在 CPU 上用 PyBullet DIRECT 做 FK，以速度差分估计加速度，扣除夹爪重力/惯性，再用 5 点力范数窗口的方差做 slip heuristic。
+
+但 camera 只参与时间同步，callback 第一行就丢弃 image payload；因此它不是视觉-力融合。该节点不参与 SmolVLA S4 GT、handoff replay go/no-go 或真机验收。
+
+三个 `message_filters.Subscriber` 现已显式传入 `qos_profile_sensor_data`，与上游/bridge 的 BestEffort sensor producer 对齐。新增 wiring test 不调用 `_on_synced_data()`，而是通过三个独立 rclpy publisher、ROS graph discovery 和 RMW subscription 发送同时间戳 joint+image+FT，并从 `/bridge/sim/grasp_status` 收到输出。它证明了合成输入下的 QoS/wiring 合同，但没有证明真实驱动、长时间负载、丢包统计或融合算法精度。
+
+#### 5. 缓冲区设计：为什么有的只存最新值，有的需要队列？
+
+| 数据 | 缓冲方式 | 满载/过期语义 | 原因 |
+|---|---|---|---|
+| torque command | 7 个 atomic latest values；DDS KeepLast(1) | 覆盖旧值；stall 后跳到下一周期 | 力矩命令过期即无价值，禁止追帧 |
+| encoder/TPDO | 一份 vector snapshot + mutex | RX callback/thread 更新，control `read()` 复制最近完整快照 | 需要同一时刻的 7 轴一致性，不能逐轴读到混合版本 |
+| controller target/FT | `RealtimeBuffer` | non-RT callback 覆盖，RT update 读最新完整对象 | callback 与 RT loop 交接不使用普通 mutex |
+| E-Stop/joint snapshot | atomic flag / atomic joint values | 最新状态覆盖 | 高频读取、数据量固定，避免锁 |
+| Isaac effort | `LatestEffortCommand` + timestamp + `RLock` | command/state stale 或 reset 时输出 zero，并清历史 | 把 latest-value 与 reset epoch/watchdog 一起原子判定 |
+| camera bridge state | 每类一份 latest q/gripper/object/EE | 新消息覆盖旧值 | 渲染只需要最新场景，不回放历史状态 |
+| recorder sync | modality latest cache + stamp | missing/stale/reused 直接拒绝 | 保持采集新鲜度和 O(1) 同步内存 |
+| recorder episode | Python `frames` list | episode stop 前持续增长；stop 后同步写盘 | 便于 immutable episode commit，但长 episode 有内存上界风险 |
+| policy observation/target | timestamped latest dict + single target slot | stale observation 不推理；新 target 替换旧 target | 10 Hz inference 与 50 Hz command 解耦 |
+| policy action chunk | 在线单 active chunk；DDS command KeepLast(1)+TTL | Hold/E-Stop/stale 清空 | 禁止安全恢复后执行旧动作 |
+| downstream actuator delay | `deque(maxlen=2000)` | 环形覆盖最老样本 | 这里的历史本身就是要模拟的 actuator delay，不应只存最新值 |
+| experimental fusion | ApproxTime queue 10 + force window 5 | 队列有界；窗口 pop oldest | 需要在时间邻域内配对异频消息并估计短期方差 |
+
+判断原则是：**控制 setpoint 用 latest-value；需要时间关系的同步/延迟/统计才用有界 queue；episode 是事务性批次，因此单独管理容量和 commit。**
+
+#### 6. 临界区逐项审计：哪些已解决，哪些仍可能卡住？
+
+| 临界区 | Producer → Consumer | 当前同步方式 | 当前评价 |
+|---|---|---|---|
+| controller target/FT | ROS callback → RT update | `RealtimeBuffer` | **已实现 RT-oriented 交接**；但 target 是 `std::vector`，update 仍发生一次值拷贝，尚无完整 allocation/WCET trace |
+| controller E-Stop/state snapshot | safety/RT loop → update/callback | atomics + acquire/release marker | **已实现**，E-Stop 在 update 开头优先读取 |
+| sim torque publish | `controller_manager::write()` → DDS publisher thread | atomic[7] | **已实现关键隔离**：RT write 不做 DDS publish，publisher stall 不持有 control lock |
+| sim encoder | DDS callback → hardware `read()` | `encoder_mutex_` + vector copy | **短临界区但仍有锁**；只有 7 轴 snapshot，风险受限，但不能宣称 lock-free hard RT |
+| real TPDO | CAN RX thread → hardware `read()` | `tpdo_mutex_` + vector copy | **短临界区但仍有锁**；CAN decode 在锁内，未来应测最坏锁等待或改双缓冲/sequence counter |
+| Isaac effort gate | state/command callback → 250 Hz forward timer | `RLock` around latest value、timestamp、counter | **临界区较小**，DDS publish 在 decision 返回后进行；reset 使用独立 callback group 和 event wait |
+| Isaac camera/reset/status | 多 callback 并发 | camera/reset/status/control 分组，5-thread executor | **已做职责隔离**；大 Image publish 仍可能占 middleware/allocator，需用 deadline/CPU profile验证 |
+| safety monitor | heartbeat/joint/cmd/service/250 Hz timer | 默认 mutually-exclusive callback group + 一个全局 `std::mutex` | **已缩短临界区**：锁内只更新状态或构造消息快照，safe pose/twist/status/diagnostics/E-Stop DDS publish 全部在解锁后执行；仍需 P99/WCET 证明实际收益 |
+| policy observation | sensor callbacks → inference/command | Python lock | **有一致性保护**；但 `np.copy(image)` 在锁内，图像复制会放大临界区，宜改为 immutable buffer swap/双缓冲 |
+| recorder latest cache | modality callbacks → camera-trigger callback | 无显式锁，SingleThreaded spin | **以串行 executor 避免数据竞争**；代价是图像转换/append/commit 会阻塞 recorder 自己，但不阻塞控制 process |
+| experimental fusion | message-filter callback 内的 PyBullet/NumPy/state history | SensorDataQoS + ApproxTime queue；SingleThreaded spin | **合成 RMW wiring 已验证但吞吐仍有限**；重计算会使有界同步 queue 丢配对，未做真实驱动/长稳/P99，因此仍不适合作为高频生产 fusion |
+
+这里最能体现系统工程判断的一点，是没有把“用了 mutex”简单等同于坏，也没有把“多线程”简单等同于快：
+
+- 7 轴 encoder/TPDO 需要一致 snapshot，短锁是当前可理解折中；是否接受要看 P99 lock hold 与 controller deadline。
+- DDS publish、日志、图像复制、磁盘写入这种不可预测操作不应该发生在 RT 临界区。
+- 单线程节点天然没有数据竞争，但 callback 内的重任务会形成 head-of-line blocking；因此通过 process 隔离把损害限制在 camera/recorder/fusion 自己。
+- MultiThreadedExecutor 必须配 callback group 与明确的共享状态协议，否则只是把阻塞问题换成竞态问题。
+
+**常用临界区与端到端诊断**
+
+```bash
+# 线程阻塞、上下文切换和调度等待
+pidstat -wt -p <PID> 1
+perf sched record -p <PID> -- sleep 10
+perf sched latency
+
+# mutex/futex 与系统调用长尾（短时、目标负载下使用）
+strace -f -ttT -e trace=futex,read,write,sendmsg,recvmsg -p <PID>
+
+# ROS callback/DDS 新鲜度
+ros2 topic info -v /sim/encoder_state
+ros2 topic info -v /policy/command
+ros2 topic delay /sim/encoder_state
+ros2 topic delay /camera/color/image_raw
+
+# 真机总线时序
+candump -tz can0
+ip -details -statistics link show can0
+```
+
+**对应项目代码事实**
+
+- **系统编排与进程边界：** [full_system.launch.py L83](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/full_system.launch.py#L83) 组装 simulation/fieldbus/control/safety/motion/recording，并在 [L231](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/full_system.launch.py#L231) 分层延迟启动；Isaac runtime 明确外置于 ROS 环境：[simulation.launch.py L42](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/simulation.launch.py#L42)、[isaac.launch.py L65](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/backends/isaac.launch.py#L65)。
+- **CPU 频率和仿真/真机调度分叉：** [control_rate_sim.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_sim.yaml)、[control_rate_real.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_real.yaml)、[ros2_control.launch.py L49](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py#L49)、[servo.launch.py L58](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py#L58)。
+- **MuJoCo 多频率数据源：** physics/encoder/observation 参数见 [mujoco_sim_node.py L132](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/mujoco_sim/mujoco_sim/mujoco_sim_node.py#L132)，physics step 与 decimation 在 [L509](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/mujoco_sim/mujoco_sim/mujoco_sim_node.py#L509)。camera 独立 process 和 10 Hz 当前默认值见 [mujoco.launch.py L66](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/backends/mujoco.launch.py#L66)、[camera_bridge_node.py L295](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/camera_bridge/camera_bridge/camera_bridge_node.py#L295)。
+- **控制器 RT/non-RT 交接：** target/FT `RealtimeBuffer` 和 atomics 在 [cartesian_impedance_controller.hpp L48](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp#L48)；callback 写入和 RT update 读取在 [cartesian_impedance_controller.cpp L117](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp#L117)、[L253](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp#L253)。
+- **硬件接口线程与临界区：** sim atomic torque、encoder mutex、CAN TPDO mutex 的结构见 [canopen_system.hpp L82](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/include/canopen_hw_interface/canopen_system.hpp#L82)；独立 spin/publish/CAN RX thread 在 [canopen_system.cpp L309](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L309)、[L332](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L332)；锁内 snapshot copy 与 atomic write 在 [L440](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L440)、[L467](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L467)、[L488](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L488)。
+- **Isaac callback/command 隔离：** 5 类 callback group 与 5-thread executor 在 [adapter_node.py L120](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/adapter_node.py#L120)、[L549](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/adapter_node.py#L549)；latest-effort `RLock`、timeout/reset epoch 在 [effort_control.py L48](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/effort_control.py#L48)。
+- **GPU 边界：** Isaac single-GPU 配置和 CPU array backend 在 [isaac_panda_backend.py L90](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/scripts/isaac_panda_backend.py#L90)、[L224](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/scripts/isaac_panda_backend.py#L224)；SmolVLA 同步 GPU forward 与 D2H 在 [scene_smolvla_runtime.py L216](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/scene_smolvla_runtime.py#L216)。
+- **统一 CPU/RSS/GPU 遥测：** process patterns、后台 `nvidia-smi` sampler、PID 级 GPU merge、1 Hz host/per-process 指标、默认关闭 affinity 和 evidence-gated affinity 位于 [system_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/system_telemetry.py)。GPU provider 不可用时显式 WARN，不将缺失值伪装为 0。
+- **安全临界区已收窄：** heartbeat/joint/cmd/timer 仍以 `mutex_` 保护一致状态，但 command callback 和 250 Hz timer 都先在锁内构造 immutable snapshot，再于解锁后 publish：[safety_monitor_node.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/src/safety_monitor_node.cpp)。结构契约测试见 [test_safety_publish_boundary.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_safety_publish_boundary.py)。
+- **数据对齐：** recorder O(1) latest-cache、camera trigger、stale/reused rejection 在 [time_sync.py L8](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L8)、[L75](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L75)、[L87](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L87)；episode memory buffer 和同步 commit 在 [recorder_node.py L161](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/recorder_node.py#L161)、[L219](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/recorder_node.py#L219)。
+- **实验性 fusion 边界：** ApproxTime queue、SensorDataQoS、CPU PyBullet FK、gravity/inertia compensation、force window 和 image discard 位于 [sensor_fusion_node.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/sensor_fusion_node.py)。合成三路 ROS graph/RMW wiring 见 [test_sensor_fusion_dds_wiring.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/test_sensor_fusion_dds_wiring.py)；它不证明真实传感器或算法准确率。
+- **下游 delay queue 不是在线 setpoint backlog：** 其 `deque(maxlen=2000)` 用于显式模拟执行器延迟：[actuator_delay.py L9](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/actuator_delay.py#L9)，不得与上游 latest-torque 语义混为一谈。
+
+**证据状态总结**
+
+- **已实现：** 进程分层、多速率链、真机/仿真优先级分叉、controller `RealtimeBuffer`/atomic、sim DDS publisher 隔离、bounded latest buffers、统一 CPU/RSS/per-process GPU telemetry、safety 锁外 publish、recorder latest-cache 对齐。
+- **已实现但仍需硬化：** encoder/TPDO mutex、safety 全局锁、policy image copy 临界区、episode 内存上界、Isaac 与 policy 共享 GPU。
+- **实验性：** 下游 joint+FT+camera ApproxTime fusion；SensorDataQoS 与合成 RMW wiring 已通过，但 camera pixel 未参与估计，未完成真实驱动、长稳和算法精度验证。
+- **Hardware Pending / 当前证据不足：** 实体 FT/相机驱动、实体时间同步误差、PREEMPT_RT/CPU isolation/WCET、master-side EMCY/Bus-Off、per-process GPU 隔离与 inference watchdog。
+
+**面试一句话**
+
+> 「我把整套运行时按截止期拆成 CPU 控制面、仿真与传感器数据面、GPU 策略面和离线训练面：GPU 不进入 500 Hz/1 kHz 力矩环；相机、采集、仿真和策略用进程与多速率 latest-value 交接隔离。控制器用 RealtimeBuffer/atomic，DDS publisher 单独线程，异频采集用 bounded latest-cache；CPU/RSS/GPU 指标统一到 PID 维度，safety DDS publish 已移出全局锁。hardware snapshot 短锁、Isaac 与 policy 共享 GPU以及真实 WCET 仍需继续硬化。」
+
+### Q5：局部补充——policy node 内部怎样避免 GPU forward 直接阻塞 command 发布？
+
+**核心原理解析**
+
+这套系统没有把“避免阻塞”理解成让 GPU 推理变得实时，而是把不同截止期的工作拆开：
+
+1. **进程边界**：Isaac 控制栈、真值记录器、视频记录器和 SmolVLA policy node 是独立进程，通过 ROS 2 传递状态。单个记录或推理进程异常不会直接把所有职责塞进同一个 Python event loop；但 Isaac 渲染与策略推理仍可能共享同一块 GPU，当前没有 MIG、独立 GPU 或 CUDA stream priority 隔离。
+2. **CPU callback 调度**：在线 SmolVLA 节点使用 4 线程 `MultiThreadedExecutor`；sensor callback 是 `ReentrantCallbackGroup`，inference 与 command 各自是 `MutuallyExclusiveCallbackGroup`。因此一次只允许一个推理任务，同时 command timer 可以由另一个 executor worker 继续发送最近一次有效目标。
+3. **多速率解耦**：推理按 10 Hz 触发，命令按 50 Hz 发布。控制侧消费的是最近一次完整 target，不直接等待每个 command tick 都完成一次 GPU forward。
+4. **过载策略**：`_inference_busy` 为真时，新 inference timer tick 直接返回，不排队追赶；观测使用带时间戳的 latest-value snapshot，缺字段或超过 timeout 就拒绝推理。这里选择的是“丢过期工作、保持新鲜度”，而不是“保证处理每一帧”。
+5. **GPU 同步边界**：`select_action()` / `predict_action_chunk()` 在 inference callback 中同步调用，随后 `.cpu().numpy()` 把结果取回 CPU。该路径可以让其他 executor worker 继续工作，但不能宣称 GPU forward 已异步化；CPU preprocess、Python GIL、host-device copy 和共享 GPU 争用仍可能形成长尾。
+
+缓冲区按数据语义分成四类：
+
+| 缓冲区 | 当前结构 | 满载/过期策略 | 设计目的 |
+|---|---|---|---|
+| 多模态观测 | 每个 modality 一份 latest cache + timestamp | 新样本覆盖旧样本；missing/stale/reused 拒绝组帧 | O(1) 内存，不让相机/状态历史积压拖慢实时性 |
+| 推理输入快照 | lock 内复制 joint/gripper/EE/image，lock 外做推理 | observation timeout 后不推理 | 保证一次 forward 使用自洽快照，同时缩小共享状态修改窗口 |
+| 控制目标 | 单槽 `_target` + lock | 新 target 原子替换旧 target；command timer 重发最近有效值 | 50 Hz 发布与 10 Hz 推理解耦，控制发布不逐 tick 等 GPU |
+| 动作块 | 在线为单 active chunk，`K=5`；DDS command 为 KeepLast(1)+TTL | Hold/E-Stop/stale 清空；TTL 后命令失效 | 防止陈旧动作在恢复后继续执行，限制排队深度 |
+
+离线还实现了一个用于验证调度收益的 async double-buffer：一个 active execute queue、一个 `_ready` prefetch buffer 和一个单 worker future。它在执行当前 K 个动作时预取下一 chunk，只在 active queue 耗尽后 swap，避免新 chunk 提前截断当前窗口；cold start 或预取超过 replan window 时仍会阻塞。这个 scheduler 已有 CPU 单测与 GPU 离线 benchmark，但**尚未接入在线 Isaac runner**。
+
+训练侧是另一种吞吐问题：Recovery v3 配置通过 `num_workers=2` 让 CPU 数据加载进程为 GPU 准备 batch，并用 `bf16`、batch size 8 控制显存与吞吐。项目没有显式启用 `pin_memory`、`non_blocking=True` 或自定义 CUDA stream，因此不能把训练路径描述为完整的 host-device 异步流水线；MLP/ACT 基线的本地 DataLoader 仍是默认 worker 行为。
+
+**常用诊断命令**
+
+```bash
+# 分清 CPU callback 堵塞还是 GPU 饱和/显存压力
+pidstat -wt -p <POLICY_PID> 1
+ps -Leo pid,tid,psr,cls,rtprio,pri,pcpu,comm --sort=-pcpu
+nvidia-smi dmon -s pucvmet
+nvidia-smi pmon -s um
+
+# 看输入、命令频率与 DDS endpoint/QoS，定位积压或掉帧
+ros2 topic hz /camera/color/image_raw
+ros2 topic hz /teleop/cmd_pose
+ros2 topic delay /teleop/cmd_pose
+ros2 topic info -v /policy/command
+
+# 需要进一步拆 kernel / memcpy / CPU launch gap 时再做 profiler
+nsys profile --trace=cuda,nvtx,osrt -o /tmp/smolvla_runtime \
+  python3 -m isaac_sim_adapter.smolvla_policy_inference_node --ros-args ...
+```
+
+诊断顺序应是：先看 command deadline miss / queue underrun，再对齐 inference latency、CPU runnable/wait 和 GPU utilization；GPU 利用率低但 CPU 线程忙，通常先查预处理、图像复制或 Python callback；GPU 持续满载且 command 出现空窗，再查 forward 时延、GPU 争用和 replan budget。
+
+**对应项目代码事实**
+
+- **已实现：CPU callback 隔离与多速率发布。** sensor/inference/command callback group、10 Hz inference、50 Hz command 以及 4 线程 executor 位于 [smolvla_policy_inference_node.py L304](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L304)、[L385](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L385)、[L991](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L991)。
+- **已实现：latest observation / target 与过载丢弃。** `_observations`、`_target`、`_inference_busy` 及锁在 [smolvla_policy_inference_node.py L286](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L286)；带 freshness 校验的 snapshot 在 [L528](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L528)；忙时跳过和同步推理在 [L561](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L561)；独立 command timer 读取最近 target 在 [L680](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/smolvla_policy_inference_node.py#L680)。
+- **已实现：GPU 推理是同步边界。** `torch.inference_mode()` 内调用 policy，随后 `.cpu().numpy()` 取回结果：[scene_smolvla_runtime.py L216](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/scene_smolvla_runtime.py#L216)、[L249](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/scene_smolvla_runtime.py#L249)。当前没有项目代码证据证明 CUDA stream priority、异步 H2D 或 GPU 资源隔离。
+- **已实现：采集缓冲是 O(1) latest cache。** `MultiModalSync` 明确丢弃历史 queue 参数，以相机为 trigger，并按 `sync_slop` 拒绝 stale / reused 样本：[time_sync.py L8](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L8)、[L75](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L75)、[L87](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L87)。episode 完成前的 `frames` 列表仍驻留内存，停止后同步写盘：[recorder_node.py L161](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/recorder_node.py#L161)、[L219](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/recorder_node.py#L219)，长 episode 仍需关注内存上界与写盘停顿。
+- **已实现：在线单 action chunk 与失效清空。** `ShadowCommandScheduler` 用一份 active chunk、锁、K 深度与 observation TTL；queue underrun、stale、Hold/E-Stop 都 fail closed：[policy_runtime.py L283](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L283)、[L318](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L318)、[L327](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L327)、[L340](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime.py#L340)。`/policy/command` 使用 KeepLast(1)、deadline 和 lifespan：[policy_runtime_ros.py L19](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime_ros.py#L19)。
+- **已实现但仅限离线诊断：async double-buffer。** `ThreadPoolExecutor(max_workers=1)`、active queue、ready buffer、耗尽后 swap 位于 [async_queue_runtime.py L160](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/smolvla_s3/async_queue_runtime.py#L160)；单测证明 150 ms inference 可隐藏在 500 ms replan window 内，除 cold start 外不 miss 100 ms control deadline：[test_smolvla_s4_async_queue_runtime.py L37](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/tests/test_smolvla_s4_async_queue_runtime.py#L37)。benchmark 产物明确记录 `async_double_buffer_runtime_implemented_online=false`：[bench_smolvla_s4_queue_runtime.py L306](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/bench_smolvla_s4_queue_runtime.py#L306)。
+- **已实现：训练侧有限并行与资源约束。** Recovery v3 固定 `bf16`、batch size 8、DataLoader workers 2，并由 control plane 传给 LeRobot CLI：[lora_train_recovery_v3_phaseaware50.yaml L90](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/configs/smolvla_s3/lora_train_recovery_v3_phaseaware50.yaml#L90)、[control_plane.py L1115](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/smolvla_s3/control_plane.py#L1115)。`pin_memory`、non-blocking transfer 与自定义 CUDA stream 当前项目证据不足，无法确认。
+- **资源隔离边界。** bounded S4 由独立 policy / GT recorder / stack 进程编排：[run_isaac_smolvla_s4.sh L272](file:///home/ina/dev/ros2-arm-teleoperation-suite/scripts/run_isaac_smolvla_s4.sh#L272)、[L331](file:///home/ina/dev/ros2-arm-teleoperation-suite/scripts/run_isaac_smolvla_s4.sh#L331)、[L362](file:///home/ina/dev/ros2-arm-teleoperation-suite/scripts/run_isaac_smolvla_s4.sh#L362)。Isaac 配置仍为单 GPU，且未设置 GPU 隔离：[isaac_panda_backend.py L90](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/scripts/isaac_panda_backend.py#L90)。因此可说“进程与 callback 层解耦”，不能说“Isaac 与 policy GPU 零争用”。
+
+**容易被追问的当前缺口**
+
+1. 在线 inference callback 仍包含 CPU image copy、preprocess、同步 forward 和 device-to-host copy；没有端到端 profiler 证明 command callback 在最坏情况下绝不受影响。
+2. 在线 scheduler 只有 active chunk，没有 prefetch buffer；新的 chunk 会替换当前 chunk。离线 double-buffer 的 reset / Hold / E-Stop 语义尚未完成在线 shadow test。
+3. episode frame buffer 无固定上限且写盘发生在 stop 路径；当前 bounded episode 可控，但不是无限时长 recorder 设计。
+4. Python lock、GIL、DDS executor 与共享 GPU 的 P95/P99 长尾仍需在目标负载下测量，不能由平均 inference latency代替。
+
+**面试一句话**
+
+> 「我没有把 GPU forward 塞进控制 tick。在线系统用 4 线程 executor 分离 sensor、inference 和 command，观测与目标都用 latest-value 缓冲，10 Hz 推理更新目标、50 Hz 命令循环只消费最近完整结果；忙时丢掉过期 inference tick，Hold/E-Stop 清空动作队列。离线双缓冲已证明可以把 150 ms 推理隐藏进 500 ms replan window，但尚未在线接线，所以我会把它说成已验证的调度方案，而不是已经完成的在线能力。」
+
+### Q6：之前 CPU 带不动、相机掉帧和控制节点不稳定，根因是什么，最后怎样解决？
+
+**直接结论**
+
+这次问题最终没有被归因为“CPU 性能不够”，而是三类耦合问题叠加：相机渲染与多模态录制争用 CPU；跨节点时间戳用排队式近似同步时容易积压或等待旧样本；仿真控制链又把 FIFO 控制线程放在需要普通 DDS worker 配合的数据路径上，形成优先级反转和长尾阻塞。
+
+最终收口不是单点优化，而是把负载、缓冲和调度边界同时改清楚：
+
+| 故障层 | 根因判断 | 最终处理 | 当前证据 |
+|---|---|---|---|
+| 相机/渲染 | 1 kHz 物理步进与图像渲染若在同一高频路径竞争，RGB、depth、wrist、tactile 全开还会重复增加 renderer 和拷贝成本 | camera bridge 拆成独立 ROS 进程；主线收敛到 scene RGB `320×240 @ 10 Hz`；depth、wrist、tactile 默认关闭；纯 RGB 路径不再额外渲染 depth，并增加 monotonic burst gate | **已实现**；wrist 最终停用的主因是目标不可见，而不是只能归因于 CPU |
+| 录制/同步 | 不同 ROS 节点各自打时间戳，传统 ApproximateTime 队列容易出现等待旧帧、队列积压和延迟随运行时间扩散 | 改为相机驱动的 O(1) latest-cache；每种模态只保留最新值，对 missing、stale、reused 样本直接拒绝，不追赶历史帧 | **已实现并有单测** |
+| 控制/DDS | 仿真 `CanopenSystem::write()` 原路径涉及 DDS；Servo/controller_manager 若运行 FIFO，可能等普通优先级 middleware worker，造成优先级反转，看起来像“控制节点随机卡住” | 仿真关闭 Servo/controller_manager FIFO；真机直连 CAN 路径保留 FIFO 40/50。仿真 write 只写 7 个 atomic torque，DDS publish 移到独立 500 Hz 线程；DDS 卡顿后跳到下一周期，不突发补发 | **已实现并有静态契约测试** |
+| 频率/启动 | 任意频率堆叠会产生拍频、消息压力和启动阶段 discovery/service 竞争 | 固定为 physics 1 kHz、encoder/controller 500 Hz、Servo 125 Hz、camera 10 Hz；控制频率使用整数倍关系。启动按 simulation → fieldbus/recording → safety → motion → ros2_control 分层延迟 | **已实现**；整数频率只能降低拍频，不能替代 WCET 测量 |
+| 资源定位 | 只看总 CPU 平均值无法判断是 renderer、recorder 还是 control 饱和 | 增加 1 Hz host/per-core、各关键进程 CPU/RSS 和 recorder effective Hz 遥测，把“高 CPU”与“采集频率跌落”关联起来 | **已实现**；affinity 默认关闭，不能说绑核已经解决了问题 |
+
+**为什么这些改动能让相机和控制同时稳定**
+
+相机链选择“有限速率、只处理最新帧”：过载时丢掉过期采集工作，不让旧图像占满队列。控制链选择“高频路径只做有界内存访问”：`write()` 不再等待 DDS，而是把最新力矩交给独立 publisher。两条链之间又通过进程边界和分频隔离，所以一次慢渲染或 middleware stall 不再沿调用链直接拖住 500 Hz controller loop。
+
+这里最关键的系统判断是：**控制命令需要新鲜和有界延迟，相机录制需要稳定吞吐，但二者都不要求处理每一条过期消息。** 因此 bounded latest-value 比无界排队更适合这个运行时。
+
+**哪些说法当前不能讲**
+
+1. 当前没有保存到仓库的历史 CPU 百分比、调度 trace 或修改前后 P99/WCET 报告，无法还原当时某一时刻究竟占用多少核。
+2. CPU affinity 只是 evidence-gated 可选能力，默认 `enable_affinity=false`；不能把“绑核”说成已经采用的主解法。
+3. 项目没有证据证明 PREEMPT_RT、`isolcpus` 或 GPU offload 解决了这次故障；真机硬实时仍是 Hardware Pending。
+4. hardware read 仍使用短时 `encoder_mutex_`/`tpdo_mutex_`；safety publish 已移出全局锁，但没有 P99/WCET 对照，所以仍不能说所有非确定性都消失了。
+
+**常用复现与诊断命令**
+
+```bash
+# 同时看相机、编码器和控制命令频率，优先检查是否随负载下降
+ros2 topic hz /camera/color/image_raw
+ros2 topic hz /joint_states
+ros2 topic hz /joint_target
+
+# 看端到端延迟和 DDS endpoint/QoS
+ros2 topic delay /camera/color/image_raw
+ros2 topic info -v /camera/color/image_raw
+
+# 找 CPU 是被哪个进程/线程消耗，以及是否存在 FIFO 线程
+pidstat -p ALL -u -r -w 1
+ps -Leo pid,tid,psr,cls,rtprio,pri,pcpu,stat,comm --sort=-pcpu
+chrt -p <PID>
+
+# 项目运行时遥测
+ros2 topic echo /system/telemetry
+ros2 topic echo /recorder/diagnostics
+```
+
+**对应项目代码事实**
+
+- **相机进程和负载收敛：** scene camera 作为独立 node，默认 `320×240 @ 10 Hz`，depth/wrist/tactile 默认关闭：[mujoco.launch.py L35](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/backends/mujoco.launch.py#L35)、[L66](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/backends/mujoco.launch.py#L66)。RGB-only render 与 burst gate 位于 [camera_bridge_node.py L295](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/camera_bridge/camera_bridge/camera_bridge_node.py#L295)。
+- **多模态缓冲：** latest-cache、camera trigger、stale/reused rejection 位于 [time_sync.py L8](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L8)、[L75](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L75)、[L87](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py#L87)；scene-only 行为测试见 [test_time_sync_scene_only.py L34](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_time_sync_scene_only.py#L34)。
+- **仿真/真机优先级分叉：** controller_manager 仿真 priority 0、真机 50 位于 [ros2_control.launch.py L49](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py#L49)；Servo 仿真 priority 0 且限制 RT rlimit、真机保留 40，位于 [servo.launch.py L58](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py#L58)。契约测试见 [test_sim_backend_launch.py L47](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py#L47)。
+- **DDS 与 control write 隔离：** 独立 sim publisher、不追赶 missed periods 位于 [canopen_system.cpp L374](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L374)、[L407](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L407)；`write()` 只更新 atomic torque 位于 [L488](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp#L488)。
+- **频率链：** MuJoCo physics 1 kHz、encoder 500 Hz、observation 100 Hz 位于 [mujoco_sim_node.py L132](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/mujoco_sim/mujoco_sim/mujoco_sim_node.py#L132)；controller 仿真 500 Hz、真机 1 kHz 分别见 [control_rate_sim.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_sim.yaml)、[control_rate_real.yaml](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/config/control_rate_real.yaml)。
+- **启动编排：** 各层在 2/4/6/12 秒分阶段启动，位于 [full_system.launch.py L231](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/full_system.launch.py#L231)。
+- **资源遥测及其边界：** 进程模式、CPU/RSS、recorder effective Hz、后台 PID 级 GPU sampler 与默认关闭的 affinity 位于 [system_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/system_telemetry.py)。当前测试机无可通信 NVIDIA driver，因此 live GPU 数值仍需在目标 GPU 主机复验。
+
+**面试一句话**
+
+> 「当时不是简单换更强 CPU，而是定位到 renderer/recorder 负载、跨节点同步积压和仿真 FIFO–DDS 优先级反转三类问题。我的收口方法是：相机独立进程并降到 scene RGB 320×240@10 Hz，采集改成相机触发的 O(1) latest-cache；仿真关闭 FIFO、真机保留 FIFO，把 DDS publish 从 500 Hz control write 中拆到独立线程，再用整数分频和分层启动减少拍频与启动竞争。这样慢相机和 DDS stall 不再直接拖住控制环。」
+
+### Q7：如何收口 GPU 可观测性、Safety 临界区和 Sensor Fusion QoS 三个运行时缺口？
+
+**核心原理解析**
+
+1. **统一资源时间轴，而不是另做一套 GPU 日志。** `system_telemetry` 保留原有逻辑进程状态，用 PID 将 CPU、RSS、affinity 与 GPU VRAM、SM/memory/encoder/decoder utilization 合并。`nvidia-smi pmon` 可能阻塞一个采样周期，因此 GPU collector 运行在后台 daemon thread；ROS 1 Hz timer 只读取最近完整快照。GPU driver 不可用时 provider 状态为 WARN 并携带错误，不能把 unavailable 当作 0%。
+2. **锁内只做状态事务，锁外做 middleware I/O。** safety callback 在全局锁内完成 watchdog/limit/E-Stop 状态变更，并复制出 safe command、status、diagnostics 和 E-Stop snapshot；退出作用域后才执行 DDS publish。这样 Reliable/TransientLocal writer 的 backpressure 不再延长共享状态临界区，同时消息仍对应一个完整状态版本。
+3. **QoS 兼容必须通过 endpoint wiring 验证。** sensor fusion 的 joint、image、FT 都是高频传感器流，三个 `message_filters.Subscriber` 统一显式使用 SensorDataQoS（BestEffort/Volatile/KeepLast）。测试创建三个独立 publisher，等待 ROS graph discovery 后发送同时间戳 triplet，并从输出 topic 接收 `GraspStatus`；没有直接调用融合 callback。
+
+**常用命令**
+
+```bash
+# 统一查看 host、逻辑进程和 GPU provider
+ros2 topic echo /system/telemetry
+nvidia-smi pmon -c 1 -s um
+nvidia-smi --query-compute-apps=pid,gpu_uuid,used_gpu_memory \
+  --format=csv,noheader,nounits
+
+# 确认 fusion 三个 endpoint 的 Reliability/Durability
+ros2 topic info -v /bridge/sim/joint_states
+ros2 topic info -v /camera/color/image_raw
+ros2 topic info -v /ft_sensor
+ros2 topic hz /bridge/sim/grasp_status
+
+# 临界区与 DDS stall 诊断
+pidstat -wt -p <SAFETY_PID> 1
+strace -f -ttT -e trace=futex,sendmsg -p <SAFETY_PID>
+```
+
+**对应项目代码事实**
+
+- **已实现：per-process GPU telemetry。** `nvidia-smi` CSV/pmon parser、后台 sampler、PID aggregation 和 GPU provider status 位于 [system_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/system_telemetry.py)；parser/merge 单测位于 [test_system_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_system_telemetry.py)。当前测试机 NVIDIA driver 不可通信，因此真实 GPU live value 尚未在本机验证。
+- **已实现：Safety 锁外 publish。** command、joint、service 和 timer callback 均先完成 locked snapshot，再发布 safe pose/twist、status、diagnostics、E-Stop：[safety_monitor_node.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/src/safety_monitor_node.cpp)。结构回归测试位于 [test_safety_publish_boundary.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_safety_publish_boundary.py)；现有 safety GTest 继续通过。
+- **已实现：Fusion QoS 与合成 RMW wiring。** 三个 subscriber 显式使用 SensorDataQoS：[sensor_fusion_node.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/pybullet_bridge/sensor_fusion_node.py)。不直接调用 callback 的三路 ROS graph test 位于 [test_sensor_fusion_dds_wiring.py](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/pybullet_bridge/test/test_sensor_fusion_dds_wiring.py)。
+- **仍是 experimental：** wiring Pass 只证明合成消息在当前 RMW 下能完成发现、同步和输出；Image 像素仍被丢弃，真实相机/FT 驱动、长稳、负载丢包和估计准确率均未验证，不能升级为任务成功或 Sim2Real 证据。
+
+**面试一句话**
+
+> 「我把三个‘看起来能跑’的缺口变成了可验证合同：资源侧用 PID 合并 CPU/RSS/GPU 且后台采样；Safety 侧锁内生成一致快照、锁外发布；Fusion 侧显式 SensorDataQoS，并让 joint、camera、FT 真正经过 ROS graph/RMW 后产生输出。与此同时我保留证据边界：本机没有 live GPU 数值，fusion 也还没有真实驱动和长稳验证。」

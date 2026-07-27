@@ -1,32 +1,59 @@
-"""ROS 2 Node for multi-source asynchronous sensor fusion and grasp/slip estimation."""
+"""ROS 2 Node for multi-source asynchronous sensor fusion and grasp/slip estimation.
+
+**Status: EXPERIMENTAL (not Panda mainline verification).**
+
+What is actually used today
+---------------------------
+- Synchronized inputs: ``/bridge/sim/joint_states``, ``/camera/color/image_raw``,
+  ``/ft_sensor`` via ``message_filters.ApproximateTimeSynchronizer``.
+- **JointState**: used for FK / gravity-inertia compensation of the gripper wrench.
+- **WrenchStamped**: used as the raw FT measurement for net contact force/torque.
+- **Image**: subscribed for time-sync only; **pixel contents are discarded**
+  (``del image_msg``). Camera is not used for vision-based grasp/slip.
+
+Verification limits
+-------------------
+- Unit tests cover gravity compensation math with synthetic messages only.
+- Not part of handoff replay harness go/no-go; not used by SmolVLA S4 GT.
+- Must not be cited as evidence of grasp success, Sim2Real, or task Pass.
+- Risk / ContinuousTaskEvaluator remain authoritative for readiness / task GT.
+"""
 
 from __future__ import annotations
 
-import time
-from typing import Dict, Optional, Sequence
+from typing import Optional
 
+from bridge_monitor_msgs.msg import GraspStatus
+from geometry_msgs.msg import WrenchStamped
+import message_filters
 import numpy as np
 import pybullet as p
 import rclpy
-from geometry_msgs.msg import WrenchStamped, Wrench
-from sensor_msgs.msg import Image, JointState
 from rclpy.node import Node
-import message_filters
+from rclpy.qos import qos_profile_sensor_data
+from sensor_msgs.msg import Image, JointState
 
-from bridge_monitor_msgs.msg import GraspStatus
 from pybullet_bridge.robot_profiles import resolve_urdf_path
+
+# Portfolio / AGENTS marker — keep in sync with docs/AGENTS.md §4.
+SENSOR_FUSION_STATUS = "experimental"
+SENSOR_FUSION_CAMERA_UTILIZATION = "timestamp_sync_only"
 
 
 class SensorFusionNode(Node):
-    """Asynchronously sync JointState, Camera Image, and Force-Torque Wrench.
+    """EXPERIMENTAL: asynchronously sync JointState, Camera Image, and FT Wrench.
 
     Compensates gravity and inertia of the gripper mass to estimate net contact wrench
-    and detect contact establishment and slip.
+    and detect contact establishment and slip. Camera frames are sync-only.
     """
 
     def __init__(self) -> None:
         super().__init__('sensor_fusion_node')
         self._declare_parameters()
+        self.get_logger().warn(
+            '[SensorFusionNode] EXPERIMENTAL: camera pixels unused; '
+            'not a task-success or Sim2Real evidence source.'
+        )
 
         self._gripper_mass = float(self.get_parameter('gripper_mass').value)
         self._gripper_com_z = float(self.get_parameter('gripper_com_z').value)
@@ -56,9 +83,15 @@ class SensorFusionNode(Node):
         )
 
         # Subscribers with message filters
-        self._joint_sub = message_filters.Subscriber(self, JointState, '/bridge/sim/joint_states')
-        self._camera_sub = message_filters.Subscriber(self, Image, '/camera/color/image_raw')
-        self._ft_sub = message_filters.Subscriber(self, WrenchStamped, '/ft_sensor')
+        # All three producers are sensor streams. BestEffort/volatile KeepLast
+        # avoids a Reliable subscriber silently becoming incompatible with the
+        # upstream SensorDataQoS publishers under load.
+        self._joint_sub = message_filters.Subscriber(
+            self, JointState, '/bridge/sim/joint_states', qos_profile_sensor_data)
+        self._camera_sub = message_filters.Subscriber(
+            self, Image, '/camera/color/image_raw', qos_profile_sensor_data)
+        self._ft_sub = message_filters.Subscriber(
+            self, WrenchStamped, '/ft_sensor', qos_profile_sensor_data)
 
         self._ts = message_filters.ApproximateTimeSynchronizer(
             [self._joint_sub, self._camera_sub, self._ft_sub],
@@ -83,7 +116,12 @@ class SensorFusionNode(Node):
             except Exception:
                 pass
 
-    def _on_synced_data(self, joint_msg: JointState, image_msg: Image, ft_msg: WrenchStamped) -> None:
+    def _on_synced_data(
+        self,
+        joint_msg: JointState,
+        image_msg: Image,
+        ft_msg: WrenchStamped,
+    ) -> None:
         del image_msg  # Sync confirmation only
 
         # 1. Kinematics via PyBullet
@@ -95,10 +133,20 @@ class SensorFusionNode(Node):
             if 'panda_joint' in name:
                 idx = int(name[-1]) - 1
                 if 0 <= idx < 7:
-                    p.resetJointState(self._robot_id, idx, joint_positions[i], physicsClientId=self._client_id)
+                    p.resetJointState(
+                        self._robot_id,
+                        idx,
+                        joint_positions[i],
+                        physicsClientId=self._client_id,
+                    )
 
         # Forward kinematics
-        state = p.getLinkState(self._robot_id, self._sensor_link_idx, computeLinkVelocity=1, physicsClientId=self._client_id)
+        state = p.getLinkState(
+            self._robot_id,
+            self._sensor_link_idx,
+            computeLinkVelocity=1,
+            physicsClientId=self._client_id,
+        )
         world_pos = np.array(state[0], dtype=np.float64)
         world_orn = np.array(state[1], dtype=np.float64)
         world_vel = np.array(state[6], dtype=np.float64)  # linear velocity
@@ -109,7 +157,7 @@ class SensorFusionNode(Node):
         if self._prev_time is not None and now > self._prev_time:
             dt = now - self._prev_time
             world_accel = (world_vel - self._prev_world_vel) / dt
-        
+
         self._prev_time = now
         self._prev_world_pos = world_pos
         self._prev_world_vel = world_vel
@@ -134,7 +182,11 @@ class SensorFusionNode(Node):
 
         # Raw wrench from FT sensor
         raw_force = np.array([ft_msg.wrench.force.x, ft_msg.wrench.force.y, ft_msg.wrench.force.z])
-        raw_torque = np.array([ft_msg.wrench.torque.x, ft_msg.wrench.torque.y, ft_msg.wrench.torque.z])
+        raw_torque = np.array([
+            ft_msg.wrench.torque.x,
+            ft_msg.wrench.torque.y,
+            ft_msg.wrench.torque.z,
+        ])
 
         # Compensated contact wrench
         net_force = raw_force - f_grav_sensor - f_inertia_sensor

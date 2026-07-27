@@ -6,7 +6,28 @@ on:
   pull_request:
 
 jobs:
+  cpu-contract:
+    name: CPU contract (handoff / profiles, no ROS)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest numpy
+      - name: Run CPU tests
+        run: |
+          chmod +x scripts/run_cpu_tests.sh
+          ./scripts/run_cpu_tests.sh
+
   build-and-test:
+    name: ROS Jazzy build + tests
     runs-on: ubuntu-24.04
     container:
       image: ros:jazzy-ros-base
@@ -34,7 +55,6 @@ jobs:
       - name: Install Python dependencies
         shell: bash
         run: |
-          # Do not upgrade Debian numpy to 2.x (breaks ROS Python bindings); see requirements.txt
           pip3 install --break-system-packages --no-cache-dir --default-timeout=120 \
             -r "${GITHUB_WORKSPACE}/requirements.txt"
 

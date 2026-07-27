@@ -52,13 +52,18 @@ python3 scripts/benchmark_system.py \
 
 ---
 
-## 4. Sensor Fusion Agent（Sim2Sim）
+## 4. Sensor Fusion Agent（Sim2Sim）— **EXPERIMENTAL**
 
 | 项 | 值 |
 |----|-----|
 | **实现** | `pybullet_bridge/sensor_fusion_node.py` |
-| **职责** | 异频传感器近似对齐、接触/滑落估计 |
-| **话题** | `/bridge/sim/grasp_status`（规划） |
+| **状态** | **experimental**（非 Panda 主线验收；不得写入任务成功 / Sim2Real） |
+| **职责** | 多源 ApproximateTime 对齐、夹爪重力/惯性补偿、接触力与滑动启发式 |
+| **话题** | `/bridge/sim/grasp_status` |
+| **输入实际利用** | JointState → FK/补偿；FT wrench → 净接触力；**Image 仅用于时间同步，像素丢弃** |
+| **验证限制** | 三个 subscriber 已显式使用 SensorDataQoS；合成 joint+image+FT 已通过 ROS graph/RMW wiring 并产生 GraspStatus。仍未接入真实传感器或主线任务验收；不进入 handoff replay go/no-go；不被 SmolVLA S4 / ContinuousTaskEvaluator 引用 |
+
+常量：`SENSOR_FUSION_STATUS="experimental"`、`SENSOR_FUSION_CAMERA_UTILIZATION="timestamp_sync_only"`。
 
 ---
 

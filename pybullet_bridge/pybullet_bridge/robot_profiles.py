@@ -1,11 +1,14 @@
-"""Robot profile registry for Plan C (2-DOF CI vs iiwa7 portfolio integration)."""
+"""Robot profile registry for Plan C (2-DOF CI vs iiwa7 portfolio integration).
+
+Panda is the current mainline profile. ``iiwa7`` is Legacy/KUKA and must not be
+mixed with Panda handoff / training release claims.
+"""
 
 from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-
-from ament_index_python.packages import get_package_share_directory
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -16,6 +19,7 @@ class RobotProfile:
     end_effector_link: str
     role: str
     joint_names: tuple[str, ...]
+    lineage: str = 'panda_mainline'  # or 'legacy_kuka' / 'ci_fixture'
 
 
 IIWA_HOME = (0.0, 0.785398, 0.0, -1.570796, 0.0, 1.570796, 0.0)
@@ -38,21 +42,23 @@ ROBOT_PROFILES: dict[str, RobotProfile] = {
         end_effector_link='tool0',
         role='CI / M1 smoke tests',
         joint_names=('joint1', 'joint2'),
+        lineage='ci_fixture',
     ),
     'iiwa7': RobotProfile(
         name='iiwa7',
         urdf_relpath=os.path.join('kuka_iiwa', 'model.urdf'),
         home_positions=IIWA_HOME,
         end_effector_link='lbr_iiwa_link_7',
-        role='Portfolio / episode-data-lab / M4 calibration',
+        role='Legacy KUKA / historical portfolio only',
         joint_names=IIWA_JOINTS,
+        lineage='legacy_kuka',
     ),
     'panda': RobotProfile(
         name='panda',
         urdf_relpath=os.path.join('franka_panda', 'panda.urdf'),
         home_positions=(0.0, -0.785398, 0.0, -2.356194, 0.0, 1.570796, 0.785398),
         end_effector_link='panda_link7',
-        role='Portfolio / episode-data-lab / Panda validation',
+        role='Panda mainline / episode-data-lab / handoff',
         joint_names=(
             'panda_joint1',
             'panda_joint2',
@@ -62,6 +68,7 @@ ROBOT_PROFILES: dict[str, RobotProfile] = {
             'panda_joint6',
             'panda_joint7',
         ),
+        lineage='panda_mainline',
     ),
 }
 
@@ -81,17 +88,43 @@ def get_profile(name: str) -> RobotProfile:
     return ROBOT_PROFILES[key]
 
 
+def _source_tree_urdf_dir() -> str | None:
+    """Fallback when ament index is unavailable (editable / CPU-only tests)."""
+    # .../pybullet_bridge/pybullet_bridge/robot_profiles.py → package root
+    candidate = Path(__file__).resolve().parents[1] / 'urdf'
+    if candidate.is_dir():
+        return str(candidate)
+    return None
+
+
 def _package_urdf_dir() -> str:
-    share = get_package_share_directory('pybullet_bridge')
-    return os.path.join(share, 'urdf')
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        share = get_package_share_directory('pybullet_bridge')
+        return os.path.join(share, 'urdf')
+    except Exception:
+        fallback = _source_tree_urdf_dir()
+        if fallback is not None:
+            return fallback
+        raise
 
 
 def resolve_urdf_path(profile_name: str) -> str:
-    """Return absolute URDF path for a profile (package share, then pybullet_data)."""
+    """Return absolute URDF path (ament share → source tree → pybullet_data)."""
     profile = get_profile(profile_name)
-    bundled = os.path.join(_package_urdf_dir(), profile.urdf_relpath)
-    if os.path.isfile(bundled):
+    try:
+        bundled = os.path.join(_package_urdf_dir(), profile.urdf_relpath)
+    except Exception:
+        bundled = ''
+    if bundled and os.path.isfile(bundled):
         return bundled
+
+    source_dir = _source_tree_urdf_dir()
+    if source_dir is not None:
+        source_urdf = os.path.join(source_dir, profile.urdf_relpath)
+        if os.path.isfile(source_urdf):
+            return source_urdf
 
     if profile.name == 'iiwa7':
         try:
@@ -114,7 +147,8 @@ def resolve_urdf_path(profile_name: str) -> str:
             pass
 
     raise FileNotFoundError(
-        f'URDF for profile {profile_name!r} not found at {bundled}',
+        f'URDF for profile {profile_name!r} not found under package share or source tree '
+        f'(relpath={profile.urdf_relpath!r}). Build the workspace or use scripts/run_cpu_tests.sh.',
     )
 
 
