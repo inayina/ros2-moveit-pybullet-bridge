@@ -13,11 +13,18 @@
 - [六、 节点编排与错峰启动 (ROS 2 Launch)](#六-节点编排与错峰启动-ros-2-launch)
 - [六-B、 进程调度甘特图（启动错峰 + 稳态多频）](#六-b-进程调度甘特图启动错峰--稳态多频)
 - [六-C、 实时优先级调度甘特图（SCHED_FIFO / 防反转）](#六-c-实时优先级调度甘特图sched_fifo--防反转)
+- [学习长文（图解）：内核 / 进程 / 通信](./RUNTIME_KERNEL_PROCESS_COMM_LEARNING.md)
 - [七、 调试诊断工具箱与 STAR 排障实战案例](#七-调试诊断工具箱与-star-排障实战案例)
 - [八、 ROS 2 环境配置与功能包架构体系 (Environment & Packages)](#八-ros-2-环境配置与功能包架构体系-environment--packages)
 - [九、 ROS 2 进阶机制与控制系统底盘 (Executors, Interfaces & Motors)](#九-ros-2-进阶机制与控制系统底盘-executors-interfaces--motors)
 - [十、 现代 C++ 与实时系统底层优化 (Modern C++ & Real-time Systems)](#十-现代-c-与实时系统底层优化-modern-c--real-time-systems)
 - [三十一、 VLA / 数据治理与分层验证高频追问（2026-07-27）](#三十一-vla--数据治理与分层验证高频追问2026-07-27)
+- [Q12、 阻塞与竞态处理速查表](#q12本项目通过什么方式处理阻塞和竞态)
+- [Q13、 真机 / 仿真 FIFO 与优先级反转](#q13为什么说真机不怕优先级反转仿真为什么要关-fifo)
+- [Q13-B、 三仓仿真不用 FIFO 为何仍能正常跑](#q13-b为什么三仓仿真不用-fifo-也能正常跑)
+- [Q6-C、 Runtime CPU/FIFO 与三仓降载如何分工](#q6-c那-robot-control-runtime-里做的-cpu--fifo--affinity-又能证明什么为什么和三仓降-cpu对不上)
+- [Q6-D、 Runtime 仓强化了哪类能力](#q6-drobot-control-runtime-到底强化了我哪方面能力感觉不像三仓那么有用)
+- [Q6-E、 Runtime 如何放进简历作品集叙事](#q6-e简历作品集里runtime该怎么放才合适)
 
 
 ---
@@ -490,8 +497,11 @@ teleop / Servo 回调 (非 RT)
 ---
 
 #### 案例 3：CAN 现场总线瞬断导致机械臂关节重力坠落
+
+> 📌 **口径说明（2026-08-05）**：本案例为**面试准备的学习案例**，推演自本仓/上游已实现的 CANopen 心跳监控与 Quick Stop 熔断机制（代码落点真实存在），**并非本人经历过的真机事故**。三仓全局口径为「无真机部署 / Not real robot」；面试讲述时建议按「若真机联调遇到总线物理断线，基于已实现机制我会这样应急处置」作答。
+
 * **情境 (Situation)**：
-  在真机联调测试中，由于拖链内电缆弯折半径不足，CAN 总线信号线偶发瞬时断开（物理层断线）。此时，由于主机收不到新指令，电机驱动器维持上一次力矩输出，在重力作用下机械臂发生下坠并险些发生碰撞。
+  学习场景设定：真机联调中若因拖链内电缆弯折半径不足导致 CAN 总线信号线偶发瞬时断开（物理层断线），主机收不到新指令，电机驱动器会维持上一次力矩输出，在重力作用下机械臂发生下坠并可能碰撞。
 * **任务 (Task)**：
   实现通信链路硬件级熔断保护，在总线突发物理断线的 50ms 内安全制动。
 * **行动 (Action)**：
@@ -2121,6 +2131,178 @@ ros2 topic echo /recorder/diagnostics
 
 > 「当时不是简单换更强 CPU，而是定位到 renderer/recorder 负载、跨节点同步积压和仿真 FIFO–DDS 优先级反转三类问题。我的收口方法是：相机独立进程并降到 scene RGB 320×240@10 Hz，采集改成相机触发的 O(1) latest-cache；仿真关闭 FIFO、真机保留 FIFO，把 DDS publish 从 500 Hz control write 中拆到独立线程，再用整数分频和分层启动减少拍频与启动竞争。这样慢相机和 DDS stall 不再直接拖住控制环。」
 
+### Q6-B：CPU 负载问题最后是不是只靠改 QoS 和原子/独立线程解决的？
+
+**直接结论**
+
+**不是。** QoS 与「atomic + 独立 publish 线程」只覆盖控制/DDS 这一层；真正把 CPU 压下来、让相机不再拖垮整机的，主要是**降渲染负载 + 换缓冲策略 + 关仿真 FIFO + 分频/错峰启动**。把收口说成「改了 QoS 和原子就好了」会低估根因面。
+
+| 手段 | 主要解决什么 | 能不能单独治好「CPU 带不动」 |
+|---|---|---|
+| 相机独立进程 + scene RGB `320×240@10 Hz`，关 depth/wrist/tactile | **渲染与拷贝吃 CPU** | 这是降负载的主杠杆 |
+| recorder O(1) latest-cache（非 ApproximateTime 排队） | 跨节点同步积压、追旧帧 | 降延迟扩散，顺带少做无效对齐工作 |
+| 仿真关 FIFO；`write()` 只写 atomic torque；DDS 独立 500 Hz 线程 + `KeepLast(1).best_effort()` | 控制环被 DDS/反转卡住 | 稳住控制环，**不减少** renderer CPU |
+| 整数分频 + 分层启动 | 拍频与启动 discovery 争用 | 辅助，不是主降载 |
+
+直觉分工：
+
+```text
+CPU 高 / 掉帧          ← 主要靠：少渲染、低分辨率、低帧率、独立相机进程
+队列越积越慢           ← 主要靠：latest-cache（丢旧保新），不是 Reliable 大队列
+控制节点“像卡住”      ← 主要靠：atomic 交接 + 独立 publish 线程 + 仿真关 FIFO
+QoS (BestEffort/KeepLast(1)/SensorDataQoS)
+                       ← 配合「丢旧保新」的合同； alone 不砍渲染成本
+```
+
+**对应项目代码事实**
+
+- **已实现：降载主杠杆在相机侧。** [mujoco.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/backends/mujoco.launch.py)、[camera_bridge_node.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/camera_bridge/camera_bridge/camera_bridge_node.py)；采集入口默认 `camera_rate:=10.0`。
+- **已实现：latest-cache。** [time_sync.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py)。
+- **已实现：atomic + 独立 DDS 线程 + KeepLast(1) best_effort。** [canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)（约 L358、L378、L407、L488）。
+- **不得声称：** 只改 QoS 就解决了 CPU；affinity / PREEMPT_RT 已是当时主解法；仓库内有修改前后的 CPU% 对照报告。
+
+**面试一句话**
+
+> 「QoS 和 atomic/独立线程解决的是控制环不被 DDS 拖死；CPU 本身是靠相机降到 10 Hz scene RGB、latest-cache 和分频隔离压下来的——两层不能互相替代。」
+
+### Q6-C：那 `robot-control-runtime` 里做的 CPU / FIFO / affinity 又能证明什么？为什么和三仓「降 CPU」对不上？
+
+**直接结论**
+
+链条不顺，是因为这是**两个不同问题、两套证据**，不是「runtime 的 CPU 管理证明了三仓降载成立」，也不是反过来。
+
+| | 三仓仿真（teleop / MuJoCo） | Runtime Lab（`robot-control-runtime`） |
+|---|---|---|
+| 问题类型 | **应用过载**：渲染/录制/队列太多活 | **调度争用**：空回调也会因同核 CFS 竞争失约 |
+| 典型症状 | CPU% 高、相机掉帧、控制像卡住 | wakeup lateness / deadline miss 爆 |
+| 主解法 | 少干活：降分辨率/帧率、latest-cache、关仿真 FIFO、atomic 拆 DDS | 换调度合同：`SCHED_FIFO`、affinity、governor、压力矩阵 |
+| 测什么 | 话题 Hz、进程 CPU、采集是否稳 | OTHER vs FIFO × idle/same-stress 的 p99/max/miss |
+| 能证明 | 软件架构能在普通笔记本上跑通采集/回放闭环 | **在本板、本内核、本窗口**下，同核 OTHER 压力会毁掉周期唤醒，FIFO 显著改善——是学习/测量信号 |
+| 不能证明 | 硬实时、真机 WCET | 硬实时、PREEMPT_RT 收益、机械臂控制环已隔离、三仓仿真“因为开了 FIFO 才稳”（仿真反而关 FIFO） |
+
+顺的口述链条（三层，不要压成一层）：
+
+```text
+L1 应用负载（三仓已做）
+   相机太多 → 少渲染；同步排队 → latest-cache
+   「CPU 带不动」主要在这里解决
+
+L2 中间件/路径设计（三仓已做）
+   仿真控制过 DDS → 关 FIFO + atomic 独立 publish
+   防的是优先级反转，不是证明「FIFO 没用」
+
+L3 调度测量（runtime 另仓）
+   空周期线程 + stress-ng 同核 → OTHER miss≈万级，FIFO 仍 µs 级
+   证明：争用下策略选择有可测量差异
+   不证明：应用已经硬实时，也不回头解释 L1 的掉帧
+```
+
+**为什么 runtime「CPU 管理」听起来像没接到三仓**
+
+1. Runtime 几乎不测「渲染吃了多少核」——它测的是**内核何时把周期线程叫醒**（`wakeup_lateness`），空 callback 是刻意隔离变量。  
+2. 三仓仿真**故意不用** FIFO；runtime 却用 FIFO 做对照。这不矛盾：仿真热路径依赖 DDS worker；runtime 热路径是自有周期线程，不经过 ROS DDS。  
+3. 作品集正确说法是「**分层能力**」：先会降应用负载，再会设计防反转路径，再能量化调度争用——而不是一条因果「所以机械臂因为 affinity 不掉帧了」。
+
+**对应项目代码 / 证据事实**
+
+- **Runtime 能证明（已有板上 dirty smoke）：** Orange Pi RT1/RT2——同核 OTHER 压力下 miss 崩、FIFO 同条件 0 miss 量级；affinity/FIFO/governor 合同可生效。见 [orangepi_rt1_smoke_20260805.md](file:///home/ina/dev/robot-control-runtime/evidence/portfolio/orangepi_rt1_smoke_20260805.md)、[orangepi_rt2_cyclictest_20260805.md](file:///home/ina/dev/robot-control-runtime/evidence/portfolio/orangepi_rt2_cyclictest_20260805.md)、[orangepi_rt7_wrapup_20260805.md](file:///home/ina/dev/robot-control-runtime/evidence/portfolio/orangepi_rt7_wrapup_20260805.md)。
+- **Runtime 不能声称：** 硬实时 / WCET；板上 PREEMPT_RT 对照（RT4 Gate Blocked）；clean formal 基线（当前多为 `git_dirty`）；已解决三仓相机 CPU。
+- **三仓侧：** 见 Q6 / Q6-B；仿真关 FIFO 见 Q13。
+
+**面试一句话**
+
+> 「三仓解决的是应用过载和 DDS 路径设计；runtime 解决的是『同核争用下周期线程会不会失约』的测量能力。FIFO 在 runtime 里有用，在仿真里反而要关——因为依赖不同。我不会用 affinity 矩阵去解释相机掉帧，也不会用降分辨率去证明硬实时。」
+
+### Q6-D：`robot-control-runtime` 到底强化了我哪方面能力？感觉不像三仓那么「有用」
+
+**直接结论**
+
+它强化的是**系统软件可验证性**（周期、调度、fd I/O、失败语义、板上测量纪律），不是再做一个更强的抓取/策略/仿真产品。若用「会不会让机械臂更成功」去衡量，会一直觉得不显眼——那是尺子拿错了。
+
+| 若目标岗位偏… | Runtime 的价值 | 三仓闭环的价值 |
+|---|---|---|
+| 嵌入式 Linux / Runtime / 中间件 / 系统软件 | **主证据**：C++20、epoll、SocketCAN、FIFO/affinity、Orange Pi 原生构建与 miss 矩阵 | 相关工程：控制进程面与仿真/真机分叉 |
+| 机器人软件 / 集成 / 控制栈 | **补强层**：ROS-free 边缘监督 + 测量边界 | **主证据**：多包、多速率、总线、采集 |
+| 具身 / VLA / 数据与评测 | **弱相关**：展示分层证据与不过分声称的成熟度 | **主证据**：Gate、handoff、归因 |
+
+**它真正补强的 4 件事（三仓很难单独证明）**
+
+1. **离开 ROS 仍能写周期 Runtime**：绝对睡眠 + miss 计数，不是 launch 拼出来的。  
+2. **失败语义写成合同**：FIFO 失败显式降级；命令 session/sequence/deadline；故障不进 latest-wins 静默覆盖。  
+3. **ARM 板上可复现测量**：OTHER 同核打穿周期、FIFO 同条件改善——敢说「测量过」。  
+4. **禁区清单**：不装假 PREEMPT_RT、空 callback ≠ 控制延迟、无 CAN 不说 daemon 常驻。
+
+**它没有强化（别硬吹）**
+
+任务成功率 / Sim2Real / 硬实时；电机 PID（故意不重复 twin）；板上 SocketCAN 常驻；「比三仓更会做机器人业务」。
+
+**为何会觉得没强化**：产出多是测量与边界，少有任务成功的反馈；若硬串成「runtime → 仿真不掉帧」会空洞；主投策略岗时它只该占简历 2–4 行补强，不该当唯一主项目。
+
+**对应项目事实**
+
+- 仓定位：[AGENTS.md](file:///home/ina/dev/robot-control-runtime/AGENTS.md)「补强机器人底层系统求职能力」。  
+- 口述与禁区：[RESUME_AND_TALK_TRACK.md](file:///home/ina/dev/robot-control-runtime/docs/portfolio/RESUME_AND_TALK_TRACK.md)。  
+- 证据等级：[orangepi_rt7_wrapup_20260805.md](file:///home/ina/dev/robot-control-runtime/evidence/portfolio/orangepi_rt7_wrapup_20260805.md) §5。
+
+**面试一句话**
+
+> 「Runtime 不是让我多会抓一次积木，而是补上三仓证明不了的那一层：我会用 C++ 写 ROS-free 周期与 SocketCAN Runtime，并在 Orange Pi 上把 OTHER/FIFO 争用测清楚、把不能声称的边界写清楚。」
+
+### Q6-E：简历 / 作品集里 Runtime 该怎么放才合适？
+
+**直接结论**
+
+用**三组并列故事**，不要用一条因果链。Runtime 永远是「故事 A：底层可测量」，三仓是「故事 B：策略数据治理」，中间只用**方法论胶水**（证据纪律 / 失败语义 / 不过分声称）连接，不要写「所以仿真不掉帧了」。
+
+权威分组已在 [SEVEN_REPOS_OVERVIEW.md](file:///home/ina/dev/robot-control-runtime/docs/portfolio/SEVEN_REPOS_OVERVIEW.md) §2：故事 A Runtime · 故事 B 三仓 · 故事 C 集成。
+
+#### 1. 一句话总开场（通用）
+
+> 我用同一套证据纪律，在三个抽象层各做了一套可运行产物：边缘 Linux Runtime（周期/调度/SocketCAN）、具身策略数据治理与分层验证（三仓）、以及 AMR/运维集成。它们**不是同一个进程产品**，而是同一类工程判断在不同层的证据。
+
+#### 2. 按岗位调主次（简历项目顺序）
+
+| 投递方向 | 简历第 1 条 | Runtime 放法 | 三仓放法 |
+|---|---|---|---|
+| 嵌入式 Linux / 系统软件 / Runtime | **Runtime + RT Lab** | 主项目全文（C++、epoll、FIFO 矩阵、边界） | 相关工程 2–3 行：仿真关 FIFO / 多速率 |
+| 机器人软件 / 控制集成 | Runtime 与三仓**并排**，各半页 | 「边缘监督 + 测量」半条 | 「控制/总线/采集」半条 |
+| 具身 / VLA / RA / 评测 | **三仓**为主 | 末尾「系统补强」2–4 行或 Skills 里点到 | 主项目 + Gate / Hold / 止损 |
+
+#### 3. 可用的「胶水句」（只许这类连接）
+
+- ✅「两边都强调失败语义：Runtime 用 session/deadline；三仓用 Gate/`claims_*=false`。」  
+- ✅「两边都区分测量对象：Runtime 测 wakeup；三仓测任务/接口，且不混用。」  
+- ✅「仿真关 FIFO、Runtime 开 FIFO 对照——说明我懂路径依赖，不是只会背 FIFO。」  
+- ❌「Runtime 的 affinity 解决了机械臂 CPU 掉帧。」  
+- ❌「七仓已合并部署成一条产品链。」
+
+#### 4. 作品集页面建议结构
+
+```text
+首页总述（一句话主线 + 三组故事卡片）
+  ├─ 卡片 A：Linux Runtime（图：OTHER vs FIFO）
+  ├─ 卡片 B：三仓策略治理（图：G0–G3 / Hold）
+  └─ 卡片 C：AMR + Dashboard + Twin（可选缩短）
+深度页按卡片展开；跨仓链接写「并列相关工程」
+```
+
+口述 2 分钟：先报岗位对应的主卡片 90 秒，再用 20 秒点另一层「补强/相关」，最后 10 秒边界清单。
+
+#### 5. 简历条模板（Runtime 短版，挂在三仓主叙事下）
+
+> 相关工程 · Linux 边缘 Runtime：C++20 周期调度 / epoll·SocketCAN / 命令 session+deadline；Orange Pi 上量化同核 OTHER 压力打穿周期、FIFO 同条件 miss 降为 0（普通内核 smoke，非硬实时）。与臂控制栈并列：仿真路径关 FIFO 防 DDS 优先级反转。
+
+**对应材料**
+
+- 总纲：[SEVEN_REPOS_OVERVIEW.md](file:///home/ina/dev/robot-control-runtime/docs/portfolio/SEVEN_REPOS_OVERVIEW.md)  
+- 简历口述：[RESUME_AND_TALK_TRACK.md](file:///home/ina/dev/robot-control-runtime/docs/portfolio/RESUME_AND_TALK_TRACK.md)  
+- 故事版：[PERSONAL_NARRATIVE.md](file:///home/ina/dev/robot-control-runtime/docs/portfolio/PERSONAL_NARRATIVE.md)  
+- 三仓轨道入口：[tracks/README.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/docs/portfolio/tracks/README.md)
+
+**面试一句话**
+
+> 「作品集是三张卡片并列，不是一条假流水线；Runtime 卡片讲测量与边界，三仓卡片讲 Gate 与止损，我用证据纪律把它们说成同一个人，而不是同一个产品。」
+
 ### Q7：如何收口 GPU 可观测性、Safety 临界区和 Sensor Fusion QoS 三个运行时缺口？
 
 **核心原理解析**
@@ -2159,3 +2341,670 @@ strace -f -ttT -e trace=futex,sendmsg -p <SAFETY_PID>
 **面试一句话**
 
 > 「我把三个‘看起来能跑’的缺口变成了可验证合同：资源侧用 PID 合并 CPU/RSS/GPU 且后台采样；Safety 侧锁内生成一致快照、锁外发布；Fusion 侧显式 SensorDataQoS，并让 joint、camera、FT 真正经过 ROS graph/RMW 后产生输出。与此同时我保留证据边界：本机没有 live GPU 数值，fusion 也还没有真实驱动和长稳验证。」
+
+### Q8：为什么 RA-WP2、phase/failure-onset telemetry 和很多评测程序用 Python，而不是全部用 C++？
+
+**核心原理解析**
+
+语言选型按实时性和生态边界分层，而不是按“高级/低级”分层：
+
+| 层级 | 更合适语言 | 原因 |
+|---|---|---|
+| 1 kHz 控制、硬件接口、安全限位 | C++ | 需要确定性延迟、`ros2_control` 插件、`RealtimeBuffer`、atomic、低动态分配 |
+| 仿真桥、数据录制、策略推理、Task GT 记录 | Python 为主 | 依赖 MuJoCo/Isaac/LeRobot/PyTorch/PyArrow/JSONL，瓶颈通常在仿真、模型或 I/O，而非解释器循环 |
+| 离线评测、统计、报告、证据审计 | Python | 需要快速迭代、parquet/NumPy/bootstrap/schema 生态，且不在实时控制环内 |
+| 面向产品的 HOC / 风险可观测 | Python/TypeScript | 主要是数据聚合、WebSocket、报告和可视化，不直接执行力矩控制 |
+
+所以我会这样回答面试官：如果代码在 1 kHz 控制循环、总线读写或 E-stop latch 内，应该用 C++，并避免动态内存、阻塞 I/O 和不可控 GC；如果代码只处理离线证据、JSONL/parquet、bootstrap 统计和报告生成，Python 更适合，因为它直接对接机器人学习生态，验证速度更快，风险也被进程边界和 fail-closed contract 限住。
+
+**对应项目代码事实**
+
+- **已实现：C++ 用在实时控制与硬件/安全层。** 上游 `teleop_controllers` 是 C++ 控制器插件，`cartesian_impedance_controller` 在 `update()` 内处理阻抗控制与 E-stop 优先逻辑：[cartesian_impedance_controller.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp)、[cartesian_impedance_controller.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp)。`canopen_hw_interface` 用 C++ 封装 SocketCAN/CANopen DS402 与 atomic write 路径：[canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)。
+- **已实现：Python 用在评测、数据和实验治理层。** RA-WP2 的 normalized-progress shift 分析、true phase-conditioned 分析和 readiness audit 都在中游 Python 层，输入是冻结 release、JSONL、parquet 和 schema，不发控制命令：[closed_loop_shift.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evaluation/closed_loop_shift.py)、[phase_conditioned_shift.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evaluation/phase_conditioned_shift.py)、[analyze_phase_conditioned_shift.py](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/training/scripts/analyze_phase_conditioned_shift.py)。
+- **已实现：Task GT telemetry 是运行时诊断合同，不是控制环。** 上游 `isaac_continuous_gt_recorder.py` 和 `task_telemetry.py` 写 `panda_task_timeline_v1`，记录 phase、subgoal、monotonic timestamp 和 failure-onset censoring；它发布/记录证据，但不参与 risk 覆盖，也不声称 task success：[isaac_continuous_gt_recorder.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/scripts/isaac_continuous_gt_recorder.py)、[task_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/synth_data_gen/synth_data_gen/task_telemetry.py)。
+- **设计边界：** Python 评测结果不得进入 1 kHz 控制路径；C++ 控制健康也不能替代 Task GT。当前 phase-conditioned 真分析器已经实现，但旧证据缺少 frame-level upstream phase、observation monotonic v2 和非空 Task GT timeline，因此 readiness audit 正确 fail-closed：[closed_loop_phase_shift_v2/README.md](file:///home/ina/robot-sim-lab/robot-arm-episode-data-lab/evidence/closed_loop_phase_shift_v2/README.md)。
+
+**面试一句话**
+
+> “我不是把机器人系统全写成 Python，而是按实时边界分层：力矩控制、硬件接口和安全限位放 C++，用 `RealtimeBuffer`、atomic 和 `ros2_control` 保证确定性；数据录制、VLA 推理、Task GT telemetry、parquet/JSONL 统计和 RA-WP2 分析放 Python，因为它们不在 1 kHz 控制环内，且直接依赖 PyTorch、LeRobot、PyArrow 和 NumPy。关键是 Python 结果只做诊断和证据，不反向冒充控制成功或 Task GT 成功。”
+
+### Q9：Python 和 C++ 写进程间通信（IPC）分别怎么写？本项目用的是哪一层？
+
+**核心原理解析 / 常用命令**
+
+进程间通信要先分清三层，面试时不要混谈：
+
+| 层级 | 典型机制 | 适用 |
+|---|---|---|
+| **同进程线程交接** | mutex、atomic、`RealtimeBuffer`、队列 | 非 RT 回调 → RT 控制环 |
+| **跨进程同机 IPC** | pipe / UNIX socket / shared memory / ZeroMQ | 自建多进程，无中间件 |
+| **机器人栈跨语言进程** | ROS 2 Topic / Service / Action（底层 DDS） | Python `rclpy` ↔ C++ `rclcpp` |
+
+本项目主路径是第三层：**Python 与 C++ 不手写 socket 协议，而是各自用 ROS 2 client library 发布/订阅同一 topic/service；DDS 负责发现与序列化。** 另外还有 CANopen（SocketCAN）作为硬件/虚拟驱动总线，以及控制器内部的 `RealtimeBuffer`（那是线程交接，不是跨进程 IPC）。
+
+**通用写法骨架（语言无关合同：消息类型 + 话题名 + QoS）**
+
+Python（`rclpy`）：
+
+```python
+self.pub = self.create_publisher(PoseStamped, "/teleop/cmd_pose", 10)
+self.sub = self.create_subscription(JointState, "/joint_states", self.cb, qos)
+self.cli = self.create_client(Trigger, "/safety/reset")
+self.srv = self.create_service(Trigger, "/foo", self.handle)
+```
+
+C++（`rclcpp`）：
+
+```cpp
+pub_ = create_publisher<geometry_msgs::msg::PoseStamped>("/safe_master_pose", qos);
+sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
+  "/teleop/cmd_pose", qos, std::bind(&Node::on_cmd, this, _1));
+srv_ = create_service<std_srvs::srv::Trigger>("/safety/reset", ...);
+```
+
+两端只要 **msg/srv 类型、话题名、QoS 兼容**，进程语言可以不同；调试常用：
+
+```bash
+ros2 topic list
+ros2 topic echo /teleop/cmd_pose --once
+ros2 topic info /teleop/cmd_pose -v   # 看 publishers/subscribers/QoS
+ros2 service call /safety/reset std_srvs/srv/Trigger {}
+candump vcan0                        # CAN 层，非 ROS Topic
+```
+
+**对应项目代码事实**
+
+- **已实现：跨语言进程用 ROS 2 Topic/Service。** 例如 Python teleop/batch 发 `/teleop/cmd_pose`，C++ `safety_monitor` 订阅并发布 `/safe_master_pose`、`/safety/estop`：[safety_monitor_node.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/src/safety_monitor_node.cpp)（约 L83–L115）。Python `virtual_servo_driver` 订 `/sim/encoder_state`、发 `/sim/joint_effort_cmd`：[driver_node.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/virtual_servo_driver/virtual_servo_driver/driver_node.py)（约 L83–L95）。C++ `canopen_system` 在仿真模式同样订/发 `/sim/*` 背板：[canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)（约 L336–L361）。
+- **已实现：进程内 RT 交接用 RealtimeBuffer，不是跨进程 IPC。** 阻抗控制器在 non-RT 回调写 `RealtimeBuffer`，`update()` 读最新目标/FT：[cartesian_impedance_controller.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp)、[cartesian_impedance_controller.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp)（约 L117 起）。
+- **已实现：总线层 IPC 是 SocketCAN，不是 ROS Topic。** RPDO/TPDO/SDO/NMT/EMCY 在 `vcan0`；Python `python-can` 与 C++ SocketCAN 读写同一总线。见上游 [ARCHITECTURE_V2.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURE_V2.md) §3.2。
+- **已实现：中游训练仓不跑 ROS 节点。** 中游与上下游的「交接」是文件级 handoff（JSONL + manifest），不是进程间 DDS；下游再加载 replay。
+- **不得声称：** 本项目没有自研跨语言 shared-memory 协议作为主控路径；也没有把 Python 评测进程直接 mmap 进 1 kHz 控制环。
+
+**面试一句话**
+
+> 「Python/C++ 跨进程在本项目里走 ROS 2：两边各写 publisher/subscription，合同是消息类型、话题名和 QoS，DDS 负责发现与传输。控制环内部再用 RealtimeBuffer 做线程交接；驱动层另走 SocketCAN。中游训练不进 ROS，用 JSONL handoff。」
+
+### Q10：写底层硬件是不是一定要用 socket？
+
+**核心原理解析 / 常用命令**
+
+**不是。** “底层硬件”是否用 socket，取决于总线/驱动接口形态，而不是“底层=socket”。
+
+| 硬件访问方式 | 典型接口 | 例子 |
+|---|---|---|
+| **字符/块设备文件** | `open/read/write/ioctl` on `/dev/...` | UART、部分电机驱动、相机 V4L2 |
+| **Socket 族** | `socket()` + bind/send/recv | **SocketCAN**（`PF_CAN`）、以太网、EtherCAT 主站常走网卡 |
+| **内存映射寄存器** | `mmap` / 直接寄存器 | 嵌入式 MCU、PCIe BAR、部分 RT 驱动 |
+| **厂商库 / SDK** | 封装好的 C API | Franka libfranka、部分工业相机 |
+| **USB / HID** | libusb、hidraw | 部分夹爪、手柄 |
+| **内核驱动 + sysfs** | 读写 sysfs、netlink | 部分传感器、GPIO |
+
+Linux 上 **CAN 总线**之所以常写 `socket()`，是因为内核提供了 **SocketCAN**：把 CAN 做成类似网络接口（`can0` / `vcan0`），用 `PF_CAN + SOCK_RAW + CAN_RAW` 收发 `can_frame`。这是“用 socket API 访问总线”，不是“所有硬件都要用 TCP/UDP 联网”。
+
+常用排查：
+
+```bash
+ip link show can0          # 或 vcan0
+candump vcan0              # 抓 CAN 帧
+cansend vcan0 123#DEADBEEF
+ls -l /dev/ttyUSB* /dev/video*   # 非 socket 类设备常见形态
+```
+
+**对应项目代码事实**
+
+- **已实现：真机/总线路径用 SocketCAN。** `CanopenSystem::open_can_socket()` 创建 `socket(PF_CAN, SOCK_RAW, CAN_RAW)`，bind 到 `can_interface_`，再用 `write`/`read` 收发 `can_frame`（RPDO/TPDO/SDO/NMT/SYNC/EMCY）：[canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)（约 L181–L232、L312）。头文件注明 `use_sim=false -> SocketCAN`：[canopen_system.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/include/canopen_hw_interface/canopen_system.hpp)。
+- **已实现：仿真路径可以不用 CAN socket。** `use_sim=true` 时走 ROS Topic 背板 `/sim/joint_effort_cmd` ↔ `/sim/encoder_state`，不打开 SocketCAN；Python `virtual_servo_driver` 也可在无 bus 时 degraded 运行。
+- **已实现：选型理由（文档）。** ADR 02 说明选 CANopen/SocketCAN 而非 EtherCAT 的原因之一是 Linux 原生 SocketCAN + `vcan0` 便于纯软件回环与 CI：[ARCHITECTURAL_DECISION_RECORDS.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURAL_DECISION_RECORDS.md)。
+- **设计规划 / Hardware Pending：** 实体驱动器 EMCY 接收闭环、Bus-Off、控制柜与物理急停验收仍是 readiness 清单项，不得写成已完成真机验收（见下游 [REAL_MACHINE_READINESS.md](file:///home/ina/ros2_ws/src/ros2-moveit-pybullet-bridge/docs/REAL_MACHINE_READINESS.md)）。
+- **易混点：** ROS 2 DDS 也会在本机建 UDP socket 做发现/传输，那是**节点间中间件**，不是电机驱动硬件接口。
+
+**面试一句话**
+
+> 「底层硬件不一定用 socket。我们这条 CANopen 路径用 SocketCAN，是因为 Linux 把 CAN 暴露成 `PF_CAN` 套接字；仿真则用 ROS `/sim/*` 背板，连 CAN socket 都可以不开。UART/摄像头/厂商 SDK 往往是 `/dev` 或库调用，不是 socket。」
+
+### Q11：为什么说「用 socket API 访问总线」≠「给电机开 TCP 连外网」？
+
+**核心原理解析**
+
+Linux 里 `socket()` 是**通用端点抽象**，不是“上网专用函数”。真正决定数据往哪走的是**地址族（address family）+ 协议**：
+
+| | 常见联网 socket | SocketCAN（本项目总线路径） |
+|---|---|---|
+| 创建 | `socket(AF_INET, SOCK_STREAM, 0)` → TCP | `socket(PF_CAN, SOCK_RAW, CAN_RAW)` |
+| 对端概念 | IP:port（主机上的进程） | CAN 接口索引（`can0`/`vcan0`）+ CAN ID |
+| 载荷 | 字节流 / UDP 报文，常再封应用协议 | 固定短帧 `struct can_frame`（≤8 字节经典 CAN） |
+| 路径 | IP 协议栈 → 网卡 → 交换机/路由器 → 远端 | SocketCAN → CAN 网卡驱动 → 差分线 → 驱动器 |
+| 是否需要 IP/DNS/路由 | 通常需要 | **不需要** |
+| 是否“连外网” | 可以（若路由允许） | **否**；即使本机防火墙关着，帧也只在 CAN 总线上 |
+
+所以同一套 API 名字（`socket` / `bind` / `write` / `read`），语义完全不同：  
+- TCP：`connect("192.168.1.10", 502)` 像打电话给远端进程；  
+- SocketCAN：`bind` 到本机 `can0`，`write(can_frame)` 像往**现场总线**上广播/寻址一帧。
+
+本项目 `send_can_frame` 写的是 `cob_id`（CANopen COB-ID）和最多 8 字节 payload，不是 HTTP、不是 TCP 流，也没有远端 IP。
+
+**对应项目代码事实**
+
+- **已实现：** `socket(PF_CAN, SOCK_RAW, CAN_RAW)` + `bind` 到 `can_interface_` + `write`/`read` `can_frame`：[canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)。
+- **已实现：** 仿真模式可不打开该 socket，改走 ROS `/sim/*` 背板；实体 EMCY/Bus-Off 真机验收仍 Hardware Pending。
+
+**面试一句话**
+
+> 「SocketCAN 借用了 Linux socket API，但地址族是 `PF_CAN`，载荷是 CAN 帧，走的是本机 CAN 接口到驱动器的总线，不是 `AF_INET` 的 TCP/IP 外网连接。」
+
+### Q12：本项目通过什么方式处理阻塞和竞态？
+
+**核心原理解析**
+
+按层拆开，不混谈「加了个锁就解决了」。面试速查（与对话中的总表对齐）：
+
+| 问题 | 做法 | 证据位置 |
+|---|---|---|
+| 控制环被回调堵住 | `RealtimeBuffer` + `atomic`（`writeFromNonRT` / `readFromRT`） | 阻抗控制器 [cartesian_impedance_controller.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/src/cartesian_impedance_controller.cpp) / [`.hpp`](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp) |
+| 多回调改安全状态 + DDS 回压 | 锁内算快照，**锁外 publish** | [safety_monitor_node.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/safety_monitor/src/safety_monitor_node.cpp)（约 L221–L251）；[test_safety_publish_boundary.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_safety_publish_boundary.py) |
+| 急停等单标志 | `std::atomic`（如 `estop_active_`） | 阻抗控制器 / [canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp) |
+| 异频传感器排队堵死 | latest-cache，不无限队列 | recorder [time_sync.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/time_sync.py) |
+| 高频丢得起的数据 | Best Effort / SensorDataQoS | `/joint_states`、`/sim/encoder_state` 等 |
+| CAN `read` 永久阻塞 | `SO_RCVTIMEO` ≈1 ms + 独立 RX 线程 | [canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)（`open_can_socket` / `can_rx_loop`） |
+| 多 topic 谁先到 | `trace_run_id` + `command_sequence` | Policy Runtime / M6；[policy_runtime_ros.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_runtime_ros.py) |
+| 旧策略命令 / 超限 | TTL、clip、Hold/E-stop | execution adapter（如 [policy_control.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/policy_control.py)、effort latest-gate） |
+
+**补充口径（面试时主动说清）**
+
+- **已实现：CAN 接收超时。** 上表 RX 路径。**代码未确认**对 CAN `write` 统一 `O_NONBLOCK`；勿把「Tx 满立即 EAGAIN」说成已验收实现。
+- **已实现：Isaac effort latest-gate。** [effort_control.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/isaac_sim_adapter/isaac_sim_adapter/effort_control.py)。
+- **不得声称：** 已完成真机 PREEMPT_RT + `mlockall` 现场验收；已证明 CAN Tx 全路径非阻塞；Python GIL 下达到硬实时。
+
+**面试一句话**
+
+> 「阻塞用分层隔离：RT 环用 RealtimeBuffer/atomic，Safety 锁外发 DDS，传感器 latest-value + Best Effort，CAN 接收带超时；竞态用锁保护共享状态，跨进程则靠 sequence/trace 显式关联，而不是猜消息到达顺序。」
+
+### Q13：为什么说「真机不怕优先级反转」？仿真为什么要关 FIFO？
+
+**核心原理解析**
+
+更准确的说法不是「真机完全不怕优先级反转」，而是：
+
+> **真机控制热路径不依赖普通优先级的 DDS worker 才能往前走**；仿真热路径会，所以仿真硬抬 FIFO 反而制造经典优先级反转。
+
+优先级反转典型形态：
+
+```text
+高优先级线程 H 需要资源/服务 R
+R 由低优先级线程 L 提供
+中优先级线程 M 抢占 L
+→ H 看起来“优先级很高”，实际卡在等 L，比 M 还惨
+```
+
+**仿真路径（会踩坑）**
+
+控制环写力矩要经 `/sim/joint_effort_cmd` 等 DDS Topic 到 MuJoCo/虚拟驱动。DDS 收发常由**普通调度**的 middleware worker 完成。若把 `controller_manager` 设成 FIFO 50：
+
+1. 高优先级控制线程发起 publish / 等中间件；
+2. 实际干活的是低优先级 DDS worker；
+3. 其它 CFS/中优先级任务占满 CPU，worker 跑不动；
+4. 控制线程干等 → **FIFO 抬优先级无效，甚至更差**。
+
+因此仿真默认 `thread_priority=0`，Servo 还用 `prlimit --rtprio=0:0` 禁止误抬 RT。
+
+**真机路径（为何可以开 FIFO 阶梯）**
+
+`use_sim=false` 时，`write()` 热路径是 **SocketCAN 直接写总线**（RPDO），不是「控制环必须同步卡在 DDS publish 上才能完成一次力矩输出」。控制计算 ↔ 非 RT 目标用 `RealtimeBuffer` 交接；急停可用 atomic / Transient Local 订阅，不把整个 1 kHz 环变成「等 DDS worker」。于是可以建立：
+
+`controller_manager FIFO 50 > MoveIt Servo FIFO 40 > recorder/spawner CFS`
+
+高优先级环主要和**自己进程内的 RT 友好路径 + CAN** 交互，而不是堵在非 RT middleware 后面。
+
+仍须注意：真机也不是“绝对无反转风险”。若 RT 线程里乱加锁、阻塞日志、同步 DDS、动态分配，照样反转。项目用锁外 publish、RealtimeBuffer、分线程等来降风险；实体 `PREEMPT_RT`/WCET 仍属 Hardware Pending。
+
+**对应项目代码事实**
+
+- **已实现：仿真关 FIFO、真机保留 FIFO 注释与参数。** [ros2_control.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py)（约 L57–60、L99–103）；[servo.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py)（约 L58–72、L112–116）。
+- **已实现契约测试。** [test_sim_backend_launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py)。
+- **不得声称：** 真机现场已用 PREEMPT_RT 跑通并测过无反转；「真机完全免疫优先级反转」。
+
+**面试一句话**
+
+> 「仿真控制环要过 DDS 才能驱动物理，FIFO 会让高优先级线程等低优先级 middleware，形成反转，所以关掉；真机热路径是 SocketCAN 直写，控制环用 RealtimeBuffer 交接，才能安全使用 FIFO 50/40 阶梯。」
+
+### Q13-B：为什么三仓仿真不用 FIFO 也能「正常跑」？
+
+**核心原理解析**
+
+「正常跑」≠「已具备硬实时」。三仓仿真能在普通 `SCHED_OTHER`（CFS）下工作，是因为验收目标与真机完全不同：
+
+| 维度 | 三仓仿真（MuJoCo / PyBullet / DDS） | 真机力矩 / 总线环 |
+|---|---|---|
+| 失败代价 | 掉帧、抖动、episode 变慢；一般**不会**因 1 ms miss 烧驱动 | 驱动器超时、啸叫、Quick Stop、机械冲击 |
+| 时间推进 | 物理步由软件推进；晚到一步多半是**视觉/动力学误差** | 墙钟绝对截止；晚到是**安全/硬件故障** |
+| 数据路径 | 控制 → **DDS** → 仿真进程（必须让中间件工人也能跑） | 控制 → **SocketCAN / 直连硬件**（可开 FIFO 阶梯） |
+| 项目默认 | `use_sim=true` → `thread_priority=0`；Servo `prlimit --rtprio=0:0` | `use_sim=false` → CM FIFO **50** / Servo **40** |
+| 控制频率合同 | 仿真 `update_rate: 500` | 真机路径 `update_rate: 1000` |
+
+直觉模型：
+
+1. **轻负载 + 多核 CFS 经常“碰巧够用”**：笔记本空闲时，500 Hz 环的周期抖动多数在可接受软实时范围内，所以你会看到“不用 FIFO 也正常”。
+2. **仿真没有电机硬截止**：没有“1 ms 收不到指令就故障”的现场约束；系统优化目标是可采集、可回放、可归因，不是 WCET 上界。
+3. **关 FIFO 是设计，不是凑合**：仿真热路径要过 DDS；硬抬 FIFO 反而可能优先级反转（见 Q13）。项目用契约测试钉死「仿真默认 0」。
+4. **robot-control-runtime 对照仓**用 FIFO 测的是**唤醒 lateness / miss**，明确声明普通 Linux ≠ 硬实时；那是调度证据，不回头证明三仓仿真“已经实时”。
+
+**对应项目代码事实**
+
+- **已实现：仿真故意 best-effort。** [ros2_control.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py)（`controller_thread_priority`：sim `'0'` / real `'50'`）；[servo.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py)（sim `prlimit --rtprio=0:0`，real priority 40）。
+- **已实现：频率分叉。** `control_rate_sim.yaml` 500 Hz vs `control_rate_real.yaml` 1000 Hz；契约 [test_sim_backend_launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py)。
+- **已实现（对照仓，非三仓主线）：** `robot-control-runtime` 的 OTHER/FIFO 矩阵测唤醒行为，**不得**写成三仓仿真已硬实时。
+- **不得声称：** 仿真能跑 = 不需要 FIFO；已完成真机 PREEMPT_RT；CFS 下 1 kHz 力矩环已有 WCET 保证。
+
+**面试一句话**
+
+> 「仿真能跑是因为失败代价是抖动而不是驱动器故障，再加轻负载 CFS 往往够软实时；我们还故意关 FIFO 防 DDS 优先级反转。真机要 FIFO，是为了在争用下保护墙钟截止，不是因为仿真证明了 CFS 万能。」
+
+### Q14：以现有多仓项目为基础，如何规划学习/落地 CAN、EtherCAT、Modbus 与套接字？
+
+**核心原理解析 / 规划原则**
+
+不要四条总线平行重写，而是按 **OSI 分层 + 本项目已有 HAL 边界** 推进：上层 `ros2_control` / 安全 / 遥操作保持不变，只在 SystemInterface / 外设驱动层换传输。
+
+| 协议 | OSI 角色 | 本项目落点 | 现状口径 |
+|---|---|---|---|
+| **SocketCAN（套接字）** | Linux 把 CAN 暴露为 `PF_CAN` socket | 上游 `canopen_system` ↔ `vcan0`/`can0` | **已实现** |
+| **CANopen DS402** | 应用层驱动器规范（NMT/PDO/SDO/EMCY） | `canopen_hw_interface` + `virtual_servo_driver` | **已实现**（M2） |
+| **Modbus** | 应用层主从寄存器协议 | `gripper_driver`（Mock 寄存器环）；底盘侧另有 UART/`/motor/*` | **夹爪：Mock 仿真已实现**；真 RTU/TCP 硬件未验收 |
+| **HTTP / WebSocket / MQTT** | 应用层套接字（`AF_INET`） | Dashboard / Mock WMS / 电机 bench 镜像 | **已实现**（运维层，非电机 1 kHz） |
+| **EtherCAT** | 实时以太网现场总线；CoE 可复用 DS402 | 文档 ADR 明确延后；面试规划走 HAL 替换 | **设计规划**，代码未实现 Master |
+
+推荐四阶段（与仓边界一致）：
+
+1. **夯实已实现的 CAN 闭环（上游）**  
+   `use_sim:=false` → `candump vcan0` 验 PDO/SYNC；故障注入 EMCY；`/safety/estop` → DS402 Quick Stop。目标是把「套接字 = SocketCAN」讲清、跑通，而不是先碰 EtherCAT。
+2. **把 Modbus 从 Mock 推到可切换后端（上游夹爪 + 可选固件）**  
+   夹爪保持 ROS 话题契约（`/teleop/gripper_cmd` ↔ `/gripper/state`），后端从进程内 Mock → 真 `Modbus TCP:502` → 再可选 `Modbus RTU` over RS485。底盘侧用 `robot-state-monitor-v1` 的 UART/`/motor/*` 练主从轮询与 CRC，**不要**把 Modbus 塞进 1 kHz 关节力矩环。
+3. **梳理「套接字」三类，避免混谈**  
+   - `PF_CAN`：现场总线控制（关节）  
+   - `AF_INET` TCP/UDP：Modbus TCP、WMS HTTP、Dashboard WebSocket、MQTT  
+   - ROS DDS：进程间控制/感知话题，不是工业现场总线替代品  
+4. **EtherCAT 仅在有 ESC/主站硬件或明确真机需求时做 HAL 替换**  
+   按 [ADR 02](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURAL_DECISION_RECORDS.md)：先用 CANopen 是因为 `vcan0`/容器/CI 友好；真机高轴数再换 IgH/SOEM。因 CoE 仍是 DS402，阻抗控制器与 Safety 契约可不动，只换 `SystemInterface` 的读写后端。
+
+**对应项目代码事实**
+
+- **已实现：CANopen + SocketCAN。** [canopen_system.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/include/canopen_hw_interface/canopen_system.hpp)、[canopen_system.cpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/canopen_hw_interface/src/canopen_system.cpp)；SPEC [SPEC_V2_M2_CANOPEN_FIELDBUS.md](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/SPEC_V2_M2_CANOPEN_FIELDBUS.md)。
+- **已实现：选型拒绝先上 EtherCAT（文档）。** [ARCHITECTURAL_DECISION_RECORDS.md ADR 02](file:///home/ina/dev/ros2-arm-teleoperation-suite/docs/ARCHITECTURAL_DECISION_RECORDS.md)。
+- **已实现：夹爪 Modbus Mock。** [gripper_modbus_node.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/gripper_driver/gripper_driver/gripper_modbus_node.py)（进程内寄存器环，非真 pymodbus TCP 服务器验收）。
+- **已实现：运维侧套接字（HTTP/WS/MQTT）。** Dashboard `WebSocket /ws/status`、`POST /api/robot/motor/cmd`；AMR Mock WMS HTTP API。
+- **不得声称：** 已实现 EtherCAT Master；夹爪已接真实 RS485 从站；Modbus 跑在关节 1 kHz 力矩环；Dashboard WebSocket 可替代现场总线。
+
+**面试一句话**
+
+> 「我们先在上游用 SocketCAN + CANopen DS402 把关节控制闭环做实，夹爪用 Modbus 主从寄存器语义做慢速外设，运维用 TCP WebSocket/HTTP；EtherCAT 等有硬件再按 CoE/DS402 只换 HAL，上层控制器不动。」
+
+### Q15：以现有项目为基础，如何小练 CPU 性能管理与线程/进程管理？
+
+**核心原理解析 / 规划原则**
+
+把「性能」拆成三层，不要一上来啃 `PREEMPT_RT` 内核补丁：
+
+| 层 | 练什么 | 本项目落点 |
+|---|---|---|
+| **A. 进程生命周期** | 错峰启动、降权、超时杀干净 | `TimerAction` bring-up；`nice`/`ionice`；`timeout`/`pkill` |
+| **B. 线程与调度策略** | CFS vs `SCHED_FIFO`、仿真关 FIFO、真机开阶梯 | `controller_thread_priority` / Servo `prlimit` |
+| **C. 线程内并发正确性** | RT 环不堵、锁外 publish、亲和观测 | `RealtimeBuffer`、Safety 锁边界、`system_telemetry` affinity |
+
+推荐五阶段小练（每阶段可验收，不改架构）：
+
+1. **进程管理操盘（半天）**  
+   用 `full_system.launch.py` 的错峰启动对照 `htop`/`pidstat`；人为并发拉起对比 CPU 尖峰；练完用 `timeout` + `pkill` 收尾（项目铁律）。  
+   辅助命令：`ps -eLo pid,tid,class,rtprio,comm | grep -E 'ros2|servo|control'`、`chrt -p <pid>`。
+2. **CPU 降权与 I/O 闲级（半天）**  
+   观察 spawner / heartbeat 的 `nice -n 19 ionice -c 3`：控制环忙时这些进程让路。对照跑批采 preflight 脚本里的同类前缀。
+3. **调度策略 A/B（1 天，最关键）**  
+   - 仿真默认：`controller_thread_priority=0`，Servo `prlimit --rtprio=0:0`（防 DDS 优先级反转）。  
+   - 真机路径参数意图：CM FIFO 50、Servo FIFO 40（**本机仿真未等于已验收硬实时**）。  
+   用契约测试 [test_sim_backend_launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py) 固化「仿真必须关 FIFO」口径。
+4. **线程模型与阻塞隔离（1–2 天）**  
+   - C++：阻抗 `RealtimeBuffer`（非 RT 写 / RT 读）；Safety「锁内算、锁外发」；CAN RX 独立线程 + `SO_RCVTIMEO`。  
+   - Python：`MultiThreadedExecutor`（policy / GT recorder / Safety）避免单线程 spin 饿死回调。  
+   验收：故意在回调里 `sleep`，看是否拖垮控制环或丢 `/teleop/heartbeat`。
+5. **亲和与遥测（可选加深）**  
+   打开 recorder `system_telemetry` 的 `enable_affinity` + `affinity_rules_json`，用 `psutil.cpu_percent` / `cpu_affinity` 观察核占用；**不要**在未 isolcpus 的笔记本上声称硬实时。嵌入式另线：ESP32 Core0 `ros_comm_task` / Core1 `motor_control_task`（FreeRTOS 任务，不是 Linux CFS）。
+
+**常用 Linux 命令清单（小练必备）**
+
+```bash
+htop / top -H                    # 线程视图
+pidstat -u -t 1                  # 每线程 CPU
+ps -eLo pid,tid,class,rtprio,ni,comm
+chrt -p <pid>                    # 看/设调度类
+taskset -cp <pid>                # CPU 亲和
+nice / renice / ionice
+prlimit --rtprio=0:0 -- <cmd>    # 禁止抢 RT（仿真 Servo 已用）
+timeout 60s ros2 launch ...      # 生命周期上限
+```
+
+**对应项目代码事实**
+
+- **已实现：仿真关 FIFO、真机保留参数。** [ros2_control.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_bringup/launch/ros2_control.launch.py)、[servo.launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_moveit_config/launch/servo.launch.py)；测试 [test_sim_backend_launch.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/tests/test_sim_backend_launch.py)。
+- **已实现：spawner/辅助进程降权。** `prefix="nice -n 19 ionice -c 3"`；批采/S4 脚本对 heartbeat 同类处理。
+- **已实现：RT 友好缓冲与多线程 executor。** [cartesian_impedance_controller.hpp](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/teleop_controllers/include/teleop_controllers/cartesian_impedance_controller.hpp) `RealtimeBuffer`；Safety / policy / GT recorder 的 `MultiThreadedExecutor`。
+- **已实现：可选 CPU 亲和遥测。** [system_telemetry.py](file:///home/ina/dev/ros2-arm-teleoperation-suite/src/lerobot_recorder/lerobot_recorder/system_telemetry.py) `_apply_affinity` / `cpu_percent`。
+- **已实现（嵌入式）：ESP32 双核任务骨架。** `robot-state-monitor-v1` Core0 ROS / Core1 motor（设计文档口径；真 PWM 闭环另阶段）。
+- **不得声称：** 本机仿真已跑通 `PREEMPT_RT` + `mlockall` 硬实时；FIFO 50/40 已在真机现场测过 WCET；打开 affinity 等于隔离核实时。
+
+**面试一句话**
+
+> 「小练路径是：先管进程生命周期和 nice/ionice，再对比仿真关 FIFO vs 真机 FIFO 阶梯，再抠 RealtimeBuffer/多线程 executor 防阻塞，最后才碰亲和与 PREEMPT_RT；我们项目里仿真故意 priority=0，就是为了避免 DDS 优先级反转。」
+
+### Q16：内核、进程/线程、套接字通信——零基础怎么串起来讲？
+
+> 完整图解学习笔记（图 A–F + 小练清单）：[RUNTIME_KERNEL_PROCESS_COMM_LEARNING.md](./RUNTIME_KERNEL_PROCESS_COMM_LEARNING.md)
+
+**核心原理解析（入门版）**
+
+把电脑想成工厂：
+
+| 概念 | 一句话 | 工厂类比 |
+|---|---|---|
+| **内核 (kernel)** | Linux 里管 CPU、内存、网卡、磁盘的「总调度员」 | 厂长 + 调度室 |
+| **进程 (process)** | 一个正在跑的程序副本（有独立地址空间） | 一条产线（有自己的仓库） |
+| **线程 (thread)** | 进程内部的执行工人，共享同一块内存 | 产线上的工人 |
+| **调度 (scheduler)** | 内核决定「下一毫秒哪个线程用 CPU」 | 排班表 |
+| **套接字 (socket)** | 程序向内核申请的「通信窗口」 | 产线对外的传话筒 |
+| **现场总线 (CAN 等)** | 机器设备之间的工业通信线 | 车间设备总线 |
+
+**1. 调度：普通 vs 实时**
+
+- **CFS（普通）**：大家轮流，谁饿了多给一点。`nice` 越大越「客气」。本项目 spawner 用 `nice -n 19`。
+- **SCHED_FIFO（实时）**：高优先级线程准备好了就能打断低优先级。真机意图：控制环 50 > Servo 40。
+- **仿真故意不用 FIFO**：控制命令要经 ROS DDS 才能到 MuJoCo；DDS 干活的线程往往是普通优先级。高 FIFO 控制线程若卡在等低优先级 DDS worker → **优先级反转**。故仿真 `thread_priority=0` + Servo `prlimit --rtprio=0:0`。
+
+**2. 通信：三种「传话筒」不要混**
+
+```text
+A. SocketCAN (PF_CAN)     控制环 ↔ 伺服驱动器（工业总线）
+B. ROS 2 Topic / DDS      进程 ↔ 进程（本机常走共享内存）
+C. TCP/HTTP/WebSocket     运维网页 ↔ 后端（AF_INET 互联网套接字）
+```
+
+同叫「socket」，但：A 是 CAN 帧；C 是 TCP 字节流；B 多数时候甚至不经过你手写的 `socket()`，而是 DDS 中间件。
+
+**3. 本项目一条完整链路（从人到电机语义）**
+
+```text
+键盘/策略
+  → /teleop/cmd_pose     (DDS 话题，进程间)
+  → safety_monitor
+  → MoveIt Servo
+  → 阻抗控制器 update()  (进程内实时线程)
+  → canopen_system write()
+       ├─ use_sim=true  → /sim/joint_effort_cmd (再走 DDS 到 MuJoCo)
+       └─ use_sim=false → SocketCAN 写 vcan0/can0 (内核 CAN 驱动)
+  → virtual_servo_driver / 真驱动
+  → 物理或仿真关节
+```
+
+**不得声称：** 理解了套接字就等于懂 EtherCAT；开了 FIFO 就等于硬实时；本机仿真已验收 PREEMPT_RT。
+
+**面试一句话**
+
+> 「内核管 CPU 谁跑；进程是程序实例，线程是进程里的工人；套接字是向内核借的通信口。我们仿真用普通调度 + DDS，真机控制热路径才用 FIFO 和 SocketCAN，两套路径不能混着吹。」
+
+### Q17：我现在学的（ROS 2 / 进程调度 / CANopen 用户态）和「嵌入式软硬件工程师」有什么区别？
+
+**核心原理解析**
+
+先分清三条岗位光谱，不要混成一个头衔：
+
+| 角色 | 主战场 | 典型交付物 |
+|---|---|---|
+| **嵌入式硬件工程师** | 原理图、PCB、电源、EMC、传感器选型 | Gerber、BOM、硬件 bring-up |
+| **嵌入式软件工程师** | MCU/RTOS、驱动、中断、外设寄存器、boot | Firmware、裸机/FreeRTOS 任务、驱动 |
+| **机器人系统 / 中间件工程师（你当前主线）** | Linux 用户态、ROS 2、控制栈、现场总线协议、多进程编排 | 节点、launch、`ros2_control` HAL、仿真闭环、数据管线 |
+
+**和你当前学习内容的对照**
+
+| 主题 | 你现在主要在练什么 | 经典嵌入式软/硬件更偏什么 |
+|---|---|---|
+| CPU / 调度 | Linux CFS vs FIFO、`nice`、进程/线程、DDS 反转 | MCU 主频、中断优先级、FreeRTOS 任务优先级、功耗模式 |
+| 通信 | ROS DDS Topic、SocketCAN **用户态**、Modbus 语义 Mock | UART/SPI/I2C 寄存器、CAN 控制器滤波、DMA、时序与电平 |
+| 控制 | `ros2_control` 阻抗环、Safety、DS402 **状态机语义** | 电流环/FOC 固件、PWM、编码器正交解码、ADC 采样 |
+| 验证环境 | MuJoCo + `vcan0` + launch 错峰 | 示波器、逻辑分析仪、烧录器、硬件在环 |
+| 你已有的嵌入式「邻接」 | `robot-state-monitor`：ESP32 双核任务骨架、STM32 IMU 链路（固件仓） | 那才是更接近嵌入式软件的日常；但不是 Panda 三仓主线的中心 |
+
+**重叠区（面试可以说「我沾过嵌入式边界」）**
+
+- CANopen DS402、Quick Stop、PDO/SDO 语义  
+- SocketCAN / 总线帧、急停到驱动器的闭环思维  
+- 实时路径上「别阻塞、独立 RX 线程、锁外 publish」  
+- 台架侧 UART / 电机 topic / FreeRTOS 双核分工（若讲 monitor 仓）
+
+**关键差异（不要把自己说成全职嵌入式硬件）**
+
+- 你主线多数时间在 **Linux 用户态 + ROS**，不是改 MCU 启动代码、写寄存器级 CAN 驱动或画板。  
+- `virtual_servo_driver` / Mock Modbus 是 **协议与系统集成仿真**，不等于已做量产固件或原理图。  
+- 嵌入式岗位常考：启动流程、链接脚本、中断延迟、看门狗、低功耗、硬件失效模式；你主线常考：节点边界、QoS、调度反转、控制栈分层、数据契约。
+
+**怎么表述更准（求职口径）**
+
+> 「我目前主线是机器人控制系统与中间件（ROS 2 + 现场总线协议层 + 仿真闭环）；在 HAL/总线语义和台架固件上与嵌入式软件有交叉，但不是以 MCU 驱动/硬件设计为主业。若目标嵌入式软件岗，需要补：RTOS 实战、外设驱动、示波器级联调与一份可展示的固件仓库深度。」
+
+**不得声称：** 已完成量产级嵌入式硬件设计；SocketCAN 用户态 = 已写 CAN 控制器驱动；仿真 DS402 = 真机伺服固件已交付。
+
+### Q18：在就业市场上，我这类背景大概落在哪一档？怎么投？
+
+**核心口径（与作品集冻结一致）**
+
+作品集对外主定位是：**具身策略的系统验证 / 评测工程 / 数据治理**（Not task success / Not Sim2Real / Not real robot）。  
+你最近补的内核调度、CANopen、进程通信，是在给这条主线加 **机器人中间件 / 控制栈深度**，不是改投「纯嵌入式硬件」赛道。
+
+**市场位置（光谱，不是精确薪资承诺）**
+
+```text
+匹配度高 ──────────────────────────────────────── 匹配度低
+验证/测试开发/评测工程
+具身数据 / Benchmark / 数据平台工程
+机器人软件 / ROS 中间件 / 系统集成
+算法工程（偏工程落地，非纯研究）
+────────────────────────────────
+嵌入式软件（需固件仓深度才有竞争力）
+嵌入式硬件 / 板级设计（当前证据不足）
+纯 LLM/CV 研究岗（缺论文与 SOTA 叙事）
+```
+
+| 岗位族 | 你的匹配逻辑 | 投递策略 |
+|---|---|---|
+| **系统验证 / 算法测试 / 评测工程** | 六层门禁、SHA 冻结、证伪指标、oracle 隔离——最强证据 | **主投**；简历用版本 A |
+| **具身数据 / Benchmark / Data-centric** | schema、immutable release、split 审计、统一报告信封 | **主投**；简历用版本 B |
+| **机器人软件 / ROS 系统集成** | 七层遥操作栈、Safety、ros2_control、CAN 语义、launch 调度 | **次主投**；强调中间件与集成，别吹真机量产 |
+| **具身算法工程（落地向）** | 有训练/LoRA/open-loop 证据，但结论是 Hold | 可投「工程向」；**禁止**写任务成功率 / 已 Sim2Real |
+| **嵌入式软件** | 仅台架固件 + 总线语义邻接 | **侧投**；必须补 RTOS/驱动作品，否则易被筛 |
+| **嵌入式硬件** | 基本不对口 | 不建议当主赛道 |
+
+**市场叙事怎么说才稳**
+
+- 热门赛道「具身智能」里，公司缺的往往不只是调模型的人，还有 **能把采集–契约–评测–止损做扎实的工程验证**——这正是你作品集的差异化。  
+- 传统「机器人软件工程师」池子更大，但同质化也高；你要用 **分层验证 + 诚实边界** 把自己从「会跑 ROS demo」里拉开。  
+- 相对纯嵌入式岗：你在 Linux/ROS 侧更强，在 MCU/板级更弱——薪资/JD 若写满 STM32/驱动/原理图，不要硬撞。
+
+**不得声称：** 已获某薪资档；已是「具身算法专家」；有真机量产交付；嵌入式硬件对口。
+
+### Q19：面试机会都偏内核/进程/通信，评测岗少、系统岗难转——是否该主攻底层？怎么讲作品集？
+
+**决策口径**
+
+可以、也应当 **把主叙事改成底层 / Linux 系统与实时路径**，若真实漏斗已经如此。作品集不丢，但角色从「评测工程师主页」改成：
+
+> **用机器人控制栈当底层能力的证据实验室**（进程调度、线程隔离、套接字/总线、阻塞与优先级），评测与数据契约降为 **加分的工程素养**，不再当作投递主标签。
+
+**主叙事（改后）**
+
+| 对外头衔倾向 | 你强调什么 | 作品集怎么用 |
+|---|---|---|
+| Linux / 机器人中间件 / 控制系统软件 | 调度、进程线程、通信、实时路径纪律 | 七层栈 + SocketCAN + FIFO 反转案例 + RealtimeBuffer |
+| 偏嵌入式软件（侧翼） | 总线协议、急停闭环、台架固件 | CANopen DS402 + `robot-state-monitor`；不吹画板 |
+
+**面试官爱问的底层题 → 你项目里的对应答法**
+
+| 经典题 | 用项目答（有代码） |
+|---|---|
+| 进程 vs 线程 | 多节点多进程；节点内 MultiThreadedExecutor / 控制环线程 |
+| 为什么会优先级反转 | 仿真 FIFO + DDS worker → 项目故意 `priority=0` / `prlimit` |
+| socket 是什么 | SocketCAN `PF_CAN` vs TCP `AF_INET` vs DDS Topic 三路拆开 |
+| 如何避免实时路径阻塞 | `RealtimeBuffer`、锁外 publish、CAN RX 超时独立线程 |
+| 如何给进程降权 | spawner `nice 19` + `ionice -c 3`、错峰 `TimerAction` |
+
+**主攻底层时优先补什么（按投入产出）**
+
+1. **已有证据讲透**（立刻可面试）：图 C/D/E/F + `chrt`/`ps -eLo` 实操口述  
+2. **Linux 系统编程加深**：`socket/bind`、非阻塞 I/O、`epoll` 概念、信号与僵尸进程、`pthread` vs 进程  
+3. **把 CAN 路径跑成可演示**：`use_sim:=false` + `candump vcan0` + E-Stop→Quick Stop  
+4. **（可选）嵌入式邻接**：ESP32/STM32 台架——只在 JD 偏固件时加厚  
+5. **先不要主攻**：写内核模块、PREEMPT_RT 定制内核、画原理图——缺硬件与周期时性价比低
+
+**评测故事怎么处理**
+
+- 简历主标题改「控制系统 / 中间件 / Linux 实时路径实践」  
+- 评测六层门禁缩成 **1–2 条**：「能把 interface 与 task GT 分开、会止损」——证明工程判断力，不抢主位  
+- 转行被问「为什么不做算法/评测」：答「市场与面试反馈导向底层；我用完整机器人栈证明能在真实多进程系统里落地」
+
+**风险与诚实边界**
+
+- 你仍是 **Linux 用户态 + 协议层** 强，不是内核开发者或量产固件负责人——自称「底层」时说清层级。  
+- 系统岗拿不到，往往缺的是 **可演示的阻塞/调度/总线排障故事**，不是再做一个评测框架。  
+- **不得声称：** 已做内核贡献；已 PREEMPT_RT 量产；纯凭仿真 FIFO 参数就等于硬实时工程师。
+
+### Q20：听说嵌入式很卷、应用层容易被 AI 替代——我主攻的「底层 / 中间件」处在什么位置？
+
+**分层看可替代性（粗光谱，不是精确预测）**
+
+| 层 | 典型工作 | 卷度 / 可替代性 | 说明 |
+|---|---|---|---|
+| **薄应用层** | CRUD、简单业务 API、胶水脚本、套模板调模型 | 人多；**AI 辅助写码替代感最强** | 交付可被「生成代码 + 快速迭代」压缩 |
+| **你主攻的带** | Linux 用户态系统、多进程编排、实时路径纪律、现场总线协议、控制/安全闭环 | 岗位比应用层少；**纯靠聊天生成很难端到端负责** | 要上机、抓总线、看调度、背安全后果 |
+| **深嵌入式 / 板级** | MCU 驱动、FOC、原理图、EMC、功能安全认证 | **入门卷、中高级门槛高** | 坑位有限；无硬件作品难进 |
+
+**对你当前方向的诚实判断**
+
+1. **不是「最卷的那一档嵌入式」**：你主攻的是 Linux/ROS 中间件与控制路径，不是海量大专/转行挤的入门 STM32 灯闪烁赛道。  
+2. **也不是「应用层里最先被 AI 抹平的那一档」**：优先级反转、CAN 急停、多进程卡死、仿真/真机路径分叉——这些要现场证据与责任边界，AI 能帮写片段，很难替你签字负责。  
+3. **真正的风险不在「AI 写完你的工作」，而在**：岗位绝对数量少于应用层；转行要过操作系统/通信基础关；若只会背概念、演示不出 `candump`/`chrt`/排障故事，一样会被刷。  
+4. **AI 对你的影响更像工具放大器**：会底层的人用 AI 写样板更快；不会底层的人用 AI 更容易在面试连环追问里露馅。
+
+**一句话定位**
+
+> 我选的是「物理与实时约束下的系统软件」中间带：比薄应用层更难被 AI 整体替代，比纯嵌入式硬件更好用现有 Linux/机器人栈积累证据；代价是坑少、要能演示，不能只靠简历关键词。
+
+### Q21：是不是每个具身智能企业都需要「底层 / 中间件 / 控制栈」这种人？
+
+**直接结论：不是。** 具身是产品类别，不是统一编制；要不要你，看阶段、形态和是否自研本体。
+
+| 企业类型 | 底层/中间件需求 | 更缺什么 |
+|---|---|---|
+| **算法/模型创业早期**（租臂、调 VLA、发 demo） | 弱～中；常外包或一人兼 | 数据、训练、demo 叙事 |
+| **做评测/数据平台/仿真 SaaS** | 中；要契约与集成，未必深 CAN | 评测、数据、云与工具链 |
+| **整机/人形/工业臂量产向** | **强**；控制、总线、安全、量产固件 | 控制、嵌入式、系统集成、测试 |
+| **应用集成商**（客户现场上臂） | 中～强；现场通信与稳定性 | 集成、交付、运维 |
+| **只做云端脑、卖 API** | 弱 | 模型与服务稳定性 |
+
+**对你的含义**
+
+- 不要假设「具身热 = 家家都要招我这种底层」——很多团队编制在 **算法 / 数据 / 产品**。  
+- 你的机会更集中在：**自研本体、要上真机/产线、要安全与实时路径** 的公司，以及算法团队里那个「能把模型接到控制系统上」的稀缺坑。  
+- 投递前读 JD：若满屏大模型/论文、几乎无 ROS/控制/总线 → 匹配度低；若写控制栈、中间件、实时、现场总线、系统集成 → 才是主战场。
+
+**面试一句话**
+
+> 「不是每家具身公司都要底层编制；我锚定的是要把策略接到真实控制与通信边界上的团队，而不是纯云端模型组。」
+
+### Q22：如果不是机器人 / 具身企业，还有哪些地方常用「进程调度 + 套接字/总线 + 控制路径」这套？
+
+**直接结论：** ROS 2 本身在非机器人公司并不普遍；但你练的 **Linux 多进程、实时路径纪律、SocketCAN/Modbus、安全急停思维** 在工业与交通装备里很常见。投非机器人时，要把简历从「ROS 作品集」改写成「工业通信与控制系统软件」。
+
+| 行业 / 企业类型 | 常用什么（与你重叠） | ROS 多不多 | 怎么改表述 |
+|---|---|---|---|
+| **工业自动化 / 运动控制 / 伺服与 PLC 生态** | CANopen、EtherCAT、Modbus、实时 Linux、力矩/位置环 | 少 | 强调 DS402、总线、控制周期、急停 |
+| **新能源车 / 充电桩 / 电池与储能 BMS** | CAN、诊断、网关、Linux 边缘 | 几乎无 | 强调 CAN 帧、节点管理、可靠性 |
+| **AGV / 仓储物流设备**（常不算「具身大模型」） | 车载 Linux、CAN/以太网、调度与安全 | 部分有 | 中间件 + 现场总线 + 运维链路 |
+| **数控 / 半导体设备 / 包装与检测机** | 实时控制、现场总线、多进程采集 | 少 | 强调周期任务、I/O、故障安全 |
+| **电梯 / 轨交 / 医疗设备软件**（门槛高） | 安全规范、看门狗、冗余通信 | 少 | 强调 Safety 锁存、诊断、生命周期 |
+| **工业物联网网关 / SCADA 边缘** | MQTT、Modbus、TCP、进程守护 | 无 | 强调套接字、协议转换、降权与保活 |
+| **纯互联网 / 普通业务后端** | 进程线程、TCP | — | 重叠薄；别硬靠机器人项目撞 |
+
+**投递策略**
+
+- **高重叠非机器人**：运动控制、工业通信、充电/BMS、设备软件、IIoT 网关。  
+- **中重叠**：AGV、自动化产线集成。  
+- **低重叠**：纯云业务、纯大模型应用——你的差异化用不上。  
+- 简历关键词优先：**CANopen/DS402、SocketCAN、Modbus、实时路径、多进程、急停/故障安全**；ROS/MuJoCo 写成「验证环境」，不要当非机器人 JD 的第一行。
+
+**面试一句话**
+
+> 「非机器人公司很少要 ROS，但很多工业与交通装备要同一类能力：Linux 上的周期控制、CAN/Modbus 和故障安全；我的项目是在仿真里把这套链路跑完整。」
+
+### Q23：自动化专业背景，底层系统软件 vs 嵌入式 vs 应用软件——入门门槛谁高？对其他专业呢？
+
+**先纠正一个常见误会**
+
+很多自动化本科生会说：「我本科也没学什么工控。」——**这往往是实话。**  
+课表里常见的是控制原理、电机、传感、一点点 PLC/组态或总线概念；真正的产线联调、CANopen 量产、实时 Linux，多数要靠实习、项目或工作后才碰到。  
+所以「自动化红利」**不是**「毕业就会工控」，而是：
+
+> 比纯 CS/纯应用转行，你对 **控制闭环、传感器、执行器、周期、安全** 的语感更近；  
+> 真正够面试用的工控/总线证据，要靠 **项目补**，不能靠文凭自动生效。
+
+**三向门槛（对自动化学生，按「课内够不够」诚实估）**
+
+| 方向 | 课内通常够不够 | 主要要补什么 | 相对谁 |
+|---|---|---|---|
+| **应用软件** | 往往不够 | 算法与工程框架 | CS 更熟；你靠项目可追 |
+| **底层系统软件**（Linux + 通信 + 控制路径） | 课内只给语感；**项目才是主证据** | OS/进程线程、套接字；用项目把「控制思维」接到 Linux | 比纯应用更能复用专业直觉；比深嵌入式少板级硬门槛 |
+| **嵌入式软/硬件** | 课内多半也不够 | MCU/RTOS/寄存器；硬件还要电路 | 电子更贴硬件；自动化不等于会嵌 |
+
+**和其他专业比**
+
+| 专业 | 应用软件 | 底层系统软件 | 嵌入式 |
+|---|---|---|---|
+| **计算机** | 入门最顺 | OS 更熟，缺机电/闭环直觉 | 能学驱动，缺机电 |
+| **自动化（课内偏理论）** | 不占优 | **直觉略近，证据靠项目** | 不自动等于会嵌 |
+| **电子** | 通常不顺 | 可碰驱动/通信 | 硬件/MCU 更顺 |
+
+**对你怎么讲才不心虚**
+
+- 别说：「我自动化科班，工控很熟。」  
+- 改说：「本科自动化给的是控制与机电语境；现场总线和 Linux 调度是我在遥操作/仿真栈里自己补齐并跑通的。」  
+- 你的作品集（CANopen、Safety、进程调度）**就是在补课内缺口**——面试官要的是这个，不是成绩单上的「过程控制」课名。
+
+**面试一句话**
+
+> 「自动化本科未必教透工控，我也不装课内就会；优势是控制闭环直觉比纯软转行近，总线和 Linux 系统能力是用完整项目补上的。」
+
+### Q24：嵌入式和应用层培训班转行人很多——我这个「底层系统软件 / 工控中间件」会不会也这样？
+
+**直接结论：会碰到转行，但很难出现应用层那种「培训班流水线同质化海投」；风险主要在稀缺坑位上的竞争，不在人数绝对值。**
+
+| 方向 | 培训班供给 | 典型同质化产物 | 你方向的情况 |
+|---|---|---|---|
+| **应用软件** | 极多 | CRUD、前端模板、业务接口 | 海投+简历撞车最严重 |
+| **入门嵌入式** | 多 | STM32 点灯/外设实验、简单 RTOS demo | 「嵌入式很卷」的重要来源 |
+| **你主攻带**（Linux 用户态 + 进程通信 + CAN/Modbus + 控制/安全路径） | **少且难标准化** | 偶有「ROS 速成」「机器人工程师」班 | 绝对人数少；**若只写 ROS 关键词会撞速成班** |
+
+**为什么培训班不太容易灌满你这条带**
+
+1. 难在 2–3 个月量产：多进程调度、总线联调、急停闭环、优先级反转——要长时间排障，不好做成统一作业包。  
+2. 企业招人少，培训机构更爱推向应用层 / 入门 MCU（更好卖课、更好包装就业率）。  
+3. 面试爱追问 OS/通信原理 + 现场现象；背题过关、深挖露馅的比例高。
+
+**你仍会遇到的竞争来源（不是零）**
+
+- 「ROS / 机器人」短期班学员（简历关键词像，系统深度弱）  
+- 嵌入式培训转行者往上贴「底层」标签  
+- 计算机科班做 Linux/网络方向的人（OS 基础往往更硬）
+
+**怎么避开「培训班撞车感」**
+
+- 简历少用空泛「熟悉 ROS」当第一行；多用 **SocketCAN / DS402 / 调度反转案例 / 急停闭环 / 可复现命令**。  
+- 面试带 **可演示排障**（`chrt`、`candump`、仿真关 FIFO 的原因），这是速成班最难批量复制的。  
+- 自动化背景给的是控制/机电语境（哪怕课内偏理论）；真正差异化靠项目里的总线与调度证据，别吹「科班工控」。
+
+**面试一句话**
+
+> 「应用层和入门嵌入式确实被培训班灌满了；我这条要长时间把控制、总线和 Linux 调度跑通，培训班难量产。竞争在坑少，不在人海——所以必须靠可演示的系统证据，而不是关键词。」

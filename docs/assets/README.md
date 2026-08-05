@@ -4,6 +4,13 @@ PNG 标题使用 **Fig. 1–9**（matplotlib 英文字体）；HTML 报告使用
 
 对齐命令：`python3 scripts/regenerate_all_reports.py` → 产出 `docs/samples/report-manifest.json`
 
+## Panda 三仓 README 当前配图
+
+| 文件 | 用途与边界 |
+|------|------------|
+| `readme_three_repo_overview.svg` | 三仓统一职责总览；canonical 源在中游，不能作为任务成功、Sim2Real 或实体硬件验收证据 |
+| `hoc-runtime-four-lane-dashboard.png` | Panda HOC 四泳道真实前端截图；展示 HOLD 与 Task GT `UNAVAILABLE`，不代表 learned policy 或功能安全通过 |
+
 | 图号 | 文件 | 报告 |
 |------|------|------|
 | 图 1 | `dual-repo-integration-overview.png` | 双仓库架构 |

@@ -15,6 +15,7 @@
 | --- | --- |
 | [项目 README](../../README.md) | 下游 replay harness · monitor · risk · HOC |
 | [INTERVIEW_PREP.md](./INTERVIEW_PREP.md) | 面试 FAQ（系统级调试与原理） |
+| [RUNTIME_KERNEL_PROCESS_COMM_LEARNING.md](./RUNTIME_KERNEL_PROCESS_COMM_LEARNING.md) | 内核 / 进程线程 / 通信图解学习笔记（图 A–F） |
 | [ACCEPTANCE_SUMMARY.md](./ACCEPTANCE_SUMMARY.md) | FR/NFR 验收与边界 |
 | [CODE_WALKTHROUGH.md](./CODE_WALKTHROUGH.md) | 源码导览 |
 | [EVIDENCE_INDEX.md](./EVIDENCE_INDEX.md) | 本仓证据索引 |
